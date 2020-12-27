@@ -1,6 +1,18 @@
 import statsmodels.api as sm
 import pandas as pd
+import numpy as np
 from itertools import chain, combinations
+from tqdm import tqdm
+
+
+def bootstrapper(comb_var):
+    samp_df = comb_var[np.random.choice(comb_var.shape[0], 800, replace=True)]
+    # @TODO generalize the frac to the function call
+    Y = samp_df[:, 0]
+    X = samp_df[:, 1:]
+    beta = np.dot(np.linalg.inv(np.dot(X.T, X)), np.dot(X.T, Y))
+    return beta[0]#model.params[0], model.pvalues[0], model.bic
+    # @TODO generalise this
 
 
 def get_mspace(varnames) -> list:
@@ -22,16 +34,30 @@ def run_ols_sm(y, x):
     return model.params[0]
 
 
-def make_robust(union_y, union_x, union_control, space):
-    beta_mat = pd.DataFrame(index=range(0, len(space)),
-                            columns=range(0, len(space)))
-    ic_mat = pd.DataFrame(index=range(0, len(space)),
-                          columns=range(0, len(space)))
-    p_mat = pd.DataFrame(index=range(0, len(space)),
-                         columns=range(0, len(space)))
-    for spec in space:
-        comb_var = pd.merge(union_x, union_control[list(space)],
-                           how='left', left_index=True,
-                           right_index=True)
+def make_robust(y, x, control,
+                space, info, straps=1000):
+    beta = np.empty([len(space), straps])
+    ic = np.empty([len(space), straps])
+    p = np.empty([len(space), straps])
+    for spec in tqdm(range(len(space))):
+        if spec == 0:
+            comb_var = x
+        else:
+            comb_var = pd.merge(x,
+                                control[list(space[spec])],
+                                how='left', left_index=True,
+                                right_index=True)
+        comb_var = pd.merge(y, comb_var,
+                            how='left', left_index=True,
+                            right_index=True)
         comb_var.loc[:, 'constant'] = 1
-    return beta_mat, ic_mat, p_mat
+        beta_list=[]
+#        p_list=[]
+#        ic_list=[]
+        for boot in range(straps):
+            beta_out = bootstrapper(comb_var.to_numpy())
+            beta_list.append(beta_out)
+        beta[:, spec] = beta_list
+#        p[:, spec] = p_list
+#        ic[:, spec] = ic_list
+    return beta
