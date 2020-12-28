@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from load_data import load_union_data
+from load_data import load_union_data, save_union_data
 from analysis import run_ols_sm, get_mspace, make_robust
 
 
@@ -14,8 +14,7 @@ def run_union_example(d_path):
     model_space = get_mspace(control_list)
     beta, p, aic, bic = make_robust(y, x, c, model_space,
                                     'bic', len(model_space))
-    np.savetxt(os.path.join(d_path, 'output', 'union', 'union_betas.csv'),
-               beta, delimiter=",")
+    save_union_data(beta, p, aic, bic, d_path)
 
 
 def main():

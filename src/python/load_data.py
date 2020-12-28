@@ -3,6 +3,18 @@ import os
 import numpy as np
 
 
+def save_union_data(beta, p, aic, bic, d_path):
+    union_out = os.path.join(d_path, 'output', 'union')
+    np.savetxt(os.path.join(union_out, 'union_betas.csv'),
+               beta, delimiter=",")
+    np.savetxt(os.path.join(union_out, 'union_p.csv'),
+               p, delimiter=",")
+    np.savetxt(os.path.join(union_out, 'union_aic.csv'),
+               aic, delimiter=",")
+    np.savetxt(os.path.join(union_out, 'union_bic.csv'),
+               bic, delimiter=",")
+
+
 def load_union_data(d_path):
     union_df = pd.read_stata(os.path.join(d_path,
                                           'nlsw88.dta'))
