@@ -9,12 +9,11 @@ from joblib import Parallel, delayed
 
 class Ols:
     """
-    Doc: Class for multi-variate regression using OLS
-    Input:
-        y = dependent variable
-        x = independent variables
+    Class for multi-variate regression using OLS
+    Input: y = dependent variable
+           x = independent variables
     Output:
-        self = an object containing the key metrics
+           self = an object containing the key metrics
 
     """
     def __init__(self, y, x):
@@ -33,15 +32,15 @@ class Ols:
         self.df_e = self.nobs - self.ncoef  # degrees of freedom, error
         self.df_r = self.ncoef - 1  # degrees of freedom, regression
         self.e = self.y - np.dot(self.x, self.b)  # residuals
-        self.sse = np.dot(self.e, self.e) / self.df_e  # SSE
+        self.sse = np.dot(self.e.T, self.e) / self.df_e  # SSE
         self.se = np.sqrt(np.diagonal(self.sse * self.inv_xx))  # coef. standard errors
         self.t = self.b / self.se  # coef. t-statistics
         self.p = (1 - scipy.stats.t.cdf(abs(self.t), self.df_e)) * 2  # coef. p-values
         self.R2 = 1 - self.e.var() / self.y.var()  # model R-squared
         self.R2adj = 1 - (1 - self.R2) * ((self.nobs - 1) / (self.nobs - self.ncoef))  # adjusted R-square
-        self.ll = -(self.nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (self.nobs / 2) * np.log(np.dot(self.e, self.e) / self.nobs)
-        self.aic = -2 * self.ll / self.nobs + (2 * self.ncoef / self.nobs)
-        self.bic = -2 * self.ll / self.nobs + (self.ncoef * np.log(self.nobs)) / self.nobs
+        self.ll = -(self.nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (self.nobs / 2) * np.log(np.dot(self.e.T, self.e) / self.nobs)
+        self.aic = (-2 * self.ll) + (2 * self.ncoef)
+        self.bic = (-2 * self.ll) + (self.ncoef * np.log(self.nobs))
         return self
 
 
@@ -64,10 +63,18 @@ def get_mspace(varnames) -> list:
     return model_space
 
 
-def run_ols_sm(y, x):
+def run_full_ols(y, x):
     x.loc[:, 'constant'] = 1
     model = sm.OLS(y, x, hasconst=True).fit()
+    results = Ols(pd.DataFrame(y).iloc[:,0].to_numpy(), x.iloc[:,:].to_numpy())
+    print('***********Printing sm.OLS Results**************\n')
     print(model.summary())
+    print('***********Printing Class Ols Results**************\n')
+    print('Our implementation for beta: ', results.b[0])
+    print('Our implementation for p: ', results.p[0])
+    print('Our implementation for aic: ', results.aic)
+    print('Our implementation for bic: ', results.bic)
+    print('Our implementation for ll: ', results.ll)
     return model.params[0]
 
 
