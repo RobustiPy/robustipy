@@ -78,7 +78,7 @@ def run_full_ols(y, x):
     return model.params[0]
 
 
-def make_robust(y, x, c, space, info='bic', s=1000):
+def make_robust(y, x, c, space, info='bic', s=100):
     beta = np.empty([len(space), s])
     p = np.empty([len(space), s])
     aic = np.empty([len(space), s])

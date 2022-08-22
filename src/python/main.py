@@ -12,9 +12,9 @@ def run_union_example(d_path):
                              right_index=True))
     control_list = c.columns.to_list()
     model_space = get_mspace(control_list)
-    beta, p, aic, bic, ll = make_robust(y, x, c, model_space,
+    beta, p, aic, bic = make_robust(y, x, c, model_space,
                                         len(model_space))
-    save_union_data(beta, p, aic, bic, ll, d_path)
+    save_union_data(beta, p, aic, bic, d_path)
 
 
 def main():

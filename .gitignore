@@ -135,3 +135,9 @@ dmypy.json
 /.idea/robcersta.iml
 /.idea/vcs.xml
 /src/python/test
+
+#user defined
+*.csv
+bin/
+lib64
+pyvenv.cfg

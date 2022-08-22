@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 
-def save_union_data(beta, p, aic, bic, ll, d_path):
+def save_union_data(beta, p, aic, bic, d_path):
     union_out = os.path.join(d_path, 'output', 'union')
     np.savetxt(os.path.join(union_out, 'union_betas.csv'),
                beta, delimiter=",")
@@ -13,8 +13,8 @@ def save_union_data(beta, p, aic, bic, ll, d_path):
                aic, delimiter=",")
     np.savetxt(os.path.join(union_out, 'union_bic.csv'),
                bic, delimiter=",")
-    np.savetxt(os.path.join(union_out, 'union_ll.csv'),
-               ll, delimiter=",")
+    #np.savetxt(os.path.join(union_out, 'union_ll.csv'),
+    #           ll, delimiter=",")
 
 
 def load_union_data(d_path):
