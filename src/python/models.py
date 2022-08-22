@@ -6,6 +6,7 @@ import numpy as np
 from itertools import chain, combinations
 from tqdm import tqdm
 from joblib import Parallel, delayed
+from figures import main_figure
 
 
 class OLSRobust(Protomodel):
@@ -77,4 +78,8 @@ class OLSRobust(Protomodel):
         self.__estimate(samp_df[:, 0], samp_df[:, 1:])
         return self.b[0], self.p[0], self.aic, self.bic
 
-    
+    def summary(self):
+        pass
+
+    def plot(self):
+        main_figure(results)
