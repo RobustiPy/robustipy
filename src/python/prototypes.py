@@ -18,6 +18,12 @@ class Protomodel(ABC):
         # Public method to fit model
         pass
 
+
+class Protoresult(ABC):
+    """
+    Prototype class for results object, intended to be used in inheritance,
+    not to be called.
+    """
     @abstractmethod
     def summary(self):
         # Public method to print summary
@@ -27,4 +33,4 @@ class Protomodel(ABC):
     def plot(self):
         # Public method to plot general results
         pass
-
+        
