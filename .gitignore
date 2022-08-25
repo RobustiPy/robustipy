@@ -135,3 +135,10 @@ dmypy.json
 /.idea/robcersta.iml
 /.idea/vcs.xml
 /src/python/test
+
+# project specific
+*~
+bin/
+lib64
+share/
+pyvenv.cfg
