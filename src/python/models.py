@@ -7,6 +7,7 @@ from itertools import chain, combinations
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from .figures import main_figure
+from .utils import simple_ols
 
 
 class OLSRobust(Protomodel):
@@ -49,27 +50,8 @@ class OLSRobust(Protomodel):
         return beta, p, aic, bic
     
     def _estimate(self, y, x):
-        # Internal method for stimation
-        # TODO: Review if this shouod in seprate module
-        inv_xx = np.linalg.inv(np.dot(x.T, x))
-        xy = np.dot(x.T, y)
-        b = np.dot(inv_xx, xy)  # estimate coefficients
-        nobs = y.shape[0]  # number of observations
-        ncoef = x.shape[1]  # number of coef.
-        df_e = nobs - ncoef  # degrees of freedom, error
-        df_r = ncoef - 1  # degrees of freedom, regression
-        e = y - np.dot(x, b)  # residuals
-        sse = np.dot(e.T, e) / df_e  # SSE
-        se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
-        t = b / se  # coef. t-statistics
-        p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
-        R2 = 1 - e.var() / y.var()  # model R-squared
-        R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
-        ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
-                   * np.log(np.dot(e.T, e) / nobs))
-        aic = (-2 * ll) + (2 * ncoef)
-        bic = (-2 * ll) + (ncoef * np.log(nobs))
-        return b, p, aic, bic 
+        output = simple_ols(y, x)
+        return output
 
     def _strap(self, comb_var):
         # Internal method for boostraing
