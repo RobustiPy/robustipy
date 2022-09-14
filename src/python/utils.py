@@ -29,7 +29,11 @@ def simple_ols(y, x) -> dict:
           * np.log(np.dot(e.T, e) / nobs))
     aic = (-2 * ll) + (2 * ncoef)
     bic = (-2 * ll) + (ncoef * np.log(nobs))
-    return {'b': b, 'p': p, 'aic': aic, 'bic': bic}
+    return {'b': b,
+            'p': p,
+            'll': ll,
+            'aic': aic,
+            'bic': bic}
 
 
 def scipy_ols(y, x):

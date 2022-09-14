@@ -51,7 +51,11 @@ class OLSRobust(Protomodel):
     
     def _estimate(self, y, x):
         output = simple_ols(y, x)
-        return output
+        b = output['b']
+        p = output['p']
+        aic = output['aic']
+        bic = output['bic']
+        return b, p, aic, bic
 
     def _strap(self, comb_var):
         # Internal method for boostraing

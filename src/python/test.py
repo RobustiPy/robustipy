@@ -37,11 +37,9 @@ model_space = get_mspace(control_list)
 
 myrobust = OLSRobust(x, y)   
 
-myrobust.fit(c=c, space=model_space)
-
-beta, p, aic, bic, ll = make_robust(y, x, c, model_space,
-                                    len(model_space))
+beta, p, aic, bic = myrobust.fit(c=c, space=model_space, s=100)
 
 
-myrobust.
+########
+
 
