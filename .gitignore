@@ -136,9 +136,13 @@ dmypy.json
 /.idea/vcs.xml
 /src/python/test
 
-# project specific
-*~
+#user defined
+*.csv
 bin/
 lib64
-share/
 pyvenv.cfg
+*~
+share/
+*.dta
+*.ipynb
+etc/
