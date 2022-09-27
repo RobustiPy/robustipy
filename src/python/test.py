@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from itertools import chain, combinations
 from src.python.models import OLSRobust
+import warnings
+warnings.filterwarnings("ignore")
 
 union_df = pd.read_stata('./data/input/nlsw88.dta')
 
@@ -37,9 +39,35 @@ model_space = get_mspace(control_list)
 
 myrobust = OLSRobust(x, y)   
 
-beta, p, aic, bic = myrobust.fit(c=c, space=model_space, s=100)
+beta, p, aic, bic = myrobust.fit(c=c, space=model_space, s=100, mode='simple')
 
 
 ########
 
 
+ASC_df = pd.read_stata('CleanData_LASpending.dta', convert_categoricals=False)
+
+one_hot = pd.get_dummies(ASC_df['year'])
+ASC_df = ASC_df.join(one_hot)
+ASC_df = ASC_df.set_index(['pidp','year'])
+ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew']*ASC_df['lrealgs']
+ASC_df['constant'] = 1
+y = ASC_df['wellbeing_kikert']
+x = ASC_df['lrealgs']
+c = ASC_df[['dcareNew*c.lrealgs',
+            'dcareNew',
+            'DR',
+            'lgva',
+            'hhsize',
+            'work',
+            'retired',
+            2005.0,
+            ]]
+
+control_list = c.columns.to_list()
+model_space = get_mspace(control_list)
+
+myrobust_panel = OLSRobust(x, y)
+beta, p, aic, bic = myrobust_panel.fit(c=c, space=model_space, s=10, mode='panel')
+
+pd.DataFrame(beta)

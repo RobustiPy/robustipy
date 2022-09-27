@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import scipy
-
+from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS estimates
 
 def simple_ols(y, x) -> dict:
     x = np.asarray(x)
@@ -38,3 +38,26 @@ def simple_ols(y, x) -> dict:
 
 def scipy_ols(y, x):
     pass
+
+
+def panel_ols(y, x):
+    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
+        raise ValueError("Inputs must not be empty.")
+    mod = PanelOLS(y,
+                   x,
+                   entity_effects=True,
+                   drop_absorbed=True)
+    res = mod.fit(cov_type='clustered',
+                  cluster_entity=True)
+    nobs = y.shape[0]  # number of observations
+    ncoef = x.shape[1]  # number of coef.
+    ll = res.loglik
+    aic = (-2 * ll) + (2 * ncoef)
+    bic = (-2 * ll) + (ncoef * np.log(nobs))
+    p = res.pvalues
+    b = res.params
+    return {'b': b,
+            'p': p,
+            'll': ll,
+            'aic': aic,
+            'bic': bic}
