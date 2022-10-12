@@ -1,13 +1,11 @@
-from .prototypes import Protomodel
+from prototypes import Protomodel
 import statsmodels.api as sm
 import scipy
 import pandas as pd
 import numpy as np
-from itertools import chain, combinations
 from tqdm import tqdm
 from joblib import Parallel, delayed
-from .figures import main_figure
-from .utils import simple_ols, panel_ols
+from utils import simple_ols, panel_ols
 
 
 class OLSRobust(Protomodel):
