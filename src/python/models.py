@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed
-from src.python.utils import simple_ols, panel_ols
+from src.python.utils import simple_ols, panel_ols, space_size, all_subsets
 
 
 class OLSRobust(Protomodel):
@@ -33,7 +33,6 @@ class OLSRobust(Protomodel):
 
     def fit(self,
             controls,
-            space,
             info='bic',
             samples=1000,
             mode='simple'):
@@ -47,9 +46,6 @@ class OLSRobust(Protomodel):
         controls : Data.Frame
                 Pandas data frame containing the all the possible
                 control variables of the model.
-        space : generator/list
-             Generator or list containing all the possible
-             combinations of control variables.
         info : str
             Type of information criteria to be included in the
             output. Defaults to 'bic'.
@@ -72,30 +68,35 @@ class OLSRobust(Protomodel):
         bic : Array
            Numpy array containing aic values for estimated models.
         """
-        beta = np.empty([len(space), samples])
-        p = np.empty([len(space), samples])
-        aic = np.empty([len(space), samples])
-        bic = np.empty([len(space), samples])
-        for spec in tqdm(range(len(space))):
-            if spec == 0:
+
+        vars_names = list(controls.columns.values)
+        space_n = space_size(vars_names)
+        beta = np.empty([space_n, samples])
+        p = np.empty([space_n, samples])
+        aic = np.empty([space_n, samples])
+        bic = np.empty([space_n, samples])
+
+        for spec, _ in zip(all_subsets(vars_names), tqdm(range(space_n))):
+            if len(spec) == 0:
                 comb = self.x
             else:
-                comb = pd.merge(self.x, controls[list(space[spec])],
+                comb = pd.merge(self.x, controls[list(spec)],
                                 how='left', left_index=True,
                                 right_index=True)
             comb = pd.merge(self.y, comb, how='left', left_index=True,
                             right_index=True)
             comb.loc[:, 'constant'] = 1
-            #comb = comb.to_numpy()
-            b_list, p_list, aic_list, bic_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap)(comb, mode)
-                                                                           for i in range(0, samples))))
+
+            b_list, p_list, aic_list, bic_list = (zip(*Parallel(n_jobs=-1)
+                                                      (delayed(self._strap)(comb, mode)
+                                                       for i in range(0, samples))))
             beta[spec, :] = b_list
             p[spec, :] = p_list
             aic[spec, :] = aic_list
             bic[spec, :] = bic_list
         return beta, p, aic, bic
 
-    def _estimate(self, y, x, mode):     
+    def _estimate(self, y, x, mode):
         if mode == 'simple':
             output = simple_ols(y, x)
         elif mode == 'panel':
@@ -116,4 +117,3 @@ class OLSRobust(Protomodel):
                                         samp_df.iloc[:, 1:],
                                         mode)
         return b[0], p[0], aic, bic
-

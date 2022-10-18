@@ -1,21 +1,32 @@
 # Module containing utility functions for the library
 
 import numpy as np
+import math
 import scipy
 import os
 from itertools import chain, combinations
 from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS estimates
 
+
+def space_size(iterable):
+    n = len(iterable)
+    n_per_iter = list(map(lambda x:
+                          math.factorial(n) / math.factorial(x) / math.factorial(n-x),
+                          range(0, n + 1)))
+    return round((sum(n_per_iter)))
+
+
+def all_subsets(ss):
+    return chain(*map(lambda x: combinations(ss, x),
+                      range(0, len(ss) + 1)))
+
+
 def get_mspace(varnames) -> list:
     model_space = []
-
-    def all_subsets(ss):
-        return chain(*map(lambda x: combinations(ss, x),
-                          range(0, len(ss) + 1)))
-
     for subset in all_subsets(varnames):
         model_space.append(subset)
     return model_space
+
 
 def simple_ols(y, x) -> dict:
     x = np.asarray(x)
@@ -74,6 +85,7 @@ def panel_ols(y, x):
             'aic': aic,
             'bic': bic}
 
+
 def save_myrobust(beta, p, aic, bic, d_path, example_name):
     d_path = os.path.join(d_path, example_name)
 
@@ -88,3 +100,4 @@ def save_myrobust(beta, p, aic, bic, d_path, example_name):
                aic, delimiter=",")
     np.savetxt(os.path.join(d_path, 'bic.csv'),
                bic, delimiter=",")
+
