@@ -76,7 +76,8 @@ class OLSRobust(Protomodel):
         aic = np.empty([space_n, samples])
         bic = np.empty([space_n, samples])
 
-        for spec, _ in zip(all_subsets(vars_names), tqdm(range(space_n))):
+        for spec, index in zip(all_subsets(vars_names),
+                               tqdm(range(1, space_n))):
             if len(spec) == 0:
                 comb = self.x
             else:
@@ -87,13 +88,14 @@ class OLSRobust(Protomodel):
                             right_index=True)
             comb.loc[:, 'constant'] = 1
 
-            b_list, p_list, aic_list, bic_list = (zip(*Parallel(n_jobs=-1)
-                                                      (delayed(self._strap)(comb, mode)
-                                                       for i in range(0, samples))))
-            beta[spec, :] = b_list
-            p[spec, :] = p_list
-            aic[spec, :] = aic_list
-            bic[spec, :] = bic_list
+            b_list, p_list, aic_list, bic_list = (
+                zip(*Parallel(n_jobs=-1)(delayed(self._strap)
+                                         (comb, mode)
+                                         for i in range(0, samples))))
+            beta[index, :] = b_list
+            p[index, :] = p_list
+            aic[index, :] = aic_list
+            bic[index, :] = bic_list
         return beta, p, aic, bic
 
     def _estimate(self, y, x, mode):

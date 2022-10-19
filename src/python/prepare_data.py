@@ -1,7 +1,6 @@
-import os
 import pandas as pd
-from utils import get_mspace
 import numpy as np
+
 
 def prepare_union(path_to_union):
     union_df = pd.read_stata(path_to_union)
@@ -27,8 +26,7 @@ def prepare_union(path_to_union):
     c = union_df[indep_list]
     x = pd.DataFrame(union_df['union'])
     control_list = c.columns.to_list()
-    model_space = get_mspace(control_list)
-    return y, c, x, control_list, model_space
+    return y, c, x, control_list
 
 
 def prepare_asc(asc_path):
@@ -51,5 +49,4 @@ def prepare_asc(asc_path):
                 ]]
 
     control_list = c.columns.to_list()
-    model_space = get_mspace(control_list)
-    return y, c, x, control_list, model_space
+    return y, c, x, control_list

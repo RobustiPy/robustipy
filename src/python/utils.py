@@ -11,7 +11,8 @@ from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS esti
 def space_size(iterable):
     n = len(iterable)
     n_per_iter = list(map(lambda x:
-                          math.factorial(n) / math.factorial(x) / math.factorial(n-x),
+                          math.factorial(n) / math.factorial(x)
+                          / math.factorial(n-x),
                           range(0, n + 1)))
     return round((sum(n_per_iter)))
 
@@ -21,19 +22,12 @@ def all_subsets(ss):
                       range(0, len(ss) + 1)))
 
 
-def get_mspace(varnames) -> list:
-    model_space = []
-    for subset in all_subsets(varnames):
-        model_space.append(subset)
-    return model_space
-
-
 def simple_ols(y, x) -> dict:
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
         raise ValueError("Inputs must not be empty.")
-    
+
     inv_xx = np.linalg.inv(np.dot(x.T, x))
     xy = np.dot(x.T, y)
     b = np.dot(inv_xx, xy)  # estimate coefficients
@@ -100,4 +94,3 @@ def save_myrobust(beta, p, aic, bic, d_path, example_name):
                aic, delimiter=",")
     np.savetxt(os.path.join(d_path, 'bic.csv'),
                bic, delimiter=",")
-
