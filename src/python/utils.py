@@ -4,6 +4,7 @@ import numpy as np
 import math
 import scipy
 import os
+import pandas as pd
 from itertools import chain, combinations
 from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS estimates
 
@@ -94,3 +95,11 @@ def save_myrobust(beta, p, aic, bic, d_path, example_name):
                aic, delimiter=",")
     np.savetxt(os.path.join(d_path, 'bic.csv'),
                bic, delimiter=",")
+
+def load_myrobust(d_path):
+    d_path = os.path.join(d_path)
+    beta = pd.read_csv(os.path.join(d_path, 'betas.csv'))
+    p = pd.read_csv(os.path.join(d_path, 'p.csv'))
+    aic = pd.read_csv(os.path.join(d_path, 'aic.csv'))
+    bic = pd.read_csv(os.path.join(d_path, 'bic.csv'))
+    return beta, p, aic, bic
