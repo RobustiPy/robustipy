@@ -1,36 +1,41 @@
-import pandas as pd
 import joypy
-import matplotlib
+import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib
+matplotlib.use('TkAgg')
 
 # Mock-ups
 
-data = pd.read_csv('./data/intermediate/union_example/betas.csv', header=None)
+def plot_joyplot(beta, fig_path):
+    beta['mean'] = beta.median(axis=1)
+    beta2 = beta.sort_values(by=['mean'])
+    beta2.reset_index(drop=True, inplace=True)
+    beta2.drop(columns=['mean'], inplace=True)
+    toplot = beta2.sample(500).sort_index()
+    joypy.joyplot(toplot.T,
+                  overlap=1,
+                  colormap=cm.OrRd_r,
+                  linecolor='w',
+                  linewidth=.5,
+                  figsize=[8, 19],
+                  ylabels=False,)
+    plt.savefig(os.path.join(fig_path, 'joyplot.pdf'))
 
 
-data.median()
+def plot_curve(summary_df, fig_path):
+    fig, ax = plt.subplots(figsize=(10, 5))
+    summary_df = summary_df.sort_values(by='beta_med')
+    summary_df = summary_df.reset_index(drop=True)
+    summary_df['beta_med'].plot(ax=ax)
+    summary_df['beta_std_plus'].plot(ax=ax)
+    summary_df['beta_std_minus'].plot(ax=ax)
+    summary_df['beta_min'].plot(ax=ax)
+    summary_df['beta_max'].plot(ax=ax)
+    plt.savefig(os.path.join(fig_path, 'curve.pdf'))
 
-data['mean'] = data.median(axis=1)
-
-data2 = data.sort_values(by=['mean'])
-
-data2.reset_index(drop=True, inplace=True)
-
-data2.drop(columns=['mean'], inplace=True)
-
-toplot = data2.sample(300).sort_index()
-
-joypy.joyplot(toplot.T,
-              overlap=1,
-              colormap=cm.OrRd_r,
-              linecolor='w',
-              linewidth=.5,
-              figsize=[8, 19],
-              ylabels=False,)
-plt.show()
-
-
-def main_figure(results):
+def main_plotter(beta, summary_df, fig_path):
+    #plot_joyplot(beta, fig_path)
+    plot_curve(summary_df, fig_path)
     pass
 

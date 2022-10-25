@@ -81,25 +81,39 @@ def panel_ols(y, x):
             'bic': bic}
 
 
-def save_myrobust(beta, p, aic, bic, d_path, example_name):
-    d_path = os.path.join(d_path, example_name)
-
-    if os.path.exists(d_path) is False:
-        os.mkdir(d_path)
-
-    np.savetxt(os.path.join(d_path, 'betas.csv'),
+def save_myrobust(beta, p, aic, bic, example_path):
+    if os.path.exists(example_path) is False:
+        os.mkdir(example_path)
+    np.savetxt(os.path.join(example_path, 'betas.csv'),
                beta, delimiter=",")
-    np.savetxt(os.path.join(d_path, 'p.csv'),
+    np.savetxt(os.path.join(example_path, 'p.csv'),
                p, delimiter=",")
-    np.savetxt(os.path.join(d_path, 'aic.csv'),
+    np.savetxt(os.path.join(example_path, 'aic.csv'),
                aic, delimiter=",")
-    np.savetxt(os.path.join(d_path, 'bic.csv'),
+    np.savetxt(os.path.join(example_path, 'bic.csv'),
                bic, delimiter=",")
 
 def load_myrobust(d_path):
-    d_path = os.path.join(d_path)
     beta = pd.read_csv(os.path.join(d_path, 'betas.csv'))
     p = pd.read_csv(os.path.join(d_path, 'p.csv'))
     aic = pd.read_csv(os.path.join(d_path, 'aic.csv'))
     bic = pd.read_csv(os.path.join(d_path, 'bic.csv'))
-    return beta, p, aic, bic
+    list_df = []
+    summary_df = pd.DataFrame(columns=['beta_med',
+                                       'beta_max',
+                                       'beta_min',
+                                       'beta_std'])
+    for strap in range(0, beta.shape[0]):
+        new_df = pd.DataFrame()
+        new_df['betas'] = beta.values[strap]
+        new_df['p'] = p.values[strap]
+        new_df['aic'] = aic.values[strap]
+        new_df['bic'] = bic.values[strap]
+        list_df.append(new_df)
+        summary_df.at[strap, 'beta_med'] = np.median(beta.values[strap])
+        summary_df.at[strap, 'beta_min'] = np.min(beta.values[strap])
+        summary_df.at[strap, 'beta_max'] = np.max(beta.values[strap])
+        summary_df.at[strap, 'beta_std'] = np.std(beta.values[strap])
+        summary_df.at[strap, 'beta_std_plus'] = np.median(beta.values[strap]) + np.std(beta.values[strap])
+        summary_df.at[strap, 'beta_std_minus'] = np.median(beta.values[strap]) - np.std(beta.values[strap])
+    return beta, summary_df, list_df
