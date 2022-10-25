@@ -25,8 +25,7 @@ def prepare_union(path_to_union):
     y = pd.DataFrame(union_df['log_wage'])
     c = union_df[indep_list]
     x = pd.DataFrame(union_df['union'])
-    control_list = c.columns.to_list()
-    return y, c, x, control_list
+    return y, c, x
 
 
 def prepare_asc(asc_path):
@@ -47,6 +46,4 @@ def prepare_asc(asc_path):
                 'retired',
                 2005.0,
                 ]]
-
-    control_list = c.columns.to_list()
-    return y, c, x, control_list
+    return y, c, x
