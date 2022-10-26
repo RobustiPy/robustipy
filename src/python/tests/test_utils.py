@@ -1,6 +1,9 @@
 import unittest
+import random
+import string
 import statsmodels.api as sm
 from src.python.utils import simple_ols
+from src.python.utils import space_size
 
 
 class TestSimpleOLS(unittest.TestCase):
@@ -32,6 +35,36 @@ class TestSimpleOLS(unittest.TestCase):
         actual_p = self.actual['p'].flatten().round(n).tolist()
         target_p = self.target.pvalues.round(n).to_numpy().tolist()
         self.assertListEqual(actual_p, target_p)
+
+    def test_aic(self):
+        '''
+        Test aic againts statmodels
+        '''
+        actual_aic = self.actual['aic']
+        target_aic = self.target.aic
+        self.assertAlmostEqual(actual_aic, target_aic)
+
+    def test_bic(self):
+        '''
+        Test bic againts statmodels
+        '''
+        actual_bic = self.actual['bic']
+        target_bic = self.target.bic
+        self.assertAlmostEqual(actual_bic, target_bic)
+
+
+class TestSpaceSize(unittest.TestCase):
+
+    def test_output_type(self):
+        '''
+        Test output type of space_size()
+        '''
+        int_list = [random.randrange(10) for i in range(10)]
+        float_list = [random.uniform(0, 1) for i in range(10)]
+        str_list = [random.choice(string.ascii_lowercase) for i in range(10)]
+        self.assertIs(type(space_size(int_list)), int)
+        self.assertIs(type(space_size(float_list)), int)
+        self.assertIs(type(space_size(str_list)), int)
 
 
 if __name__ == '__main__':

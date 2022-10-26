@@ -8,11 +8,11 @@ matplotlib.use('TkAgg')
 # Mock-ups
 
 def plot_joyplot(beta, fig_path):
-    beta['mean'] = beta.median(axis=1)
-    beta2 = beta.sort_values(by=['mean'])
+    beta['median'] = beta.median(axis=1)
+    beta2 = beta.sort_values(by=['median'])
     beta2.reset_index(drop=True, inplace=True)
-    beta2.drop(columns=['mean'], inplace=True)
-    toplot = beta2.sample(500).sort_index()
+    beta2.drop(columns=['median'], inplace=True)
+    toplot = beta2.sample(300).sort_index()
     joypy.joyplot(toplot.T,
                   overlap=1,
                   colormap=cm.OrRd_r,
@@ -20,7 +20,7 @@ def plot_joyplot(beta, fig_path):
                   linewidth=.5,
                   figsize=[8, 19],
                   ylabels=False,)
-    plt.savefig(os.path.join(fig_path, 'joyplot.pdf'))
+    plt.savefig(os.path.join(fig_path, 'joyplot.png'))
 
 
 def plot_curve(summary_df, fig_path):
@@ -32,7 +32,7 @@ def plot_curve(summary_df, fig_path):
     summary_df['beta_std_minus'].plot(ax=ax)
     summary_df['beta_min'].plot(ax=ax)
     summary_df['beta_max'].plot(ax=ax)
-    plt.savefig(os.path.join(fig_path, 'curve.pdf'))
+    plt.savefig(os.path.join(fig_path, 'curve.png'))
 
 def main_plotter(beta, summary_df, fig_path):
     #plot_joyplot(beta, fig_path)

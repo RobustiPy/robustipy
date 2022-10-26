@@ -1,6 +1,4 @@
 from src.python.prototypes import Protomodel
-import statsmodels.api as sm
-import scipy
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -71,13 +69,13 @@ class OLSRobust(Protomodel):
 
         vars_names = list(controls.columns.values)
         space_n = space_size(vars_names)
-        beta = np.empty([space_n, samples])
-        p = np.empty([space_n, samples])
-        aic = np.empty([space_n, samples])
-        bic = np.empty([space_n, samples])
+        b_array = np.empty([space_n, samples])
+        p_array = np.empty([space_n, samples])
+        aic_array = np.empty([space_n, samples])
+        bic_array = np.empty([space_n, samples])
 
         for spec, index in zip(all_subsets(vars_names),
-                               tqdm(range(1, space_n))):
+                               tqdm(range(0, space_n))):
             if len(spec) == 0:
                 comb = self.x
             else:
@@ -86,17 +84,17 @@ class OLSRobust(Protomodel):
                                 right_index=True)
             comb = pd.merge(self.y, comb, how='left', left_index=True,
                             right_index=True)
-            comb.loc[:, 'constant'] = 1
 
             b_list, p_list, aic_list, bic_list = (
                 zip(*Parallel(n_jobs=-1)(delayed(self._strap)
                                          (comb, mode)
                                          for i in range(0, samples))))
-            beta[index, :] = b_list
-            p[index, :] = p_list
-            aic[index, :] = aic_list
-            bic[index, :] = bic_list
-        return beta, p, aic, bic
+
+            b_array[index, :] = b_list
+            p_array[index, :] = p_list
+            aic_array[index, :] = aic_list
+            bic_array[index, :] = bic_list
+        return b_array, p_array, aic_array, bic_array
 
     def _estimate(self, y, x, mode):
         if mode == 'simple':
@@ -112,10 +110,11 @@ class OLSRobust(Protomodel):
     def _strap(self, comb_var, mode):
         # Internal method for boostraing
         # TODO Review if put in another module
-        #samp_df = comb_var[np.random.choice(comb_var.shape[0], 800, replace=True)]
-        samp_df = comb_var.sample(5000, replace=True)
+        #idx = np.random.choice(comb_var.shape[0], 800, replace=True)
+        #samp_df = comb_var.iloc[idx, :]
+        samp_df = comb_var.sample(1000, replace=True)
         # @TODO generalize the frac to the function call
-        b, p, aic, bic = self._estimate(samp_df.iloc[:, 0],
-                                        samp_df.iloc[:, 1:],
-                                        mode)
-        return b[0], p[0], aic, bic
+        b, p, aic, bic = self._estimate(y=samp_df.iloc[:, :1],
+                                        x=samp_df.iloc[:, 1:],
+                                        mode=mode)
+        return b[0][0], p[0][0], aic[0][0], bic[0][0]

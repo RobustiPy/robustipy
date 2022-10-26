@@ -9,7 +9,7 @@ from itertools import chain, combinations
 from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS estimates
 
 
-def space_size(iterable):
+def space_size(iterable) -> int:
     n = len(iterable)
     n_per_iter = list(map(lambda x:
                           math.factorial(n) / math.factorial(x)
