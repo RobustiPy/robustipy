@@ -23,19 +23,22 @@ class OLSRobust(Protomodel):
         An object containing the key metrics.
     """
 
-    def __init__(self, y, x):
+    def __init__(self, *, y, x):
         super().__init__()
         self.y = y
         self.x = x
         self.results = None
 
     def fit(self,
+            *,
             controls,
             info='bic',
-            samples=1000,
-            mode='simple'):
+            mode='simple',
+            draws=1000,
+            sample_size=1000,
+            replace=False):
 
-        """
+        '''
         Fit the OLS models into the specification space
         as well as over the bootstrapped samples.
 
@@ -65,14 +68,14 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         bic : Array
            Numpy array containing aic values for estimated models.
-        """
+        '''
 
         vars_names = list(controls.columns.values)
         space_n = space_size(vars_names)
-        b_array = np.empty([space_n, samples])
-        p_array = np.empty([space_n, samples])
-        aic_array = np.empty([space_n, samples])
-        bic_array = np.empty([space_n, samples])
+        b_array = np.empty([space_n, draws])
+        p_array = np.empty([space_n, draws])
+        aic_array = np.empty([space_n, draws])
+        bic_array = np.empty([space_n, draws])
 
         for spec, index in zip(all_subsets(vars_names),
                                tqdm(range(0, space_n))):
@@ -87,8 +90,8 @@ class OLSRobust(Protomodel):
 
             b_list, p_list, aic_list, bic_list = (
                 zip(*Parallel(n_jobs=-1)(delayed(self._strap)
-                                         (comb, mode)
-                                         for i in range(0, samples))))
+                                         (comb, mode, sample_size, replace)
+                                         for i in range(0, draws))))
 
             b_array[index, :] = b_list
             p_array[index, :] = p_list
@@ -97,6 +100,38 @@ class OLSRobust(Protomodel):
         return b_array, p_array, aic_array, bic_array
 
     def _estimate(self, y, x, mode):
+
+        '''
+        This method calls utils estimation functions
+        depending of mode parameter. This method intentionally
+        returns raw outputs from the estimation methods calls.
+
+        Parameters
+        ----------
+        y : Array
+          1D array like object (pandas dataframe of numpy array)
+          contaning the data for y.
+        x : Array
+          ND array like object (pandas dataframe of numpy array)
+          contaning the data for x and controls.
+        mode : str
+            Estimation method. Curretly only supporting simple OLS
+            and panel OLS.
+
+        Returns
+        -------
+        beta : Array
+            Numpy array contaning the estimates of the independent variable x
+            for each specification of control variables across all the
+            bootstrap samples.
+        p : Array
+         Numpy array containing the p values of all the betas.
+        aic : Array
+           Numpy array containing aic values for estimated models.
+        bic : Array
+           Numpy array containing aic values for estimated models.
+        '''
+
         if mode == 'simple':
             output = simple_ols(y, x)
         elif mode == 'panel':
@@ -107,14 +142,39 @@ class OLSRobust(Protomodel):
         bic = output['bic']
         return b, p, aic, bic
 
-    def _strap(self, comb_var, mode):
-        # Internal method for boostraing
-        # TODO Review if put in another module
-        #idx = np.random.choice(comb_var.shape[0], 800, replace=True)
-        #samp_df = comb_var.iloc[idx, :]
-        samp_df = comb_var.sample(1000, replace=True)
+    def _strap(self, comb_var, mode, sample_size, replace):
+
+        '''
+        This method calls self._estimate() over a random sample
+        of the data contaning y, x and controls. Returns a single
+        value for each returning variable.
+
+        Parameters
+        ----------
+        comb_var : Array
+                ND array like object (pandas dataframe of numpy array)
+                contaning the data for y, x, and controls.
+        mode : str
+            Estimation method. Curretly only supporting simple OLS
+            and panel OLS.
+
+        Returns
+        -------
+        beta : float
+            Estimate for x.
+        p : float
+         P value for x.
+        aic : float
+           Akaike Information Criteria for the model.
+        bic : float
+           Bayesian Information Criteria for the model.
+        '''
+
+        samp_df = comb_var.sample(n=sample_size, replace=replace)
         # @TODO generalize the frac to the function call
-        b, p, aic, bic = self._estimate(y=samp_df.iloc[:, :1],
-                                        x=samp_df.iloc[:, 1:],
+        y = samp_df.iloc[:, :1]
+        x = samp_df.iloc[:, 1:]
+        b, p, aic, bic = self._estimate(y=y,
+                                        x=x,
                                         mode=mode)
         return b[0][0], p[0][0], aic[0][0], bic[0][0]

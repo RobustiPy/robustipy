@@ -36,11 +36,20 @@ class TestSimpleOLS(unittest.TestCase):
         target_p = self.target.pvalues.round(n).to_numpy().tolist()
         self.assertListEqual(actual_p, target_p)
 
+    def test_p_less_one(self):
+        '''
+        Test pvalues less than 1
+        '''
+        n = 7
+        actual_p = self.actual['p'].flatten().round(n).tolist()
+        for p in actual_p:
+            self.assertLess(p, 1)
+
     def test_aic(self):
         '''
         Test aic againts statmodels
         '''
-        actual_aic = self.actual['aic']
+        actual_aic = self.actual['aic'].item(0)
         target_aic = self.target.aic
         self.assertAlmostEqual(actual_aic, target_aic)
 
@@ -48,7 +57,7 @@ class TestSimpleOLS(unittest.TestCase):
         '''
         Test bic againts statmodels
         '''
-        actual_bic = self.actual['bic']
+        actual_bic = self.actual['bic'].item(0)
         target_bic = self.target.bic
         self.assertAlmostEqual(actual_bic, target_bic)
 

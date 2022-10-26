@@ -31,9 +31,16 @@ comb = pd.merge(comb, c, how='left', left_index=True,
                 right_index=True)
 comb
 
-myrobust._strap(comb.iloc[:, 0:3], mode='simple')
+myrobust._strap(comb_var=comb.iloc[:, 0:3],
+                mode='simple',
+                sample_size=100,
+                replace=True)
 
-beta, p, aic, bic = myrobust.fit(controls=c, samples=100, mode='simple')
+beta, p, aic, bic = myrobust.fit(controls=c,
+                                 draws=1,
+                                 mode='simple',
+                                 sample_size=100,
+                                 replace=False)
 
 beta
 
