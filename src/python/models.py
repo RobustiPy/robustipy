@@ -1,6 +1,7 @@
 from src.python.prototypes import Protomodel
 import pandas as pd
 import numpy as np
+import warnings
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from src.python.utils import simple_ols, panel_ols, space_size, all_subsets
@@ -135,7 +136,9 @@ class OLSRobust(Protomodel):
         if mode == 'simple':
             output = simple_ols(y, x)
         elif mode == 'panel':
-            output = panel_ols(y, x)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                output = panel_ols(y, x)
         b = output['b']
         p = output['p']
         aic = output['aic']
@@ -174,7 +177,15 @@ class OLSRobust(Protomodel):
         # @TODO generalize the frac to the function call
         y = samp_df.iloc[:, :1]
         x = samp_df.iloc[:, 1:]
-        b, p, aic, bic = self._estimate(y=y,
-                                        x=x,
-                                        mode=mode)
-        return b[0][0], p[0][0], aic[0][0], bic[0][0]
+        if mode == 'simple':
+            b, p, aic, bic = self._estimate(y=y,
+                                            x=x,
+                                            mode=mode)
+            return b[0][0], p[0][0], aic[0][0], bic[0][0]
+        elif mode == 'panel':
+            b, p, aic, bic = self._estimate(y=y,
+                                            x=x,
+                                            mode=mode)
+            return b[0], p[0], aic, bic
+        else:
+            raise ValueError(' "mode" argument not found')

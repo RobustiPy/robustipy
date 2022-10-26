@@ -12,9 +12,9 @@ def plot_joyplot(beta, fig_path):
     beta2 = beta.sort_values(by=['median'])
     beta2.reset_index(drop=True, inplace=True)
     beta2.drop(columns=['median'], inplace=True)
-    toplot = beta2.sample(300).sort_index()
+    toplot = beta2.sample(100).sort_index()
     joypy.joyplot(toplot.T,
-                  overlap=1,
+                  overlap=3,
                   colormap=cm.OrRd_r,
                   linecolor='w',
                   linewidth=.5,

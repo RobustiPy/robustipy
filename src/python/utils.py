@@ -93,11 +93,12 @@ def save_myrobust(beta, p, aic, bic, example_path):
     np.savetxt(os.path.join(example_path, 'bic.csv'),
                bic, delimiter=",")
 
+
 def load_myrobust(d_path):
-    beta = pd.read_csv(os.path.join(d_path, 'betas.csv'))
-    p = pd.read_csv(os.path.join(d_path, 'p.csv'))
-    aic = pd.read_csv(os.path.join(d_path, 'aic.csv'))
-    bic = pd.read_csv(os.path.join(d_path, 'bic.csv'))
+    beta = pd.read_csv(os.path.join(d_path, 'betas.csv'), header=None)
+    p = pd.read_csv(os.path.join(d_path, 'p.csv'), header=None)
+    aic = pd.read_csv(os.path.join(d_path, 'aic.csv'), header=None)
+    bic = pd.read_csv(os.path.join(d_path, 'bic.csv'), header=None)
     list_df = []
     summary_df = pd.DataFrame(columns=['beta_med',
                                        'beta_max',
