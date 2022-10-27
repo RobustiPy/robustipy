@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
 
 setup(
@@ -19,7 +19,7 @@ setup(
     author='Charles Rahal, Daniel Valdenegro',
     author_email='charles.rahal@sociology.ox.ac.uk, daniel.valdenegro@sociology.ox.ac.uk',
     license='GPLv3',
-    packages=['nrobust'],
+    packages=find_packages(include=['nrobust']),
     python_requires='>=3.7',
     install_requires=[
         'numpy>=1.23.2',
