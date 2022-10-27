@@ -1,7 +1,7 @@
 import unittest
 import statsmodels.api as sm
 import numpy as np
-from src.python.models import OLSRobust
+from src.nrobust.models import OLSRobust
 
 
 class TestOLSRobust(unittest.TestCase):

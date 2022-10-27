@@ -1,10 +1,10 @@
-from src.python.prototypes import Protomodel
+from src.nrobust.prototypes import Protomodel
 import pandas as pd
 import numpy as np
 import warnings
 from tqdm import tqdm
 from joblib import Parallel, delayed
-from src.python.utils import simple_ols, panel_ols, space_size, all_subsets
+from src.nrobust.utils import simple_ols, panel_ols, space_size, all_subsets
 
 
 class OLSRobust(Protomodel):

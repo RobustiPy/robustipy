@@ -2,8 +2,8 @@ import unittest
 import random
 import string
 import statsmodels.api as sm
-from src.python.utils import simple_ols
-from src.python.utils import space_size
+from src.nrobust.utils import simple_ols
+from src.nrobust.utils import space_size
 
 
 class TestSimpleOLS(unittest.TestCase):
