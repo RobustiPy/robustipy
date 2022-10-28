@@ -1,9 +1,8 @@
-from setuptools import setup, find_packages
-import os
+from setuptools import setup
 
 setup(
     name='nrobust',
-    version='0.0.1.dev1',
+    version='0.0.1.dev2',
     description='Multiversal estimation for robust inference.',
     long_description='Multiversal estimation for robust inference.',
     classifiers=[
@@ -19,7 +18,8 @@ setup(
     author='Charles Rahal, Daniel Valdenegro',
     author_email='charles.rahal@sociology.ox.ac.uk, daniel.valdenegro@sociology.ox.ac.uk',
     license='GPLv3',
-    packages=find_packages(include=['nrobust']),
+    packages=['nrobust'],
+    package_dir={'': 'src'},
     python_requires='>=3.7',
     install_requires=[
         'numpy>=1.23.2',
