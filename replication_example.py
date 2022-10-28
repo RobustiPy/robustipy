@@ -1,9 +1,9 @@
 import os
-from src.nrobust.models import OLSRobust
-from src.nrobust.replication_data_prep import prepare_union, prepare_asc
-from src.nrobust.utils import save_myrobust, load_myrobust
-from src.nrobust.figures import main_plotter
-from src.nrobust.figures import plot_joyplot, plot_curve
+from nrobust.models import OLSRobust
+from nrobust.replication_data_prep import prepare_union, prepare_asc
+from nrobust.utils import save_myrobust, load_myrobust
+from nrobust.figures import main_plotter
+from nrobust.figures import plot_joyplot, plot_curve
 
 # union example
 
