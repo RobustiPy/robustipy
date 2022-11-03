@@ -25,6 +25,7 @@ def prepare_union(path_to_union):
     y = pd.DataFrame(union_df['log_wage'])
     c = union_df[indep_list]
     x = pd.DataFrame(union_df['union'])
+    c.loc[:, 'constant'] = 1
     return y, c, x
 
 

@@ -4,9 +4,39 @@ import numpy as np
 import math
 import scipy
 import os
+import warnings
 import pandas as pd
 from itertools import chain, combinations
-from linearmodels.panel import PanelOLS #temporary solution to get PanelOLS estimates
+# temporary solution to get PanelOLS estimates
+from linearmodels.panel import PanelOLS
+
+
+def full_curve(y, x, c, mode):
+    b = []
+    p = []
+    aic = []
+    bic = []
+    vars_names = list(c.columns.values)
+    for spec in all_subsets(vars_names):
+        comb = pd.merge(x, c[list(spec)],
+                     how='left', left_index=True,
+                     right_index=True)
+        if mode == 'simple':
+            output = simple_ols(y, comb)
+        elif mode == 'panel':
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                output = panel_ols(y, comb)
+        b.append(float(output['b'][0]))
+        if mode == 'panel':
+            p.append(float(output['p'][0]))
+            # @TODO something bad is hapopening here
+            # Likely related to issue #5 on GitHub
+        else:
+            p.append(float(output['p'][0][0]))
+        aic.append(float(output['aic']))
+        bic.append(float(output['bic']))
+    return b, p, aic, bic
 
 
 def space_size(iterable) -> int:
@@ -94,6 +124,16 @@ def save_myrobust(beta, p, aic, bic, example_path):
                bic, delimiter=",")
 
 
+def save_spec(b_spec, p_spec, aic_spec, bic_spec, example_path):
+    np.savetxt(os.path.join(example_path, 'b_spec.csv'),
+               b_spec, delimiter=",")
+    np.savetxt(os.path.join(example_path, 'p_spec.csv'),
+               p_spec, delimiter=",")
+    np.savetxt(os.path.join(example_path, 'aic_spec.csv'),
+               aic_spec, delimiter=",")
+    np.savetxt(os.path.join(example_path, 'bic_spec.csv'),
+               bic_spec, delimiter=",")
+
 def load_myrobust(d_path):
     beta = pd.read_csv(os.path.join(d_path, 'betas.csv'), header=None)
     p = pd.read_csv(os.path.join(d_path, 'p.csv'), header=None)
@@ -118,3 +158,10 @@ def load_myrobust(d_path):
         summary_df.at[strap, 'beta_std_plus'] = np.median(beta.values[strap]) + np.std(beta.values[strap])
         summary_df.at[strap, 'beta_std_minus'] = np.median(beta.values[strap]) - np.std(beta.values[strap])
     return beta, summary_df, list_df
+
+def load_spec(example_path):
+    beta = pd.read_csv(os.path.join(example_path, 'b_spec.csv'), header=None)
+    p = pd.read_csv(os.path.join(example_path, 'p_spec.csv'), header=None)
+    aic = pd.read_csv(os.path.join(example_path, 'aic_spec.csv'), header=None)
+    bic = pd.read_csv(os.path.join(example_path, 'bic_spec.csv'), header=None)
+    return beta, p, aic, bic

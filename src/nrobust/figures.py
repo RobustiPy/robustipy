@@ -23,8 +23,9 @@ def plot_joyplot(beta, fig_path):
     plt.savefig(os.path.join(fig_path, 'joyplot.png'))
 
 
-def plot_curve(summary_df, fig_path):
+def plot_curve(summary_df, b_spec, fig_path):
     fig, ax = plt.subplots(figsize=(10, 5))
+    summary_df['beta_spec'] = b_spec
     summary_df = summary_df.sort_values(by='beta_med')
     summary_df = summary_df.reset_index(drop=True)
     summary_df['beta_med'].plot(ax=ax)
@@ -32,10 +33,12 @@ def plot_curve(summary_df, fig_path):
     summary_df['beta_std_minus'].plot(ax=ax)
     summary_df['beta_min'].plot(ax=ax)
     summary_df['beta_max'].plot(ax=ax)
+    summary_df['beta_spec'].plot(ax=ax, color='k')
     plt.savefig(os.path.join(fig_path, 'curve.png'))
+    plt.show()
 
-def main_plotter(beta, summary_df, fig_path):
+def main_plotter(beta, b_spec, full_beta, summary_df, fig_path):
     #plot_joyplot(beta, fig_path)
-    plot_curve(summary_df, fig_path)
+    plot_curve(summary_df, b_spec, fig_path)
     pass
 
