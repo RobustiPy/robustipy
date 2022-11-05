@@ -17,10 +17,14 @@ def full_curve(y, x, c, mode):
     aic = []
     bic = []
     vars_names = list(c.columns.values)
-    for spec in all_subsets(vars_names):
+    spec_generator = all_subsets(vars_names)
+    comb = pd.merge(x, c,
+                    how='left', left_index=True,
+                    right_index=True)
+    for spec in spec_generator:
         comb = pd.merge(x, c[list(spec)],
-                     how='left', left_index=True,
-                     right_index=True)
+                        how='left', left_index=True,
+                        right_index=True)
         if mode == 'simple':
             output = simple_ols(y, comb)
         elif mode == 'panel':
@@ -30,7 +34,7 @@ def full_curve(y, x, c, mode):
         b.append(float(output['b'][0]))
         if mode == 'panel':
             p.append(float(output['p'][0]))
-            # @TODO something bad is hapopening here
+            # @TODO something bad is happening here
             # Likely related to issue #5 on GitHub
         else:
             p.append(float(output['p'][0][0]))
@@ -91,25 +95,42 @@ def scipy_ols(y, x):
 def panel_ols(y, x):
     if np.asarray(x).size == 0 or np.asarray(y).size == 0:
         raise ValueError("Inputs must not be empty.")
-    mod = PanelOLS(y,
-                   x,
-                   entity_effects=True,
-                   drop_absorbed=True)
-    res = mod.fit(cov_type='clustered',
-                  cluster_entity=True)
-    nobs = y.shape[0]  # number of observations
-    ncoef = x.shape[1]  # number of coef.
-    ll = res.loglik
-    aic = (-2 * ll) + (2 * ncoef)
-    bic = (-2 * ll) + (ncoef * np.log(nobs))
-    p = res.pvalues
-    b = res.params
-    return {'b': b,
-            'p': p,
-            'll': ll,
-            'aic': aic,
-            'bic': bic}
-
+    try:
+        mod = PanelOLS(y,
+                       x,
+                       entity_effects=True,
+                       drop_absorbed=True,
+                       # necessary because we dont always have
+                       # full rank on some resamples...
+                       # @TODO: a better way to handle this?
+                      #                    check_rank=False
+                                          )
+        res = mod.fit(cov_type='clustered',
+                      cluster_entity=True)
+        nobs = y.shape[0]  # number of observations
+        ncoef = x.shape[1]  # number of coef.
+        ll = res.loglik
+        aic = (-2 * ll) + (2 * ncoef)
+        bic = (-2 * ll) + (ncoef * np.log(nobs))
+        try:
+        # @TODO: necessary due to a singular matrix error
+        # due to resampling of the ASC data. Not sure what
+        # else to do.
+            p = res.pvalues
+        except:
+            p = np.nan
+        b = res.params
+        return {'b': b,
+                'p': p,
+                'll': ll,
+                'aic': aic,
+                'bic': bic}
+    except ValueError:
+        return {'b': np.nan,
+                'p': np.nan,
+                'll': np.nan,
+                'aic': np.nan,
+                'bic': np.nan}
 
 def save_myrobust(beta, p, aic, bic, example_path):
     if os.path.exists(example_path) is False:

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 
+
 def prepare_union(path_to_union):
     union_df = pd.read_stata(path_to_union)
     union_df.loc[:, 'log_wage'] = np.log(union_df['wage'].copy()) * 100
@@ -35,16 +36,16 @@ def prepare_asc(asc_path):
     ASC_df = ASC_df.join(one_hot)
     ASC_df = ASC_df.set_index(['pidp', 'year'])
     ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew'] * ASC_df['lrealgs']
-    ASC_df['constant'] = 1
+    #ASC_df['constant'] = 1
     y = ASC_df['wellbeing_kikert']
-    x = ASC_df['lrealgs']
-    c = ASC_df[['dcareNew*c.lrealgs',
-                'dcareNew',
-                'DR',
-                'lgva',
-                'hhsize',
-                'work',
-                'retired',
-                2005.0,
+    x = ASC_df[['lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
+                'DR', 'lgva', 'Mtotp', 'ddgree', 'age',
+                2005, 2006.0, 2007.0, 2009.0,
+                2010.0, 2011.0, 2012.0, 2013.0 , 2014.0,
+                2015.0, 2016.0, 2017.0, 2018.0,]]
+    c = ASC_df[['married', 'widowed', 'disable', 'lrealtinc_m',
+                'house_ownership', 'hhsize', 'work', 'retired',
                 ]]
+
+
     return y, c, x

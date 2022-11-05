@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import statsmodels.api as sm
+from linearmodels.panel import PanelOLS
 from nrobust.models import OLSRobust
 from nrobust.replication_data_prep import prepare_union,\
     prepare_asc
@@ -29,7 +30,8 @@ def make_union_example():
     union_path = os.path.join('data',
                               'intermediate',
                               'union_example')
-    # Some of these can probably be combined
+
+    # @TODO Some of these can probably be combined
     save_myrobust(beta, p, aic, bic, union_path)
     save_spec(b_spec, p_spec, aic_spec, bic_spec, union_path)
     beta, summary_df, list_df = load_myrobust(union_path)
@@ -41,7 +43,18 @@ def make_ASC_example():
     y, c, x = prepare_asc(os.path.join('data',
                                        'input',
                                        'CleanData_LASpending.dta'))
-    # @TODO full_beta equivilent example here
+
+    # @TODO handle this missingvalue warning:
+    #  dropping nans results in singularity issues
+    comb = pd.DataFrame(pd.merge(x, c, how='left',
+                        left_index=True,
+                        right_index=True))
+    mod = PanelOLS(y, pd.merge(x, c, how='left',
+                               left_index=True,
+                               right_index=True),
+                   drop_absorbed=True,
+                   entity_effects=True)
+    full_beta = mod.fit(cov_type='clustered', cluster_entity=True).params[0]
     b_spec, p_spec, aic_spec, bic_spec = full_curve(y, x, c, 'panel')
     myrobust_panel = OLSRobust(y=y, x=x)
     beta, p, aic, bic = myrobust_panel.fit(controls=c,
@@ -55,14 +68,11 @@ def make_ASC_example():
     beta, summary_df, list_df = load_myrobust(ASC_path)
     b_spec, p_spec, aic_spec, bic_spec = load_spec(ASC_path)
 
-    # @TODO requires a full_beta replication here
-    # Otherwise breaking
-    main_plotter(beta, summary_df, os.path.join(os.getcwd(),
-                                                'figures',
-                                                'ASC_example'))
+    main_plotter(beta, b_spec, full_beta, summary_df,
+                 os.path.join(os.getcwd(), 'figures', 'ASC_example'))
 
 
 
 if __name__ == "__main__":
-    make_union_example()
+#    make_union_example()
     make_ASC_example()

@@ -186,6 +186,16 @@ class OLSRobust(Protomodel):
             b, p, aic, bic = self._estimate(y=y,
                                             x=x,
                                             mode=mode)
-            return b[0], p[0], aic, bic
+            # @TODO better error handling:
+            # TypeError: 'float' object is not subscriptable
+            try:
+                b = b[0]
+            except:
+                b = b
+            try:
+                p = p[0]
+            except:
+                p = p
+            return b, p, aic, bic
         else:
             raise ValueError(' "mode" argument not found')
