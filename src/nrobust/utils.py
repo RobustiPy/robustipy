@@ -5,6 +5,7 @@ import math
 import scipy
 import os
 import warnings
+import matplotlib
 import pandas as pd
 from itertools import chain, combinations
 # temporary solution to get PanelOLS estimates
@@ -132,6 +133,7 @@ def panel_ols(y, x):
                 'aic': np.nan,
                 'bic': np.nan}
 
+
 def save_myrobust(beta, p, aic, bic, example_path):
     if os.path.exists(example_path) is False:
         os.mkdir(example_path)
@@ -155,6 +157,7 @@ def save_spec(b_spec, p_spec, aic_spec, bic_spec, example_path):
     np.savetxt(os.path.join(example_path, 'bic_spec.csv'),
                bic_spec, delimiter=",")
 
+
 def load_myrobust(d_path):
     beta = pd.read_csv(os.path.join(d_path, 'betas.csv'), header=None)
     p = pd.read_csv(os.path.join(d_path, 'p.csv'), header=None)
@@ -165,6 +168,9 @@ def load_myrobust(d_path):
                                        'beta_max',
                                        'beta_min',
                                        'beta_std'])
+    # the operation performed with this loop can be done with built-in pandas
+    # functions for better performance. See function compute_summary bellow.
+    # Use the decorator_timer to measure the execution time.
     for strap in range(0, beta.shape[0]):
         new_df = pd.DataFrame()
         new_df['betas'] = beta.values[strap]
@@ -180,9 +186,51 @@ def load_myrobust(d_path):
         summary_df.at[strap, 'beta_std_minus'] = np.median(beta.values[strap]) - np.std(beta.values[strap])
     return beta, summary_df, list_df
 
+
 def load_spec(example_path):
     beta = pd.read_csv(os.path.join(example_path, 'b_spec.csv'), header=None)
     p = pd.read_csv(os.path.join(example_path, 'p_spec.csv'), header=None)
     aic = pd.read_csv(os.path.join(example_path, 'aic_spec.csv'), header=None)
     bic = pd.read_csv(os.path.join(example_path, 'bic_spec.csv'), header=None)
     return beta, p, aic, bic
+
+
+def decorator_timer(some_function):
+    from time import time
+
+    def wrapper(*args, **kwargs):
+        t1 = time()
+        result = some_function(*args, **kwargs)
+        end = time()-t1
+        return result, end
+    return wrapper
+
+
+def compute_summary(data):
+    out = pd.DataFrame()
+    out['median'] = data.median(axis=1)
+    out['max'] = data.max(axis=1)
+    out['min'] = data.min(axis=1)
+    out['std'] = data.std(axis=1, ddof=0)
+    out['std_one_up'] = out['median'] + out['std']
+    out['std_one_down'] = out['median'] - out['std']
+    return out
+
+
+def get_selection_key(specs):
+    if all(isinstance(ele, list) for ele in specs):
+        target = [frozenset(x) for x in specs]
+        return target
+    else:
+        raise ValueError('Argument `specs` must be a list of list.')
+
+
+def get_colors(specs, color_set_name=None):
+    if color_set_name is None:
+        color_set_name = 'Set1'
+    if all(isinstance(ele, list) for ele in specs):
+        colorset = matplotlib.colormaps[color_set_name]
+        colorset = colorset.resampled(len(specs))
+        return colorset.colors
+    else:
+        raise ValueError('Argument `specs` must be a list of list.')

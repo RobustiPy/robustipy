@@ -33,4 +33,3 @@ class Protoresult(ABC):
     def plot(self):
         # Public method to plot general results
         pass
-        
