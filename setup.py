@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='nrobust',
-    version='0.0.1.dev3',
+    version='0.0.1.dev4',
     description='Multiversal estimation for robust inference.',
     long_description='Multiversal estimation for robust inference.',
     classifiers=[

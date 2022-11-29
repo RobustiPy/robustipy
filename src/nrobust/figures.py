@@ -2,10 +2,10 @@ import joypy
 import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import matplotlib
+#import matplotlib
 from nrobust.utils import get_selection_key
 from nrobust.utils import get_colors
-matplotlib.use('TkAgg')
+#matplotlib.use('TkAgg')
 
 
 def plot_joyplot(beta, fig_path):
