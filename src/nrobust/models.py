@@ -7,6 +7,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
 from nrobust.utils import panel_ols
+from nrobust.utils import simple_panel_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
@@ -74,7 +75,7 @@ class OLSRobust(Protomodel):
             *,
             controls,
             info='bic',
-            mode='simple',
+            group=None,
             draws=1000,
             sample_size=1000,
             replace=False):
@@ -130,11 +131,11 @@ class OLSRobust(Protomodel):
             comb = pd.merge(self.y, comb, how='left', left_index=True,
                             right_index=True)
 
-            b_discard, p_discard, aic_i, bic_i = self._full_sample(comb, mode)
+            b_discard, p_discard, aic_i, bic_i = self._full_sample(comb, group)
 
             b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap)
                                                        (comb,
-                                                        mode,
+                                                        group,
                                                         sample_size,
                                                         replace)
                                                        for i in range(0,
@@ -154,7 +155,7 @@ class OLSRobust(Protomodel):
 
         self.results = results
 
-    def _estimate(self, y, x, mode):
+    def _estimate(self, y, x, group=None):
 
         '''
         This method calls utils estimation functions
@@ -187,30 +188,29 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         '''
 
-        if mode == 'simple':
+        if group is None:
             output = simple_ols(y, x)
-        elif mode == 'panel':
+        else:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
-                output = panel_ols(y, x)
+                output = simple_panel_ols(y, x, group)
         b = output['b']
         p = output['p']
         aic = output['aic']
         bic = output['bic']
         return b, p, aic, bic
 
-    def _full_sample(self, comb_var, mode):
+    def _full_sample(self, comb_var, group):
         y = comb_var.iloc[:, :1]
         x = comb_var.iloc[:, 1:]
-        if mode == 'simple':
+        if group is None:
             b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            mode=mode)
+                                            x=x)
             return b[0][0], p[0][0], aic[0][0], bic[0][0]
-        elif mode == 'panel':
+        else:
             b, p, aic, bic = self._estimate(y=y,
                                             x=x,
-                                            mode=mode)
+                                            group=group)
             # @TODO better error handling:
             # TypeError: 'float' object is not subscriptable
             try:
@@ -222,10 +222,8 @@ class OLSRobust(Protomodel):
             except:
                 p = p
             return b, p, aic, bic
-        else:
-            raise ValueError(' "mode" argument not found')
 
-    def _strap(self, comb_var, mode, sample_size, replace):
+    def _strap(self, comb_var, group, sample_size, replace):
 
         '''
         This method calls self._estimate() over a random sample
@@ -257,15 +255,14 @@ class OLSRobust(Protomodel):
         # @TODO generalize the frac to the function call
         y = samp_df.iloc[:, :1]
         x = samp_df.iloc[:, 1:]
-        if mode == 'simple':
+        if group is None:
             b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            mode=mode)
+                                            x=x)
             return b[0][0], p[0][0]
-        elif mode == 'panel':
+        else:
             b, p, aic, bic = self._estimate(y=y,
                                             x=x,
-                                            mode=mode)
+                                            group=group)
             # @TODO better error handling:
             # TypeError: 'float' object is not subscriptable
             try:
@@ -277,5 +274,3 @@ class OLSRobust(Protomodel):
             except:
                 p = p
             return b, p, aic, bic
-        else:
-            raise ValueError(' "mode" argument not found')

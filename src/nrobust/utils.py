@@ -88,7 +88,6 @@ def simple_ols(y, x) -> dict:
             'aic': aic,
             'bic': bic}
 
-
 def scipy_ols(y, x):
     pass
 
@@ -132,6 +131,42 @@ def panel_ols(y, x):
                 'll': np.nan,
                 'aic': np.nan,
                 'bic': np.nan}
+
+
+def _lstsq(x, y, rcond=None):
+    A = np.vstack([x, np.ones(len(x))]).T
+    if rcond is None:
+        eps = np.finfo(np.float64).eps
+        rcond = float(max(x.shape) * eps)
+    return np.linalg.lstsq(a=A, b=y, rcond=rcond)
+
+
+def _group_demean(x, group=None):
+    copy_x = x.copy()
+    if group is None:
+        return copy_x - np.mean(copy_x)
+    x_g = copy_x.groupby(group)
+    x_gm = x_g.transform(np.mean)
+    return copy_x - x_gm
+
+
+def simple_panel_ols(y, x, group):
+    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
+        raise ValueError("Inputs must not be empty.")
+    y_c = _group_demean(y, group)
+    x_c = _group_demean(x, group)
+    res = _lstsq(x_c, y_c)[0].round(6)
+    nobs = y.shape[0]  # number of observations
+    ncoef = x.shape[1]  # number of coef.
+    ll = res.loglik
+    aic = (-2 * ll) + (2 * ncoef)
+    bic = (-2 * ll) + (ncoef * np.log(nobs))
+    b = res[0]
+    return {'b': b,
+            'p': np.nan,
+            'll': ll,
+            'aic': aic,
+            'bic': bic}
 
 
 def save_myrobust(beta, p, aic, bic, example_path):

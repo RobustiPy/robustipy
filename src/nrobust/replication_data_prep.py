@@ -34,7 +34,7 @@ def prepare_asc(asc_path):
     ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
     one_hot = pd.get_dummies(ASC_df['year'])
     ASC_df = ASC_df.join(one_hot)
-    ASC_df = ASC_df.set_index(['pidp', 'year'])
+    #ASC_df = ASC_df.set_index(['pidp', 'year'])
     ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew'] * ASC_df['lrealgs']
     #ASC_df['constant'] = 1
     y = ASC_df['wellbeing_kikert']
@@ -47,5 +47,6 @@ def prepare_asc(asc_path):
                 'house_ownership', 'hhsize', 'work', 'retired',
                 ]]
 
+    group = ASC_df['pidp']
 
-    return y, c, x
+    return y, c, x, group
