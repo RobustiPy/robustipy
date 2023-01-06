@@ -64,6 +64,10 @@ class OLSRobust(Protomodel):
 
     def __init__(self, *, y, x):
         super().__init__()
+        if y.isnull().values.any():
+            raise ValueError('NaNs are not supported. NaN values found in y')
+        if x.isnull().values.any():
+            raise ValueError('NaNs are not supported. NaN values found in x')
         self.y = y
         self.x = x
         self.results = None
@@ -112,6 +116,9 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         '''
 
+        if controls.isnull().values.any():
+            raise ValueError(
+                'NaNs are not supported./NaN values found in controls')
         vars_names = list(controls.columns.values)
         space_n = space_size(vars_names)
         specs = []

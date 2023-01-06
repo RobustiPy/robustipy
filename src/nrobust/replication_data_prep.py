@@ -32,6 +32,7 @@ def prepare_union(path_to_union):
 
 def prepare_asc(asc_path):
     ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
+    ASC_df.dropna(inplace=True)
     one_hot = pd.get_dummies(ASC_df['year'])
     ASC_df = ASC_df.join(one_hot)
     #ASC_df = ASC_df.set_index(['pidp', 'year'])
