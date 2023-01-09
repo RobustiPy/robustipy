@@ -79,7 +79,7 @@ def simple_ols(y, x) -> dict:
     R2 = 1 - e.var() / y.var()  # model R-squared
     R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
-          * np.log(np.dot(e.T, e) / nobs))
+          * np.log(abs(np.dot(e.T, e) / nobs)))
     aic = (-2 * ll) + (2 * ncoef)
     bic = (-2 * ll) + (ncoef * np.log(nobs))
     return {'b': b,
@@ -133,14 +133,6 @@ def panel_ols(y, x):
                 'bic': np.nan}
 
 
-def _lstsq(x, y, rcond=None):
-    A = np.vstack([x, np.ones(len(x))]).T
-    if rcond is None:
-        eps = np.finfo(np.float64).eps
-        rcond = float(max(x.shape) * eps)
-    return np.linalg.lstsq(a=A, b=y, rcond=rcond)
-
-
 def _group_demean(x, group=None):
     copy_x = x.copy()
     if group is None:
@@ -155,18 +147,7 @@ def simple_panel_ols(y, x, group):
         raise ValueError("Inputs must not be empty.")
     y_c = _group_demean(y, group)
     x_c = _group_demean(x, group)
-    res = _lstsq(x_c, y_c)[0].round(6)
-    nobs = y.shape[0]  # number of observations
-    ncoef = x.shape[1]  # number of coef.
-    ll = res.loglik
-    aic = (-2 * ll) + (2 * ncoef)
-    bic = (-2 * ll) + (ncoef * np.log(nobs))
-    b = res[0]
-    return {'b': b,
-            'p': np.nan,
-            'll': ll,
-            'aic': aic,
-            'bic': bic}
+    return simple_ols(x_c, y_c)
 
 
 def save_myrobust(beta, p, aic, bic, example_path):

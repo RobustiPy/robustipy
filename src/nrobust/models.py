@@ -198,9 +198,7 @@ class OLSRobust(Protomodel):
         if group is None:
             output = simple_ols(y, x)
         else:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                output = simple_panel_ols(y, x, group)
+            output = simple_panel_ols(y, x, group)
         b = output['b']
         p = output['p']
         aic = output['aic']
@@ -218,17 +216,7 @@ class OLSRobust(Protomodel):
             b, p, aic, bic = self._estimate(y=y,
                                             x=x,
                                             group=group)
-            # @TODO better error handling:
-            # TypeError: 'float' object is not subscriptable
-            try:
-                b = b[0]
-            except:
-                b = b
-            try:
-                p = p[0]
-            except:
-                p = p
-            return b, p, aic, bic
+            return b[0][0], p[0][0], aic[0][0], bic[0][0]
 
     def _strap(self, comb_var, group, sample_size, replace):
 
@@ -270,14 +258,4 @@ class OLSRobust(Protomodel):
             b, p, aic, bic = self._estimate(y=y,
                                             x=x,
                                             group=group)
-            # @TODO better error handling:
-            # TypeError: 'float' object is not subscriptable
-            try:
-                b = b[0]
-            except:
-                b = b
-            try:
-                p = p[0]
-            except:
-                p = p
-            return b, p, aic, bic
+            return b[0][0], p[0][0]

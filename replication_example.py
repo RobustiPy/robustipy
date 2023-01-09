@@ -54,17 +54,17 @@ def make_ASC_example():
     #full_beta = mod.fit(cov_type='clustered', cluster_entity=True).params[0]
     #b_spec, p_spec, aic_spec, bic_spec = full_curve(y, x, c, 'panel')
     myrobust_panel = OLSRobust(y=y, x=x)
-    
-    beta, p, aic, bic = myrobust_panel.fit(controls=c,
-                                           draws=20,
-                                           group=g,
-                                           sample_size=50000,
-                                           replace=True)
-    #ASC_path = os.path.join('data', 'intermediate', 'ASC_example')
-    #save_myrobust(beta, p, aic, bic, ASC_path)
-    #save_spec(b_spec, p_spec, aic_spec, bic_spec, ASC_path)
-    #beta, summary_df, list_df = load_myrobust(ASC_path)
-    #b_spec, p_spec, aic_spec, bic_spec = load_spec(ASC_path)
+    myrobust_panel.fit(controls=c,
+                       draws=10,
+                       group=g,
+                       sample_size=50000,
+                       replace=True)
+    results = myrobust_panel.get_results()
+
+    fig, ax1, ax2, ax3 = results.plot()
+    plt.savefig(os.path.join(os.getcwd(), 'figures',
+                             'ASC_example',
+                             'curve.png'))
 
 
 make_ASC_example()
