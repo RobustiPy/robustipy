@@ -56,7 +56,7 @@ def prepare_asc(asc_path):
     c = ASC_df[['married', 'widowed', 'disable', 'lrealtinc_m',
                 'house_ownership', 'hhsize', 'work', 'retired',
                 ]]
-
+    c.loc[:, 'constant'] = 1
     group = ASC_df['pidp']
 
     return y, c, x, group

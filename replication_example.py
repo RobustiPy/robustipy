@@ -18,8 +18,8 @@ def make_union_example():
 
     union_robust = OLSRobust(y=y, x=x)
     union_robust.fit(controls=c,
-                     draws=10,
-                     sample_size=100,
+                     draws=100,
+                     sample_size=1000,
                      replace=True)
 
     union_results = union_robust.get_results()
@@ -38,8 +38,8 @@ make_union_example()
 
 def make_ASC_example():
     y, c, x, g = prepare_asc(os.path.join('data',
-                                       'input',
-                                       'CleanData_LASpending.dta'))
+                                          'input',
+                                          'CleanData_LASpending.dta'))
 
     # @TODO handle this missingvalue warning:
     #  dropping nans results in singularity issues
@@ -55,7 +55,7 @@ def make_ASC_example():
     #b_spec, p_spec, aic_spec, bic_spec = full_curve(y, x, c, 'panel')
     myrobust_panel = OLSRobust(y=y, x=x)
     myrobust_panel.fit(controls=c,
-                       draws=10,
+                       draws=1,
                        group=g,
                        sample_size=50000,
                        replace=True)

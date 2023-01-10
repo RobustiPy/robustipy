@@ -6,8 +6,9 @@ import warnings
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
-from nrobust.utils import panel_ols
 from nrobust.utils import simple_panel_ols
+from nrobust.bootstrap_utils import stripped_ols
+from nrobust.bootstrap_utils import stripped_panel_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
@@ -196,27 +197,25 @@ class OLSRobust(Protomodel):
         '''
 
         if group is None:
-            output = simple_ols(y, x)
+            output = stripped_ols(y, x)
         else:
-            output = simple_panel_ols(y, x, group)
+            output = stripped_panel_ols(y, x, group)
         b = output['b']
         p = output['p']
-        aic = output['aic']
-        bic = output['bic']
-        return b, p, aic, bic
+        return b, p
 
     def _full_sample(self, comb_var, group):
         y = comb_var.iloc[:, :1]
         x = comb_var.iloc[:, 1:]
         if group is None:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x)
-            return b[0][0], p[0][0], aic[0][0], bic[0][0]
+            out = simple_ols(y=y,
+                             x=x)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
         else:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            group=group)
-            return b[0][0], p[0][0], aic[0][0], bic[0][0]
+            out = simple_panel_ols(y=y,
+                                   x=x,
+                                   group=group)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
 
     def _strap(self, comb_var, group, sample_size, replace):
 
@@ -246,16 +245,21 @@ class OLSRobust(Protomodel):
            Bayesian Information Criteria for the model.
         '''
 
-        samp_df = comb_var.sample(n=sample_size, replace=replace)
-        # @TODO generalize the frac to the function call
-        y = samp_df.iloc[:, :1]
-        x = samp_df.iloc[:, 1:]
+
         if group is None:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x)
+            samp_df = comb_var.sample(n=sample_size, replace=replace)
+            # @TODO generalize the frac to the function call
+            y = samp_df.iloc[:, :1]
+            x = samp_df.iloc[:, 1:]
+            b, p = self._estimate(y=y,
+                                  x=x)
             return b[0][0], p[0][0]
         else:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            group=group)
+            samp_df = comb_var.groupby(group).sample(frac=0.3, replace=replace)
+            # @TODO generalize the frac to the function call
+            y = samp_df.iloc[:, :1]
+            x = samp_df.iloc[:, 1:]
+            b, p = self._estimate(y=y,
+                                  x=x,
+                                  group=group)
             return b[0][0], p[0][0]

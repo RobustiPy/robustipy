@@ -88,9 +88,6 @@ def simple_ols(y, x) -> dict:
             'aic': aic,
             'bic': bic}
 
-def scipy_ols(y, x):
-    pass
-
 
 def panel_ols(y, x):
     if np.asarray(x).size == 0 or np.asarray(y).size == 0:
@@ -133,7 +130,7 @@ def panel_ols(y, x):
                 'bic': np.nan}
 
 
-def _group_demean(x, group=None):
+def group_demean(x, group=None):
     copy_x = x.copy()
     if group is None:
         return copy_x - np.mean(copy_x)
@@ -145,9 +142,10 @@ def _group_demean(x, group=None):
 def simple_panel_ols(y, x, group):
     if np.asarray(x).size == 0 or np.asarray(y).size == 0:
         raise ValueError("Inputs must not be empty.")
-    y_c = _group_demean(y, group)
-    x_c = _group_demean(x, group)
+    y_c = group_demean(y, group)
+    x_c = group_demean(x, group)
     return simple_ols(x_c, y_c)
+
 
 
 def save_myrobust(beta, p, aic, bic, example_path):
