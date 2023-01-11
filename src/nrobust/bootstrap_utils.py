@@ -1,0 +1,70 @@
+import numpy as np
+import scipy
+from linearmodels.panel import PanelOLS
+np.seterr(divide='ignore', invalid='ignore')
+
+
+def group_demean(x, group=None):
+    data = x.copy()
+    if group is None:
+        return data - np.mean(data)
+    data_gm = data.groupby([group]).transform(np.mean)
+    return data.drop(columns=group) - data_gm
+
+
+def stripped_ols(y, x) -> dict:
+    x = np.asarray(x)
+    y = np.asarray(y)
+    if x.size == 0 or y.size == 0:
+        raise ValueError("Inputs must not be empty.")
+    inv_xx = np.linalg.inv(np.dot(x.T, x))
+    xy = np.dot(x.T, y)
+    b = np.dot(inv_xx, xy)
+    nobs = y.shape[0]  # number of observations
+    ncoef = x.shape[1]  # number of coef.
+    df_e = nobs - ncoef  # degrees of freedom, error
+    e = y - np.dot(x, b)  # residuals
+    sse = np.dot(e.T, e) / df_e  # SSE
+    se = np.sqrt(np.diagonal(sse * inv_xx)) # coef. standard errors
+    t = b / se  # coef. t-statistics
+    p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
+    return {'b': b,
+            'p': p}
+
+
+def stripped_panel_ols(y, x, group):
+    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
+        raise ValueError("Inputs must not be empty.")
+    y_c = group_demean(y, group)
+    x_c = group_demean(x, group)
+    return stripped_ols(x_c, y_c)
+
+
+def old_panel_ols(y, x):
+    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
+        raise ValueError("Inputs must not be empty.")
+    try:
+        mod = PanelOLS(y,
+                       x,
+                       entity_effects=True,
+                       drop_absorbed=True,
+                       # necessary because we dont always have
+                       # full rank on some resamples...
+                       # @TODO: a better way to handle this?
+                      #                    check_rank=False
+                                          )
+        res = mod.fit(cov_type='clustered',
+                      cluster_entity=True)
+        try:
+        # @TODO: necessary due to a singular matrix error
+        # due to resampling of the ASC data. Not sure what
+        # else to do.
+            p = res.pvalues
+        except:
+            p = np.nan
+        b = res.params
+        return {'b': b,
+                'p': p}
+    except ValueError:
+        return {'b': np.nan,
+                'p': np.nan}

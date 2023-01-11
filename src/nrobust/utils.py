@@ -131,12 +131,11 @@ def panel_ols(y, x):
 
 
 def group_demean(x, group=None):
-    copy_x = x.copy()
+    data = x.copy()
     if group is None:
-        return copy_x - np.mean(copy_x)
-    x_g = copy_x.groupby(group)
-    x_gm = x_g.transform(np.mean)
-    return copy_x - x_gm
+        return data - np.mean(data)
+    data_gm = data.groupby([group]).transform(np.mean)
+    return data.drop(columns=group) - data_gm
 
 
 def simple_panel_ols(y, x, group):
@@ -145,7 +144,6 @@ def simple_panel_ols(y, x, group):
     y_c = group_demean(y, group)
     x_c = group_demean(x, group)
     return simple_ols(x_c, y_c)
-
 
 
 def save_myrobust(beta, p, aic, bic, example_path):
