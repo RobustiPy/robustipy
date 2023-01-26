@@ -13,6 +13,7 @@ from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
+from multiprocessing import Pool
 
 
 class OLSResult(Protoresult):
@@ -172,7 +173,7 @@ class OLSRobust(Protomodel):
 
     def _full_est(self, comb_var, group):
         if group is None:
-            y = comb_var.loc[:, :self.y]
+            y = comb_var.loc[:, self.y]
             x = comb_var.drop(columns=self.y)
             out = simple_ols(y=y,
                              x=x)
@@ -216,7 +217,7 @@ class OLSRobust(Protomodel):
         if group is None:
             samp_df = comb_var.sample(n=sample_size, replace=replace)
             # @TODO generalize the frac to the function call
-            y = samp_df.loc[:, :self.y]
+            y = samp_df.loc[:, self.y]
             x = samp_df.drop(columns=self.y)
             output = stripped_ols(y, x)
             b = output['b']
@@ -234,3 +235,111 @@ class OLSRobust(Protomodel):
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]
+
+
+class OLSRobust_fast(Protomodel):
+    def __init__(self, *, y, x, data):
+        super().__init__()
+        if data.isnull().values.any():
+            raise ValueError('NaNs are not supported. NaN values found in data')
+        if isinstance(y, list) and isinstance(x, list):
+            self.y: list = y
+            self.x: list = x
+        else:
+            raise TypeError("'y' and 'x' must be of type list[str]")
+        self.data: pd.DataFrame = data
+        self.results = None
+
+    def get_results(self):
+        return self.results
+
+    def _full_est(self, comb_var, group):
+        if group is None:
+            y = comb_var.loc[:, self.y]
+            x = comb_var.drop(columns=self.y)
+            out = simple_ols(y=y,
+                             x=x)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+        else:
+            y = comb_var.loc[:, self.y + [group]]
+            x = comb_var.drop(columns=self.y)
+            out = simple_panel_ols(y=y,
+                                   x=x,
+                                   group=group)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+
+    def path_ols(self, s):
+        b_list = []
+        p_list = []
+        for spec, index in zip(all_subsets(self.controls),
+                               range(0, self.space_n)):
+            if len(spec) == 0:
+                sample_spec = s[self.y + self.x]
+            else:
+                sample_spec = s[self.y + self.x + list(spec)]
+
+            y = sample_spec.loc[:, self.y]
+            x = sample_spec.drop(columns=self.y)
+
+            out = stripped_ols(y=y,
+                               x=x)
+            b = out['b'][0][0]
+            p = out['p'][0][0]
+
+            b_list.append(b)
+            p_list.append(p)
+        return b_list, p_list
+
+    def fit(self,
+            *,
+            controls,
+            info='bic',
+            group: str = None,
+            draws=10,
+            sample_size=100,
+            replace=False):
+        self.controls = controls
+        self.info = info
+        self.group = group
+        self.draws = draws
+        self.sample_size = sample_size
+        self.replace = replace
+        self.space_n = space_size(controls)
+        self.specs = []
+        self.b_array = np.empty([self.space_n, draws])
+        self.p_array = np.empty([self.space_n, draws])
+        self.aic_array = np.empty([self.space_n])
+        self.bic_array = np.empty([self.space_n])
+
+        if self.group is None:
+            self.samples: list = []
+            for i in range(draws):
+                sample = self.data.sample(n=sample_size, replace=replace)
+                self.samples.append(sample)
+
+            with Pool() as pool:
+                out = pool.map(self.path_ols, self.samples)
+                for ele, index in zip(out, range(self.draws)):
+                    self.b_array[:, index] = ele[0]
+                    self.p_array[:, index] = ele[1]
+
+            for spec, index in zip(all_subsets(controls),
+                                   tqdm(range(0, self.space_n))):
+                if len(spec) == 0:
+                    data_spec = self.data[self.y + self.x]
+                else:
+                    data_spec = self.data[self.y + self.x + list(spec)]
+
+                b_discard, p_discard, aic_i, bic_i = self._full_est(data_spec,
+                                                                    self.group)
+                self.aic_array[index] = aic_i
+                self.bic_array[index] = bic_i
+                self.specs.append(frozenset(spec))
+
+        results = OLSResult(specs=self.specs,
+                            estimates=self.b_array,
+                            p_values=self.p_array,
+                            aic_array=self.aic_array,
+                            bic_array=self.bic_array)
+
+        self.results = results

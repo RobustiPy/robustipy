@@ -38,33 +38,3 @@ def stripped_panel_ols(y, x, group):
     y_c = group_demean(y, group)
     x_c = group_demean(x, group)
     return stripped_ols(x_c, y_c)
-
-
-def old_panel_ols(y, x):
-    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
-        raise ValueError("Inputs must not be empty.")
-    try:
-        mod = PanelOLS(y,
-                       x,
-                       entity_effects=True,
-                       drop_absorbed=True,
-                       # necessary because we dont always have
-                       # full rank on some resamples...
-                       # @TODO: a better way to handle this?
-                      #                    check_rank=False
-                                          )
-        res = mod.fit(cov_type='clustered',
-                      cluster_entity=True)
-        try:
-        # @TODO: necessary due to a singular matrix error
-        # due to resampling of the ASC data. Not sure what
-        # else to do.
-            p = res.pvalues
-        except:
-            p = np.nan
-        b = res.params
-        return {'b': b,
-                'p': p}
-    except ValueError:
-        return {'b': np.nan,
-                'p': np.nan}

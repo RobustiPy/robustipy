@@ -10,16 +10,18 @@ from nrobust.utils import save_myrobust,\
     load_myrobust, full_curve, save_spec,\
     load_spec
 import matplotlib.pyplot as plt
+from nrobust.utils import decorator_timer
 
 
-def make_union_example():
+@decorator_timer
+def make_union_example_a():
     y, c, x, data = prepare_union(os.path.join('data',
                                          'input',
                                          'nlsw88.dta'))
     data = data.dropna()
     union_robust = OLSRobust(y=y, x=x, data=data)
     union_robust.fit(controls=c,
-                     draws=5,
+                     draws=100,
                      sample_size=100,
                      replace=True)
 
@@ -34,7 +36,31 @@ def make_union_example():
                              'curve_exp1.png'))
 
 
-make_union_example()
+@decorator_timer
+def make_union_example_b():
+    y, c, x, data = prepare_union(os.path.join('data',
+                                         'input',
+                                         'nlsw88.dta'))
+    data = data.dropna()
+    union_robust = OLSRobust(y=y, x=x, data=data)
+    union_robust.fit_b(controls=c,
+                       draws=100,
+                       sample_size=100,
+                       replace=True)
+
+    union_results = union_robust.get_results()
+
+    fig, ax1, ax2, ax3 = union_results.plot(specs=[['hours', 'collgrad'],
+                                                   ['collgrad'],
+                                                   ['hours', 'age']],
+                                            figsize=(36, 12))
+    plt.savefig(os.path.join(os.getcwd(), 'figures',
+                             'union_example',
+                             'curve_exp1.png'))
+
+
+make_union_example_a()
+make_union_example_b()
 
 
 def make_ASC_example():
