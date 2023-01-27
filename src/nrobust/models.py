@@ -290,6 +290,28 @@ class OLSRobust_fast(Protomodel):
             p_list.append(p)
         return b_list, p_list
 
+    def path_fixeffects(self, s):
+        b_list = []
+        p_list = []
+        for spec, index in zip(all_subsets(self.controls),
+                               range(0, self.space_n)):
+            if len(spec) == 0:
+                sample_spec = s[self.y + self.x + [self.group]]
+            else:
+                sample_spec = s[self.y + self.x + [self.group] + list(spec)]
+
+            y = sample_spec.loc[:, self.y + [self.group]]
+            x = sample_spec.drop(columns=self.y)
+            out = stripped_panel_ols(y=y,
+                                     x=x,
+                                     group=self.group)
+            b = out['b'][0][0]
+            p = out['p'][0][0]
+
+            b_list.append(b)
+            p_list.append(p)
+        return b_list, p_list
+
     def fit(self,
             *,
             controls,
@@ -313,8 +335,9 @@ class OLSRobust_fast(Protomodel):
 
         if self.group is None:
             self.samples: list = []
-            for i in range(draws):
-                sample = self.data.sample(n=sample_size, replace=replace)
+            for i in range(self.draws):
+                sample = self.data.sample(n=self.sample_size,
+                                          replace=replace)
                 self.samples.append(sample)
 
             with Pool() as pool:
@@ -329,6 +352,35 @@ class OLSRobust_fast(Protomodel):
                     data_spec = self.data[self.y + self.x]
                 else:
                     data_spec = self.data[self.y + self.x + list(spec)]
+
+                b_discard, p_discard, aic_i, bic_i = self._full_est(data_spec,
+                                                                    self.group)
+                self.aic_array[index] = aic_i
+                self.bic_array[index] = bic_i
+                self.specs.append(frozenset(spec))
+
+        else:
+            self.samples: list = []
+            for i in range(self.draws):
+                idx = np.random.choice(self.data[self.group].unique(),
+                                       self.sample_size)
+                sample = self.data[self.data[self.group].isin(idx)]
+                # dropping singletons
+                sample = sample[sample.groupby(self.group).transform('size') > 1]
+                self.samples.append(sample)
+
+            with Pool() as pool:
+                out = pool.map(self.path_fixeffects, self.samples)
+                for ele, index in zip(out, range(self.draws)):
+                    self.b_array[:, index] = ele[0]
+                    self.p_array[:, index] = ele[1]
+            print(self.b_array)
+            for spec, index in zip(all_subsets(controls),
+                                   tqdm(range(0, self.space_n))):
+                if len(spec) == 0:
+                    data_spec = self.data[self.y + self.x + [self.group]]
+                else:
+                    data_spec = self.data[self.y + self.x + [self.group] + list(spec)]
 
                 b_discard, p_discard, aic_i, bic_i = self._full_est(data_spec,
                                                                     self.group)
