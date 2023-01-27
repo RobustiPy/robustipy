@@ -6,12 +6,14 @@ import warnings
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
-from nrobust.utils import panel_ols
 from nrobust.utils import simple_panel_ols
+from nrobust.bootstrap_utils import stripped_ols
+from nrobust.bootstrap_utils import stripped_panel_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
+from multiprocessing import Pool
 
 
 class OLSResult(Protoresult):
@@ -51,10 +53,12 @@ class OLSRobust(Protomodel):
 
     Parameters
     ----------
-    y : Array like object
-     Array like object containing the data for the dependent variable.
-    x : Array like object
-     Array like object containing the data for the independent variable(s).
+    y : str
+     Name of the dependent variable.
+    x : str or list<str>
+     Names of names of the independent variable(s).
+    data : DataFrame
+     DataFrame contaning all the data to be used in the model.
 
     Returns
     -------
@@ -62,14 +66,13 @@ class OLSRobust(Protomodel):
         An object containing the key metrics.
     """
 
-    def __init__(self, *, y, x):
+    def __init__(self, *, y, x, data):
         super().__init__()
-        if y.isnull().values.any():
-            raise ValueError('NaNs are not supported. NaN values found in y')
-        if x.isnull().values.any():
-            raise ValueError('NaNs are not supported. NaN values found in x')
+        if data.isnull().values.any():
+            raise ValueError('NaNs are not supported. NaN values found in data')
         self.y = y
         self.x = x
+        self.data = data
         self.results = None
 
     def get_results(self):
@@ -79,7 +82,7 @@ class OLSRobust(Protomodel):
             *,
             controls,
             info='bic',
-            group=None,
+            group: str = None,
             draws=1000,
             sample_size=1000,
             replace=False):
@@ -90,17 +93,16 @@ class OLSRobust(Protomodel):
 
         Parameters
         ----------
-        controls : Data.Frame
-                Pandas data frame containing the all the possible
+        controls : list<str>
+                List containing all the names of the  possible
                 control variables of the model.
         info : str
             Type of information criteria to be included in the
             output. Defaults to 'bic'.
         samples : int
               Number of bootstrap samples to collect.
-        mode : str
-            Estimation method. Curretly only supporting simple OLS
-            and panel OLS.
+        group : str
+            Grouping variable. If provided a Fixed Effects model is estimated.
 
         Returns
         -------
@@ -116,31 +118,38 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         '''
 
-        if controls.isnull().values.any():
-            raise ValueError(
-                'NaNs are not supported./NaN values found in controls')
-        vars_names = list(controls.columns.values)
-        space_n = space_size(vars_names)
+        space_n = space_size(controls)
         specs = []
         b_array = np.empty([space_n, draws])
         p_array = np.empty([space_n, draws])
         aic_array = np.empty([space_n])
         bic_array = np.empty([space_n])
 
-        for spec, index in zip(all_subsets(vars_names),
+        for spec, index in zip(all_subsets(controls),
                                tqdm(range(0, space_n))):
             if len(spec) == 0:
-                comb = self.x
+                comb = self.data[self.x]
             else:
-                comb = pd.merge(self.x, controls[list(spec)],
-                                how='left', left_index=True,
+                comb = pd.merge(self.data[self.x],
+                                self.data[list(spec)],
+                                how='left',
+                                left_index=True,
                                 right_index=True)
-            comb = pd.merge(self.y, comb, how='left', left_index=True,
+            comb = pd.merge(self.data[self.y],
+                            comb,
+                            how='left',
+                            left_index=True,
                             right_index=True)
+            if group:
+                comb = pd.merge(self.data[[group]],
+                                comb,
+                                how='left',
+                                left_index=True,
+                                right_index=True)
 
-            b_discard, p_discard, aic_i, bic_i = self._full_sample(comb, group)
+            b_discard, p_discard, aic_i, bic_i = self._full_est(comb, group)
 
-            b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap)
+            b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
                                                        (comb,
                                                         group,
                                                         sample_size,
@@ -162,63 +171,22 @@ class OLSRobust(Protomodel):
 
         self.results = results
 
-    def _estimate(self, y, x, group=None):
-
-        '''
-        This method calls utils estimation functions
-        depending of mode parameter. This method intentionally
-        returns raw outputs from the estimation methods calls.
-
-        Parameters
-        ----------
-        y : Array
-          1D array like object (pandas dataframe of numpy array)
-          contaning the data for y.
-        x : Array
-          ND array like object (pandas dataframe of numpy array)
-          contaning the data for x and controls.
-        mode : str
-            Estimation method. Curretly only supporting simple OLS
-            and panel OLS.
-
-        Returns
-        -------
-        beta : Array
-            Numpy array contaning the estimates of the independent variable x
-            for each specification of control variables across all the
-            bootstrap samples.
-        p : Array
-         Numpy array containing the p values of all the betas.
-        aic : Array
-           Numpy array containing aic values for estimated models.
-        bic : Array
-           Numpy array containing aic values for estimated models.
-        '''
-
+    def _full_est(self, comb_var, group):
         if group is None:
-            output = simple_ols(y, x)
+            y = comb_var.loc[:, self.y]
+            x = comb_var.drop(columns=self.y)
+            out = simple_ols(y=y,
+                             x=x)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
         else:
-            output = simple_panel_ols(y, x, group)
-        b = output['b']
-        p = output['p']
-        aic = output['aic']
-        bic = output['bic']
-        return b, p, aic, bic
+            y = comb_var.loc[:, [self.y, group]]
+            x = comb_var.drop(columns=self.y)
+            out = simple_panel_ols(y=y,
+                                   x=x,
+                                   group=group)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
 
-    def _full_sample(self, comb_var, group):
-        y = comb_var.iloc[:, :1]
-        x = comb_var.iloc[:, 1:]
-        if group is None:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x)
-            return b[0][0], p[0][0], aic[0][0], bic[0][0]
-        else:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            group=group)
-            return b[0][0], p[0][0], aic[0][0], bic[0][0]
-
-    def _strap(self, comb_var, group, sample_size, replace):
+    def _strap_est(self, comb_var, group, sample_size, replace):
 
         '''
         This method calls self._estimate() over a random sample
@@ -230,9 +198,9 @@ class OLSRobust(Protomodel):
         comb_var : Array
                 ND array like object (pandas dataframe of numpy array)
                 contaning the data for y, x, and controls.
-        mode : str
-            Estimation method. Curretly only supporting simple OLS
-            and panel OLS.
+        group : str
+            Grouping variable. If provided a Fixed Effects model is estimated.
+
 
         Returns
         -------
@@ -246,16 +214,132 @@ class OLSRobust(Protomodel):
            Bayesian Information Criteria for the model.
         '''
 
-        samp_df = comb_var.sample(n=sample_size, replace=replace)
-        # @TODO generalize the frac to the function call
-        y = samp_df.iloc[:, :1]
-        x = samp_df.iloc[:, 1:]
         if group is None:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x)
+            samp_df = comb_var.sample(n=sample_size, replace=replace)
+            # @TODO generalize the frac to the function call
+            y = samp_df.loc[:, self.y]
+            x = samp_df.drop(columns=self.y)
+            output = stripped_ols(y, x)
+            b = output['b']
+            p = output['p']
             return b[0][0], p[0][0]
         else:
-            b, p, aic, bic = self._estimate(y=y,
-                                            x=x,
-                                            group=group)
+            #samp_df = comb_var.groupby(group).sample(frac=0.3, replace=replace)
+            # @TODO generalize the frac to the function call
+            idx = np.random.choice(comb_var[group].unique(), sample_size)
+            select = comb_var[comb_var[group].isin(idx)]
+            no_singleton = select[select.groupby(group).transform('size') > 1]
+            y = no_singleton.loc[:, [self.y, group]]
+            x = no_singleton.drop(columns=self.y)
+            output = stripped_panel_ols(y, x, group)
+            b = output['b']
+            p = output['p']
             return b[0][0], p[0][0]
+
+
+class OLSRobust_fast(Protomodel):
+    def __init__(self, *, y, x, data):
+        super().__init__()
+        if data.isnull().values.any():
+            raise ValueError('NaNs are not supported. NaN values found in data')
+        if isinstance(y, list) and isinstance(x, list):
+            self.y: list = y
+            self.x: list = x
+        else:
+            raise TypeError("'y' and 'x' must be of type list[str]")
+        self.data: pd.DataFrame = data
+        self.results = None
+
+    def get_results(self):
+        return self.results
+
+    def _full_est(self, comb_var, group):
+        if group is None:
+            y = comb_var.loc[:, self.y]
+            x = comb_var.drop(columns=self.y)
+            out = simple_ols(y=y,
+                             x=x)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+        else:
+            y = comb_var.loc[:, self.y + [group]]
+            x = comb_var.drop(columns=self.y)
+            out = simple_panel_ols(y=y,
+                                   x=x,
+                                   group=group)
+            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+
+    def path_ols(self, s):
+        b_list = []
+        p_list = []
+        for spec, index in zip(all_subsets(self.controls),
+                               range(0, self.space_n)):
+            if len(spec) == 0:
+                sample_spec = s[self.y + self.x]
+            else:
+                sample_spec = s[self.y + self.x + list(spec)]
+
+            y = sample_spec.loc[:, self.y]
+            x = sample_spec.drop(columns=self.y)
+
+            out = stripped_ols(y=y,
+                               x=x)
+            b = out['b'][0][0]
+            p = out['p'][0][0]
+
+            b_list.append(b)
+            p_list.append(p)
+        return b_list, p_list
+
+    def fit(self,
+            *,
+            controls,
+            info='bic',
+            group: str = None,
+            draws=10,
+            sample_size=100,
+            replace=False):
+        self.controls = controls
+        self.info = info
+        self.group = group
+        self.draws = draws
+        self.sample_size = sample_size
+        self.replace = replace
+        self.space_n = space_size(controls)
+        self.specs = []
+        self.b_array = np.empty([self.space_n, draws])
+        self.p_array = np.empty([self.space_n, draws])
+        self.aic_array = np.empty([self.space_n])
+        self.bic_array = np.empty([self.space_n])
+
+        if self.group is None:
+            self.samples: list = []
+            for i in range(draws):
+                sample = self.data.sample(n=sample_size, replace=replace)
+                self.samples.append(sample)
+
+            with Pool() as pool:
+                out = pool.map(self.path_ols, self.samples)
+                for ele, index in zip(out, range(self.draws)):
+                    self.b_array[:, index] = ele[0]
+                    self.p_array[:, index] = ele[1]
+
+            for spec, index in zip(all_subsets(controls),
+                                   tqdm(range(0, self.space_n))):
+                if len(spec) == 0:
+                    data_spec = self.data[self.y + self.x]
+                else:
+                    data_spec = self.data[self.y + self.x + list(spec)]
+
+                b_discard, p_discard, aic_i, bic_i = self._full_est(data_spec,
+                                                                    self.group)
+                self.aic_array[index] = aic_i
+                self.bic_array[index] = bic_i
+                self.specs.append(frozenset(spec))
+
+        results = OLSResult(specs=self.specs,
+                            estimates=self.b_array,
+                            p_values=self.p_array,
+                            aic_array=self.aic_array,
+                            bic_array=self.bic_array)
+
+        self.results = results
