@@ -4,44 +4,11 @@ import numpy as np
 import math
 import scipy
 import os
-import warnings
 import matplotlib
 import pandas as pd
 from itertools import chain, combinations
 # temporary solution to get PanelOLS estimates
 from linearmodels.panel import PanelOLS
-
-
-def full_curve(y, x, c, mode):
-    b = []
-    p = []
-    aic = []
-    bic = []
-    vars_names = list(c.columns.values)
-    spec_generator = all_subsets(vars_names)
-    comb = pd.merge(x, c,
-                    how='left', left_index=True,
-                    right_index=True)
-    for spec in spec_generator:
-        comb = pd.merge(x, c[list(spec)],
-                        how='left', left_index=True,
-                        right_index=True)
-        if mode == 'simple':
-            output = simple_ols(y, comb)
-        elif mode == 'panel':
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                output = panel_ols(y, comb)
-        b.append(float(output['b'][0]))
-        if mode == 'panel':
-            p.append(float(output['p'][0]))
-            # @TODO something bad is happening here
-            # Likely related to issue #5 on GitHub
-        else:
-            p.append(float(output['p'][0][0]))
-        aic.append(float(output['aic']))
-        bic.append(float(output['bic']))
-    return b, p, aic, bic
 
 
 def space_size(iterable) -> int:
@@ -70,14 +37,14 @@ def simple_ols(y, x) -> dict:
     nobs = y.shape[0]  # number of observations
     ncoef = x.shape[1]  # number of coef.
     df_e = nobs - ncoef  # degrees of freedom, error
-    df_r = ncoef - 1  # degrees of freedom, regression
+    #df_r = ncoef - 1  # degrees of freedom, regression
     e = y - np.dot(x, b)  # residuals
     sse = np.dot(e.T, e) / df_e  # SSE
     se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
     t = b / se  # coef. t-statistics
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
-    R2 = 1 - e.var() / y.var()  # model R-squared
-    R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
+    #R2 = 1 - e.var() / y.var()  # model R-squared
+    #R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
           * np.log(abs(np.dot(e.T, e) / nobs)))
     aic = (-2 * ll) + (2 * ncoef)
@@ -87,47 +54,6 @@ def simple_ols(y, x) -> dict:
             'll': ll,
             'aic': aic,
             'bic': bic}
-
-
-def panel_ols(y, x):
-    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
-        raise ValueError("Inputs must not be empty.")
-    try:
-        mod = PanelOLS(y,
-                       x,
-                       entity_effects=True,
-                       drop_absorbed=True,
-                       # necessary because we dont always have
-                       # full rank on some resamples...
-                       # @TODO: a better way to handle this?
-                      #                    check_rank=False
-                                          )
-        res = mod.fit(cov_type='clustered',
-                      cluster_entity=True)
-        nobs = y.shape[0]  # number of observations
-        ncoef = x.shape[1]  # number of coef.
-        ll = res.loglik
-        aic = (-2 * ll) + (2 * ncoef)
-        bic = (-2 * ll) + (ncoef * np.log(nobs))
-        try:
-        # @TODO: necessary due to a singular matrix error
-        # due to resampling of the ASC data. Not sure what
-        # else to do.
-            p = res.pvalues
-        except:
-            p = np.nan
-        b = res.params
-        return {'b': b,
-                'p': p,
-                'll': ll,
-                'aic': aic,
-                'bic': bic}
-    except ValueError:
-        return {'b': np.nan,
-                'p': np.nan,
-                'll': np.nan,
-                'aic': np.nan,
-                'bic': np.nan}
 
 
 def group_demean(x, group=None):
@@ -246,3 +172,44 @@ def get_colors(specs, color_set_name=None):
         return colorset.colors
     else:
         raise ValueError('Argument `specs` must be a list of list.')
+
+
+def panel_ols(y, x):
+    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
+        raise ValueError("Inputs must not be empty.")
+    try:
+        mod = PanelOLS(y,
+                       x,
+                       entity_effects=True,
+                       drop_absorbed=True,
+                       # necessary because we dont always have
+                       # full rank on some resamples...
+                       # @TODO: a better way to handle this?
+                      #                    check_rank=False
+                                          )
+        res = mod.fit(cov_type='clustered',
+                      cluster_entity=True)
+        nobs = y.shape[0]  # number of observations
+        ncoef = x.shape[1]  # number of coef.
+        ll = res.loglik
+        aic = (-2 * ll) + (2 * ncoef)
+        bic = (-2 * ll) + (ncoef * np.log(nobs))
+        try:
+        # @TODO: necessary due to a singular matrix error
+        # due to resampling of the ASC data. Not sure what
+        # else to do.
+            p = res.pvalues
+        except:
+            p = np.nan
+        b = res.params
+        return {'b': b,
+                'p': p,
+                'll': ll,
+                'aic': aic,
+                'bic': bic}
+    except ValueError:
+        return {'b': np.nan,
+                'p': np.nan,
+                'll': np.nan,
+                'aic': np.nan,
+                'bic': np.nan}

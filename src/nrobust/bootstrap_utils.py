@@ -1,6 +1,5 @@
 import numpy as np
 import scipy
-from linearmodels.panel import PanelOLS
 np.seterr(divide='ignore', invalid='ignore')
 
 
@@ -25,7 +24,7 @@ def stripped_ols(y, x) -> dict:
     df_e = nobs - ncoef  # degrees of freedom, error
     e = y - np.dot(x, b)  # residuals
     sse = np.dot(e.T, e) / df_e  # SSE
-    se = np.sqrt(np.diagonal(sse * inv_xx)) # coef. standard errors
+    se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
     t = b / se  # coef. t-statistics
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
     return {'b': b,
