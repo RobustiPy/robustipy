@@ -56,7 +56,7 @@ def prepare_asc(asc_path):
                      'house_ownership', 'hhsize', 'work', 'retired',
                      'pidp', 'year', 'constant'
                      ]]
-    ASC_df = ASC_df.dropna()
+    #ASC_df = ASC_df.dropna()
     y = 'wellbeing_kikert'
     x = ['lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
          'DR', 'lgva', 'Mtotp', 'ddgree', 'age',

@@ -12,6 +12,8 @@ from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
+from nrobust.prototypes import MissingValueWarning
+import warnings
 
 
 class OLSResult(Protoresult):
@@ -67,7 +69,8 @@ class OLSRobust(Protomodel):
     def __init__(self, *, y, x, data):
         super().__init__()
         if data.isnull().values.any():
-            raise ValueError('NaNs are not supported. NaN values found in data')
+            warnings.warn('Missing values found in data. Listwise deletion will be applied',
+                          MissingValueWarning)
         self.y = y
         self.x = x
         self.data = data
@@ -138,12 +141,15 @@ class OLSRobust(Protomodel):
                             how='left',
                             left_index=True,
                             right_index=True)
+
+            comb = comb.dropna()
             if group:
                 comb = pd.merge(self.data[[group]],
                                 comb,
                                 how='left',
                                 left_index=True,
                                 right_index=True)
+                comb = comb.dropna()
 
             b_discard, p_discard, aic_i, bic_i = self._full_est(comb, group)
 

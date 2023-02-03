@@ -29,10 +29,17 @@ In a Python script import OLSRobust class running:
 ```python
 from nrobust.models import OLSRobust
 
-my_ols_robust = OLSrobust(y=y, x=x)
+model_robust = OLSRobust(y=y, x=x, data=data)
+
+model_robust.fit(controls=c,
+	             draws=100,
+                 sample_size=100,
+                 replace=True)
+
+model_results = model_robust.get_results()
 
 ```
-Where `y` is a 1D array containing your target variable data, and `x` is a 1D array containing your predictor data.
+Where `y` is a list of variables names used to create your dependent variable, and `x` is a list of variables names used as predictors.
 
 # Example
 
