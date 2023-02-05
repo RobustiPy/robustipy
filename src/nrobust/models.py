@@ -129,28 +129,13 @@ class OLSRobust(Protomodel):
         for spec, index in zip(all_subsets(controls),
                                tqdm(range(0, space_n))):
             if len(spec) == 0:
-                comb = self.data[self.x]
+                comb = self.data[self.y + self.x]
             else:
-                comb = pd.merge(self.data[self.x],
-                                self.data[list(spec)],
-                                how='left',
-                                left_index=True,
-                                right_index=True)
-            comb = pd.merge(self.data[self.y],
-                            comb,
-                            how='left',
-                            left_index=True,
-                            right_index=True)
+                comb = self.data[self.y + self.x + list(spec)]
+            if group:
+                comb = self.data[self.y + self.x + [group] + list(spec)]
 
             comb = comb.dropna()
-            if group:
-                comb = pd.merge(self.data[[group]],
-                                comb,
-                                how='left',
-                                left_index=True,
-                                right_index=True)
-                comb = comb.dropna()
-
             b_discard, p_discard, aic_i, bic_i = self._full_est(comb, group)
 
             b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
