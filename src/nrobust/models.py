@@ -18,12 +18,14 @@ import warnings
 
 class OLSResult(Protoresult):
     def __init__(self, *,
+                 y,
                  specs,
                  estimates,
                  p_values,
                  aic_array,
                  bic_array):
         super().__init__()
+        self.y_name = y
         self.specs_names = pd.Series(specs)
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
@@ -31,6 +33,7 @@ class OLSResult(Protoresult):
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['spec_name'] = self.specs_names
+        self.summary_df['y'] = self.y_name
 
     def summary(self):
         pass
@@ -79,11 +82,24 @@ class OLSRobust(Protomodel):
     def get_results(self):
         return self.results
 
+    def multiple_y(self):
+        self.y_specs = []
+        self.y_composites = []
+        print("Calculating Composite Ys")
+        for spec, index in zip(all_subsets(self.y),
+                               tqdm(range(0, space_size(self.y)))):
+            if len(spec) > 1:
+                subset = self.data[list(spec)]
+                subset = (subset-subset.mean())/subset.std()
+                self.y_composites.append(subset.mean(axis=1))
+                self.y_specs.append(spec)
+
     def fit(self,
             *,
             controls,
             info='bic',
             group: str = None,
+            bootstrap=True,
             draws=1000,
             sample_size=1000,
             replace=False):
@@ -119,59 +135,121 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         '''
 
-        space_n = space_size(controls)
-        specs = []
-        b_array = np.empty([space_n, draws])
-        p_array = np.empty([space_n, draws])
-        aic_array = np.empty([space_n])
-        bic_array = np.empty([space_n])
+        if len(self.y) > 1:
+            self.multiple_y()
+            list_b_array = []
+            list_p_array = []
+            list_aic_array = []
+            list_bic_array = []
+            y_names = []
+            specs = []
+            for y, y_name in zip(self.y_composites,
+                                 self.y_specs):
+                space_n = space_size(controls)
+                b_array = np.empty([space_n, draws])
+                p_array = np.empty([space_n, draws])
+                aic_array = np.empty([space_n])
+                bic_array = np.empty([space_n])
 
-        for spec, index in zip(all_subsets(controls),
-                               tqdm(range(0, space_n))):
-            if len(spec) == 0:
-                comb = self.data[self.y + self.x]
-            else:
-                comb = self.data[self.y + self.x + list(spec)]
-            if group:
-                comb = self.data[self.y + self.x + [group] + list(spec)]
+                for spec, index in zip(all_subsets(controls),
+                                       tqdm(range(0, space_n))):
+                    if len(spec) == 0:
+                        comb = self.data[self.x]
+                    else:
+                        comb = self.data[self.x + list(spec)]
+                    if group:
+                        comb = self.data[self.x + [group] + list(spec)]
 
-            comb = comb.dropna()
-            b_discard, p_discard, aic_i, bic_i = self._full_est(comb, group)
+                    comb = pd.concat([y, comb], axis=1)
+                    comb = comb.dropna()
+                    b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
+                                                                        group)
 
-            b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
-                                                       (comb,
-                                                        group,
-                                                        sample_size,
-                                                        replace)
-                                                       for i in range(0,
-                                                                      draws))))
+                    b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
+                                                               (comb,
+                                                                group,
+                                                                sample_size,
+                                                                replace)
+                                                               for i in range(0,
+                                                                              draws))))
+                    y_names.append(y_name)
+                    specs.append(frozenset(spec))
+                    b_array[index, :] = b_list
+                    p_array[index, :] = p_list
+                    aic_array[index] = aic_i
+                    bic_array[index] = bic_i
 
-            specs.append(frozenset(spec))
-            b_array[index, :] = b_list
-            p_array[index, :] = p_list
-            aic_array[index] = aic_i
-            bic_array[index] = bic_i
+                list_b_array.append(b_array)
+                list_p_array.append(p_array)
+                list_aic_array.append(aic_array)
+                list_bic_array.append(bic_array)
 
-        results = OLSResult(specs=specs,
-                            estimates=b_array,
-                            p_values=p_array,
-                            aic_array=aic_array,
-                            bic_array=bic_array)
+            results = OLSResult(y=y_names,
+                                specs=specs,
+                                estimates=np.vstack(list_b_array),
+                                p_values=np.vstack(list_p_array),
+                                aic_array=np.hstack(list_aic_array),
+                                bic_array=np.hstack(list_bic_array))
 
-        self.results = results
+            self.results = results
+
+        else:
+            space_n = space_size(controls)
+            specs = []
+            b_array = np.empty([space_n, draws])
+            p_array = np.empty([space_n, draws])
+            aic_array = np.empty([space_n])
+            bic_array = np.empty([space_n])
+            for spec, index in zip(all_subsets(controls),
+                                   tqdm(range(0, space_n))):
+                if len(spec) == 0:
+                    comb = self.data[self.y + self.x]
+                else:
+                    comb = self.data[self.y + self.x + list(spec)]
+                if group:
+                    comb = self.data[self.y + self.x + [group] + list(spec)]
+
+                comb = comb.dropna()
+                b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
+                                                                    group)
+
+                b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
+                                                           (comb,
+                                                            group,
+                                                            sample_size,
+                                                            replace)
+                                                           for i in range(0,
+                                                                          draws))))
+
+                specs.append(frozenset(spec))
+                b_array[index, :] = b_list
+                p_array[index, :] = p_list
+                aic_array[index] = aic_i
+                bic_array[index] = bic_i
+
+            results = OLSResult(y=self.y[0],
+                                specs=specs,
+                                estimates=b_array,
+                                p_values=p_array,
+                                aic_array=aic_array,
+                                bic_array=bic_array)
+
+            self.results = results
 
     def _full_est(self, comb_var, group):
         if group is None:
-            y = comb_var.loc[:, self.y]
-            x = comb_var.drop(columns=self.y)
+            y = comb_var.iloc[:, [0]]
+            x = comb_var.drop(comb_var.columns[0], axis=1)
             out = simple_ols(y=y,
                              x=x)
             return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
         else:
-            y = comb_var.loc[:, self.y + [group]]
-            x = comb_var.drop(columns=self.y)
-            out = simple_panel_ols(y=y,
-                                   x=x,
+            g = comb_var.loc[:, [group]]
+            y = comb_var.iloc[:, [0]]
+            y_g = pd.concat([y, g], axis=1)
+            x_g = comb_var.drop(comb_var.columns[0], axis=1)
+            out = simple_panel_ols(y=y_g,
+                                   x=x_g,
                                    group=group)
             return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
 
@@ -206,8 +284,8 @@ class OLSRobust(Protomodel):
         if group is None:
             samp_df = comb_var.sample(n=sample_size, replace=replace)
             # @TODO generalize the frac to the function call
-            y = samp_df.loc[:, self.y]
-            x = samp_df.drop(columns=self.y)
+            y = samp_df.iloc[:, [0]]
+            x = samp_df.drop(samp_df.columns[0], axis=1)
             output = stripped_ols(y, x)
             b = output['b']
             p = output['p']
@@ -218,9 +296,11 @@ class OLSRobust(Protomodel):
             idx = np.random.choice(comb_var[group].unique(), sample_size)
             select = comb_var[comb_var[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
-            y = no_singleton.loc[:, self.y + [group]]
-            x = no_singleton.drop(columns=self.y)
-            output = stripped_panel_ols(y, x, group)
+            g = no_singleton.loc[:, [group]]
+            y = no_singleton.iloc[:, [0]]
+            y_g = pd.concat([y, g], axis=1)
+            x_g = no_singleton.drop(no_singleton.columns[0], axis=1)
+            output = stripped_panel_ols(y_g, x_g, group)
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]

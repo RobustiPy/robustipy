@@ -16,7 +16,10 @@ def stripped_ols(y, x) -> dict:
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
         raise ValueError("Inputs must not be empty.")
-    inv_xx = np.linalg.inv(np.dot(x.T, x))
+    try:
+        inv_xx = np.linalg.inv(np.dot(x.T, x))
+    except np.linalg.LinAlgError:
+        inv_xx = np.linalg.pinv(np.dot(x.T, x))
     xy = np.dot(x.T, y)
     b = np.dot(inv_xx, xy)
     nobs = y.shape[0]  # number of observations

@@ -37,6 +37,7 @@ def prepare_union(path_to_union):
                           how='left',
                           left_index=True,
                           right_index=True)
+    final_data = final_data.reset_index(drop=True)
     return y, c, x, final_data
 
 
