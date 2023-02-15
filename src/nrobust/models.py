@@ -164,14 +164,14 @@ class OLSRobust(Protomodel):
                     comb = comb.dropna()
                     b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
                                                                         group)
-
-                    b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
-                                                               (comb,
-                                                                group,
-                                                                sample_size,
-                                                                replace)
-                                                               for i in range(0,
-                                                                              draws))))
+                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                          (delayed(self._strap_est)
+                                           (comb,
+                                            group,
+                                            sample_size,
+                                            replace)
+                                           for i in range(0,
+                                                          draws))))
                     y_names.append(y_name)
                     specs.append(frozenset(spec))
                     b_array[index, :] = b_list
@@ -212,14 +212,14 @@ class OLSRobust(Protomodel):
                 comb = comb.dropna()
                 b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
                                                                     group)
-
-                b_list, p_list = (zip(*Parallel(n_jobs=-1)(delayed(self._strap_est)
-                                                           (comb,
-                                                            group,
-                                                            sample_size,
-                                                            replace)
-                                                           for i in range(0,
-                                                                          draws))))
+                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                      (delayed(self._strap_est)
+                                       (comb,
+                                        group,
+                                        sample_size,
+                                        replace)
+                                       for i in range(0,
+                                                      draws))))
 
                 specs.append(frozenset(spec))
                 b_array[index, :] = b_list

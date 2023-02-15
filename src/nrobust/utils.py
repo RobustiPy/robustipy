@@ -13,12 +13,7 @@ from linearmodels.panel import PanelOLS
 
 def space_size(iterable) -> int:
     n = len(iterable)
-    n_per_iter = list(map(lambda x:
-                          math.factorial(n) / math.factorial(x)
-                          / math.factorial(n-x),
-                          range(0, n + 1)))
-    return round((sum(n_per_iter)))
-
+    return int(2**n)
 
 def all_subsets(ss):
     return chain(*map(lambda x: combinations(ss, x),
