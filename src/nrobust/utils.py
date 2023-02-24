@@ -1,7 +1,6 @@
 # Module containing utility functions for the library
 
 import numpy as np
-import math
 import scipy
 import os
 import matplotlib
@@ -14,6 +13,7 @@ from linearmodels.panel import PanelOLS
 def space_size(iterable) -> int:
     n = len(iterable)
     return int(2**n)
+
 
 def all_subsets(ss):
     return chain(*map(lambda x: combinations(ss, x),
@@ -44,13 +44,15 @@ def simple_ols(y, x) -> dict:
     #R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
           * np.log(abs(np.dot(e.T, e) / nobs)))
-    aic = (-2 * ll) + (2 * ncoef)
-    bic = (-2 * ll) + (ncoef * np.log(nobs))
+    aic = (-2.0 * ll) + (2 * ncoef)
+    bic = (-2.0 * ll) + (ncoef * np.log(nobs))
+    hqic = (-2.0 * ll) + 2 * np.log(np.log(nobs)) * ncoef
     return {'b': b,
             'p': p,
             'll': ll,
             'aic': aic,
-            'bic': bic}
+            'bic': bic,
+            'hqic': hqic}
 
 
 def group_demean(x, group=None):
@@ -210,3 +212,19 @@ def panel_ols(y, x):
                 'll': np.nan,
                 'aic': np.nan,
                 'bic': np.nan}
+
+
+def scipy_ols(y, x) -> dict:
+    x = np.asarray(x)
+    y = np.asarray(y)
+    if x.size == 0 or y.size == 0:
+        raise ValueError("Inputs must not be empty.")
+    b, res, rnk, s = scipy.linalg.lstsq(x,
+                                        y,
+                                        lapack_driver='gelsy',
+                                        check_finite=False)
+    return {'b': b,
+            'p': p,
+            'll': ll,
+            'aic': aic,
+            'bic': bic}

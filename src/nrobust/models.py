@@ -23,7 +23,8 @@ class OLSResult(Protoresult):
                  estimates,
                  p_values,
                  aic_array,
-                 bic_array):
+                 bic_array,
+                 hqic_array):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
@@ -32,6 +33,7 @@ class OLSResult(Protoresult):
         self.summary_df = compute_summary(self.estimates)
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
+        self.summary_df['hqic'] = pd.Series(hqic_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
 
@@ -40,11 +42,13 @@ class OLSResult(Protoresult):
 
     def plot(self,
              specs=None,
+             ic=None,
              colormap=None,
              colorset=None,
              figsize=(12, 6)):
         return plot_results(results_object=self,
                             specs=specs,
+                            ic=ic,
                             colormap=colormap,
                             colorset=colorset,
                             figsize=figsize)
@@ -100,8 +104,8 @@ class OLSRobust(Protomodel):
             info='bic',
             group: str = None,
             bootstrap=True,
-            draws=1000,
-            sample_size=1000,
+            draws=500,
+            sample_size=None,
             replace=False):
 
         '''
@@ -135,12 +139,16 @@ class OLSRobust(Protomodel):
            Numpy array containing aic values for estimated models.
         '''
 
+        if sample_size is None:
+            sample_size = self.data.shape[0]
+            
         if len(self.y) > 1:
             self.multiple_y()
             list_b_array = []
             list_p_array = []
             list_aic_array = []
             list_bic_array = []
+            list_hqic_array = []
             y_names = []
             specs = []
             for y, y_name in zip(self.y_composites,
@@ -150,6 +158,7 @@ class OLSRobust(Protomodel):
                 p_array = np.empty([space_n, draws])
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
+                hqic_array = np.empty([space_n])
 
                 for spec, index in zip(all_subsets(controls),
                                        tqdm(range(0, space_n))):
@@ -162,8 +171,9 @@ class OLSRobust(Protomodel):
 
                     comb = pd.concat([y, comb], axis=1)
                     comb = comb.dropna()
-                    b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
-                                                                        group)
+                    (b_discard, p_discard,
+                     aic_i, bic_i, hqic_i) = self._full_est(comb,
+                                                            group)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                           (delayed(self._strap_est)
                                            (comb,
@@ -178,18 +188,21 @@ class OLSRobust(Protomodel):
                     p_array[index, :] = p_list
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
+                    hqic_array[index] = hqic_i
 
                 list_b_array.append(b_array)
                 list_p_array.append(p_array)
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
+                list_hqic_array.append(hqic_array)
 
             results = OLSResult(y=y_names,
                                 specs=specs,
                                 estimates=np.vstack(list_b_array),
                                 p_values=np.vstack(list_p_array),
                                 aic_array=np.hstack(list_aic_array),
-                                bic_array=np.hstack(list_bic_array))
+                                bic_array=np.hstack(list_bic_array),
+                                hqic_array=np.hstack(list_hqic_array))
 
             self.results = results
 
@@ -200,6 +213,7 @@ class OLSRobust(Protomodel):
             p_array = np.empty([space_n, draws])
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
+            hqic_array = np.empty([space_n])
             for spec, index in zip(all_subsets(controls),
                                    tqdm(range(0, space_n))):
                 if len(spec) == 0:
@@ -210,8 +224,9 @@ class OLSRobust(Protomodel):
                     comb = self.data[self.y + self.x + [group] + list(spec)]
 
                 comb = comb.dropna()
-                b_discard, p_discard, aic_i, bic_i = self._full_est(comb,
-                                                                    group)
+                (b_discard, p_discard,
+                 aic_i, bic_i, hqic_i) = self._full_est(comb,
+                                                        group)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                       (delayed(self._strap_est)
                                        (comb,
@@ -226,13 +241,15 @@ class OLSRobust(Protomodel):
                 p_array[index, :] = p_list
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
+                hqic_array[index] = hqic_i
 
             results = OLSResult(y=self.y[0],
                                 specs=specs,
                                 estimates=b_array,
                                 p_values=p_array,
                                 aic_array=aic_array,
-                                bic_array=bic_array)
+                                bic_array=bic_array,
+                                hqic_array=hqic_array)
 
             self.results = results
 
@@ -242,7 +259,11 @@ class OLSRobust(Protomodel):
             x = comb_var.drop(comb_var.columns[0], axis=1)
             out = simple_ols(y=y,
                              x=x)
-            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+            return (out['b'][0][0],
+                    out['p'][0][0],
+                    out['aic'][0][0],
+                    out['bic'][0][0],
+                    out['hqic'][0][0])
         else:
             g = comb_var.loc[:, [group]]
             y = comb_var.iloc[:, [0]]
@@ -251,7 +272,11 @@ class OLSRobust(Protomodel):
             out = simple_panel_ols(y=y_g,
                                    x=x_g,
                                    group=group)
-            return out['b'][0][0], out['p'][0][0], out['aic'][0][0], out['bic'][0][0]
+            return (out['b'][0][0],
+                    out['p'][0][0],
+                    out['aic'][0][0],
+                    out['bic'][0][0],
+                    out['hqic'][0][0])
 
     def _strap_est(self, comb_var, group, sample_size, replace):
 

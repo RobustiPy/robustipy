@@ -86,8 +86,26 @@ def plot_ic(results_object,
     return ic
 
 
+def plot_bdist(results_object,
+               specs=None,
+               ax=None,
+               colormap='Set1',
+               colorset=None):
+    if ax is None:
+        ax = plt.gca()
+    df = results_object.estimates.T
+    df.columns = results_object.specs_names
+    idx = get_selection_key(specs)
+    if colorset is None:
+        colors = get_colors(specs=specs, color_set_name=colormap)
+        return df[idx].plot(kind='density', ax=ax, color=colors)
+    else:
+        return df[idx].plot(kind='density', ax=ax)
+
+
 def plot_results(results_object,
                  specs=None,
+                 ic=None,
                  colormap=None,
                  colorset=None,
                  figsize=(12, 8)):
@@ -100,19 +118,20 @@ def plot_results(results_object,
                ax=ax1,
                colormap=colormap,
                colorset=colorset)
-    plot_ic(results_object=results_object,
-            ic='bic',
-            specs=specs,
-            ax=ax2,
-            colormap=colormap,
-            colorset=colorset)
-    plot_ic(results_object=results_object,
-            ic='aic',
-            specs=specs,
-            ax=ax3,
-            colormap=colormap,
-            colorset=colorset)
     ax1.set_title('Estimates curve')
-    ax2.set_title('BIC curve')
-    ax3.set_title('AIC curve')
+    if ic is not None:
+        plot_ic(results_object=results_object,
+                ic=ic,
+                specs=specs,
+                ax=ax2,
+                colormap=colormap,
+                colorset=colorset)
+        ax2.set_title(f'{ic.upper()} curve')
+    if specs is not None:
+        plot_bdist(results_object=results_object,
+                   specs=specs,
+                   ax=ax3,
+                   colormap=colormap,
+                   colorset=colorset)
+        ax3.set_title('Bootstrap Est. Dist.')
     return fig, ax1, ax2, ax3
