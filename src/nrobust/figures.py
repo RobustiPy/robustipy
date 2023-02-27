@@ -39,12 +39,14 @@ def plot_curve(results_object,
         df['idx'] = df.spec_name.isin(key)
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
-    df['median'].plot(ax=ax, color='blue')
-    df['std_one_up'].rolling(window=10).mean().plot(ax=ax, color='red', alpha=.9)
-    df['std_one_down'].rolling(window=10).mean().plot(ax=ax, color='red', alpha=.9)
-    df['min'].rolling(window=10).mean().plot(ax=ax, color='grey', alpha=.5)
-    df['max'].rolling(window=10).mean().plot(ax=ax, color='grey', alpha=.5)
-    ax.axhline(y=0, color='black')
+    df['median'].plot(ax=ax, color='black')
+    one_up = df['std_one_up']
+    one_down = df['std_one_down']
+    min = df['min']
+    max = df['max']
+    ax.fill_between(df.index, one_up, one_down, facecolor='black', alpha=0.4)
+    ax.fill_between(df.index, min, max, facecolor='black', alpha=0.2)
+    ax.axhline(y=0, color='black', ls='--')
     if specs:
         idxs = df.index[df['idx']].tolist()
         lines = []

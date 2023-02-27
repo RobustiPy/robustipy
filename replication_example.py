@@ -9,18 +9,18 @@ def union_example():
     y, c, x, data = prepare_union(os.path.join('data',
                                                'input',
                                                'nlsw88.dta'))
-
-    union_robust = OLSRobust(y=[y], x=[x], data=data)
+    data['const'] = 1
+    x = ['union', 'const']
+    union_robust = OLSRobust(y=[y], x=x, data=data)
     union_robust.fit(controls=c,
-                     draws=100,
-                     sample_size=100,
+                     draws=500,
                      replace=True)
     union_results = union_robust.get_results()
 
     fig, ax1, ax2, ax3 = union_results.plot(specs=[['hours', 'collgrad'],
                                                    ['collgrad'],
                                                    ['hours', 'age']],
-                                            figsize=(36, 12))
+                                            ic='hqic')
     plt.savefig(os.path.join(os.getcwd(), 'figures',
                              'union_example',
                              'union_curve.png'))
