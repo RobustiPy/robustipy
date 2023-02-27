@@ -40,10 +40,10 @@ def plot_curve(results_object,
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
     df['median'].plot(ax=ax, color='blue')
-    df['std_one_up'].plot(ax=ax, color='red', alpha=.9)
-    df['std_one_down'].plot(ax=ax, color='red', alpha=.9)
-    df['min'].plot(ax=ax, color='grey', alpha=.5)
-    df['max'].plot(ax=ax, color='grey', alpha=.5)
+    df['std_one_up'].rolling(window=10).mean().plot(ax=ax, color='red', alpha=.9)
+    df['std_one_down'].rolling(window=10).mean().plot(ax=ax, color='red', alpha=.9)
+    df['min'].rolling(window=10).mean().plot(ax=ax, color='grey', alpha=.5)
+    df['max'].rolling(window=10).mean().plot(ax=ax, color='grey', alpha=.5)
     ax.axhline(y=0, color='black')
     if specs:
         idxs = df.index[df['idx']].tolist()
@@ -113,6 +113,10 @@ def plot_results(results_object,
     ax1 = fig.add_axes([0.05, 0.05, 0.9, 0.9])
     ax2 = fig.add_axes([0.2, 0.65, 0.2, 0.2])
     ax3 = fig.add_axes([0.45, 0.65, 0.2, 0.2])
+    ax2.axis('off')
+    ax2.patch.set_alpha(0)
+    ax3.axis('off')
+    ax3.patch.set_alpha(0)
     plot_curve(results_object=results_object,
                specs=specs,
                ax=ax1,
@@ -126,6 +130,8 @@ def plot_results(results_object,
                 ax=ax2,
                 colormap=colormap,
                 colorset=colorset)
+        ax2.axis('on')
+        ax2.patch.set_alpha(0.5)
         ax2.set_title(f'{ic.upper()} curve')
     if specs is not None:
         plot_bdist(results_object=results_object,
@@ -133,5 +139,7 @@ def plot_results(results_object,
                    ax=ax3,
                    colormap=colormap,
                    colorset=colorset)
+        ax3.axis('on')
+        ax3.patch.set_alpha(0.5)
         ax3.set_title('Bootstrap Est. Dist.')
     return fig, ax1, ax2, ax3

@@ -101,9 +101,7 @@ class OLSRobust(Protomodel):
     def fit(self,
             *,
             controls,
-            info='bic',
             group: str = None,
-            bootstrap=True,
             draws=500,
             sample_size=None,
             replace=False):
@@ -117,26 +115,15 @@ class OLSRobust(Protomodel):
         controls : list<str>
                 List containing all the names of the  possible
                 control variables of the model.
-        info : str
-            Type of information criteria to be included in the
-            output. Defaults to 'bic'.
-        samples : int
+        sample_size : int
               Number of bootstrap samples to collect.
         group : str
             Grouping variable. If provided a Fixed Effects model is estimated.
 
         Returns
         -------
-        beta : Array
-            Numpy array contaning the estimates of the independent variable x
-            for each specification of control variables across all the
-            bootstrap samples.
-        p : Array
-         Numpy array containing the p values of all the betas.
-        aic : Array
-           Numpy array containing aic values for estimated models.
-        bic : Array
-           Numpy array containing aic values for estimated models.
+        self : Object
+             Object class OLSRobust containing the fitted estimators.
         '''
 
         if sample_size is None:
@@ -254,6 +241,32 @@ class OLSRobust(Protomodel):
             self.results = results
 
     def _full_est(self, comb_var, group):
+        '''
+        This method calls stripped_ols() or stripped_panel_ols()
+        over the full data contaning y, x and controls.
+        Returns a single value for each returning variable.
+
+        Parameters
+        ----------
+        comb_var : Array
+                ND array like object (pandas dataframe of numpy array)
+                contaning the data for y, x, and controls.
+        group : str
+            Grouping variable. If provided a Fixed Effects model is estimated.
+
+        Returns
+        -------
+        beta : float
+            Estimate for x.
+        p : float
+         P value for x.
+        AIC : float
+          Akaike information criteria value for the model.
+        BIC : float
+          Bayesian information criteria value for the model.
+        HQIC : float
+          Hannan-Quinn information criteria value for the model.
+        '''
         if group is None:
             y = comb_var.iloc[:, [0]]
             x = comb_var.drop(comb_var.columns[0], axis=1)
@@ -281,9 +294,9 @@ class OLSRobust(Protomodel):
     def _strap_est(self, comb_var, group, sample_size, replace):
 
         '''
-        This method calls self._estimate() over a random sample
-        of the data contaning y, x and controls. Returns a single
-        value for each returning variable.
+        This method calls stripped_ols() or stripped_panel_ols()
+        over a random sample of the data contaning y, x and controls.
+        Returns a single value for each returning variable.
 
         Parameters
         ----------
@@ -292,7 +305,12 @@ class OLSRobust(Protomodel):
                 contaning the data for y, x, and controls.
         group : str
             Grouping variable. If provided a Fixed Effects model is estimated.
-
+        sample_size : int
+                  Optional: Sample size to use in the bootstrap. If not
+                  provided, sample size is obtained from the length
+                  of the self.data.
+        replace : bool
+              Whether to use replace on sampling.
 
         Returns
         -------
@@ -300,10 +318,6 @@ class OLSRobust(Protomodel):
             Estimate for x.
         p : float
          P value for x.
-        aic : float
-           Akaike Information Criteria for the model.
-        bic : float
-           Bayesian Information Criteria for the model.
         '''
 
         if group is None:
