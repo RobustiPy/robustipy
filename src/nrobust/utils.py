@@ -148,9 +148,8 @@ def compute_summary(data):
     out['median'] = data.median(axis=1)
     out['max'] = data.max(axis=1)
     out['min'] = data.min(axis=1)
-    out['std'] = data.std(axis=1, ddof=0)
-    out['std_one_up'] = out['median'] + out['std']
-    out['std_one_down'] = out['median'] - out['std']
+    out['ci_up'] = data.quantile(q=0.975, axis=1, interpolation='nearest')
+    out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
     return out
 
 

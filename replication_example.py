@@ -20,7 +20,8 @@ def union_example():
     fig, ax1, ax2, ax3 = union_results.plot(specs=[['hours', 'collgrad'],
                                                    ['collgrad'],
                                                    ['hours', 'age']],
-                                            ic='hqic')
+                                            ic='hqic',
+                                            figsize=(16, 8))
     plt.savefig(os.path.join(os.getcwd(), 'figures',
                              'union_example',
                              'union_curve.png'))
