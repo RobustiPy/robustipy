@@ -12,6 +12,7 @@ from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
+from nrobust.utils import panel_ols
 from nrobust.prototypes import MissingValueWarning
 import warnings
 
@@ -101,6 +102,7 @@ class OLSRobust(Protomodel):
     def fit(self,
             *,
             controls,
+            type='ols',
             group: str = None,
             draws=500,
             sample_size=None,
@@ -158,17 +160,30 @@ class OLSRobust(Protomodel):
 
                     comb = pd.concat([y, comb], axis=1)
                     comb = comb.dropna()
-                    (b_discard, p_discard,
-                     aic_i, bic_i, hqic_i) = self._full_est(comb,
-                                                            group)
-                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                          (delayed(self._strap_est)
-                                           (comb,
-                                            group,
-                                            sample_size,
-                                            replace)
-                                           for i in range(0,
-                                                          draws))))
+
+                    # hotfix
+                    if type == 'fe':
+                        (b_discard, p_discard,
+                         aic_i, bic_i, hqic_i) = self._hotfix_full(comb)
+                        b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                              (delayed(self._hotfix_strap)
+                                               (comb,
+                                                sample_size,
+                                                replace)
+                                               for i in range(0,
+                                                              draws))))
+                    else:
+                        (b_discard, p_discard,
+                         aic_i, bic_i, hqic_i) = self._full_est(comb,
+                                                                group)
+                        b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                              (delayed(self._strap_est)
+                                               (comb,
+                                                group,
+                                                sample_size,
+                                                replace)
+                                               for i in range(0,
+                                                              draws))))
                     y_names.append(y_name)
                     specs.append(frozenset(spec))
                     b_array[index, :] = b_list
@@ -211,17 +226,30 @@ class OLSRobust(Protomodel):
                     comb = self.data[self.y + self.x + [group] + list(spec)]
 
                 comb = comb.dropna()
-                (b_discard, p_discard,
-                 aic_i, bic_i, hqic_i) = self._full_est(comb,
-                                                        group)
-                b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                      (delayed(self._strap_est)
-                                       (comb,
-                                        group,
-                                        sample_size,
-                                        replace)
-                                       for i in range(0,
-                                                      draws))))
+
+                # hot fix for fixed effects problem
+                if type == 'fe':
+                    (b_discard, p_discard,
+                     aic_i, bic_i, hqic_i) = self._hotfix_full(comb)
+                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                          (delayed(self._hotfix_strap)
+                                           (comb,
+                                            sample_size,
+                                            replace)
+                                           for i in range(0,
+                                                          draws))))
+                else:
+                    (b_discard, p_discard,
+                     aic_i, bic_i, hqic_i) = self._full_est(comb,
+                                                            group)
+                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                          (delayed(self._strap_est)
+                                           (comb,
+                                            group,
+                                            sample_size,
+                                            replace)
+                                           for i in range(0,
+                                                          draws))))
 
                 specs.append(frozenset(spec))
                 b_array[index, :] = b_list
@@ -239,6 +267,26 @@ class OLSRobust(Protomodel):
                                 hqic_array=hqic_array)
 
             self.results = results
+
+    def _hotfix_full(self, comb_var):
+        y = comb_var.iloc[:, [0]]
+        x = comb_var.drop(comb_var.columns[0], axis=1)
+        out = panel_ols(y=y,
+                        x=x)
+        return (out['b'][0],
+                out['p'][0],
+                out['aic'],
+                out['bic'],
+                out['hqic'])
+
+    def _hotfix_strap(self, comb_var, sample_size, replace):
+        samp_df = comb_var.sample(n=sample_size, replace=replace)
+        # @TODO generalize the frac to the function call
+        y = samp_df.iloc[:, [0]]
+        x = samp_df.drop(samp_df.columns[0], axis=1)
+        out = panel_ols(y=y,
+                        x=x)
+        return out['b'][0], out['p'][0]
 
     def _full_est(self, comb_var, group):
         '''

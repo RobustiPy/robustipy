@@ -8,6 +8,7 @@ import pandas as pd
 from itertools import chain, combinations
 # temporary solution to get PanelOLS estimates
 from linearmodels.panel import PanelOLS
+import warnings
 
 
 def space_size(iterable) -> int:
@@ -176,22 +177,25 @@ def panel_ols(y, x):
     if np.asarray(x).size == 0 or np.asarray(y).size == 0:
         raise ValueError("Inputs must not be empty.")
     try:
-        mod = PanelOLS(y,
-                       x,
-                       entity_effects=True,
-                       drop_absorbed=True,
-                       # necessary because we dont always have
-                       # full rank on some resamples...
-                       # @TODO: a better way to handle this?
-                      #                    check_rank=False
-                                          )
-        res = mod.fit(cov_type='clustered',
-                      cluster_entity=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mod = PanelOLS(y,
+                           x,
+                           entity_effects=True,
+                           drop_absorbed=True,
+                           # necessary because we dont always have
+                           # full rank on some resamples...
+                           # @TODO: a better way to handle this?
+                           #                    check_rank=False
+                           )
+            res = mod.fit(cov_type='clustered',
+                          cluster_entity=True)
         nobs = y.shape[0]  # number of observations
         ncoef = x.shape[1]  # number of coef.
         ll = res.loglik
         aic = (-2 * ll) + (2 * ncoef)
         bic = (-2 * ll) + (ncoef * np.log(nobs))
+        hqic = (-2.0 * ll) + 2 * np.log(np.log(nobs)) * ncoef
         try:
         # @TODO: necessary due to a singular matrix error
         # due to resampling of the ASC data. Not sure what
@@ -204,13 +208,15 @@ def panel_ols(y, x):
                 'p': p,
                 'll': ll,
                 'aic': aic,
-                'bic': bic}
+                'bic': bic,
+                'hqic': hqic}
     except ValueError:
         return {'b': np.nan,
                 'p': np.nan,
                 'll': np.nan,
                 'aic': np.nan,
-                'bic': np.nan}
+                'bic': np.nan,
+                'hqic': np.nan}
 
 
 def scipy_ols(y, x) -> dict:
