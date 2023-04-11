@@ -30,7 +30,7 @@ setup(
         'joblib>=1.2.0',
         'joypy>=0.2.6',
         'linearmodels>=4.27',
-        'matplotlib>=3.6.1',
+        'matplotlib==3.6.1',
     ],
     zip_safe=False
 )
