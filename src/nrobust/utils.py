@@ -69,7 +69,8 @@ def simple_panel_ols(y, x, group):
         raise ValueError("Inputs must not be empty.")
     y_c = group_demean(y, group)
     x_c = group_demean(x, group)
-    return simple_ols(x_c, y_c)
+    x_c['const'] = 1
+    return simple_ols(y_c, x_c)
 
 
 def save_myrobust(beta, p, aic, bic, example_path):

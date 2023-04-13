@@ -35,7 +35,7 @@ def asc_example():
     myrobust_panel = OLSRobust(y=[y], x=x, data=data)
     myrobust_panel.fit(controls=c,
                        draws=500,
-                       type='fe',
+                       group=g,
                        replace=True)
     asc_results = myrobust_panel.get_results()
 

@@ -333,8 +333,8 @@ class OLSRobust(Protomodel):
             out = simple_panel_ols(y=y_g,
                                    x=x_g,
                                    group=group)
-            return (out['b'][0][0],
-                    out['p'][0][0],
+            return (out['b'][1][0],
+                    out['p'][1][0],
                     out['aic'][0][0],
                     out['bic'][0][0],
                     out['hqic'][0][0])
@@ -390,4 +390,4 @@ class OLSRobust(Protomodel):
             output = stripped_panel_ols(y_g, x_g, group)
             b = output['b']
             p = output['p']
-            return b[0][0], p[0][0]
+            return b[1][0], p[1][0]

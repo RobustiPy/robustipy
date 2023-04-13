@@ -39,4 +39,5 @@ def stripped_panel_ols(y, x, group):
         raise ValueError("Inputs must not be empty.")
     y_c = group_demean(y, group)
     x_c = group_demean(x, group)
-    return stripped_ols(x_c, y_c)
+    x_c['const'] = 1
+    return stripped_ols(y_c, x_c)
