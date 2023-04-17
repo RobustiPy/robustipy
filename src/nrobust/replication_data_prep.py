@@ -54,7 +54,8 @@ def prepare_asc(asc_path):
                      2010.0, 2011.0, 2012.0, 2013.0, 2014.0,
                      2015.0, 2016.0, 2017.0, 2018.0,
                      'married', 'widowed', 'disable', 'lrealtinc_m',
-                     'house_ownership', 'hhsize', 'work', 'retired', 'constant',
+                     'house_ownership', 'hhsize', 'work', 'retired',
+                     #'constant'
                      'pidp'
                      ]]
     #ASC_df = ASC_df.dropna()
@@ -63,7 +64,7 @@ def prepare_asc(asc_path):
          'DR', 'lgva', 'Mtotp', 'ddgree', 'age',
          2005, 2006.0, 2007.0, 2009.0,
          2010.0, 2011.0, 2012.0, 2013.0, 2014.0,
-         2015.0, 2016.0, 2017.0, 2018.0, 'constant']
+         2015.0, 2016.0, 2017.0, 2018.0]
     c = ['married', 'widowed', 'disable', 'lrealtinc_m',
          'house_ownership', 'hhsize', 'work', 'retired',
          ]

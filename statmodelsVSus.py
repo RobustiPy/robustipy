@@ -55,13 +55,13 @@ data = wage_panel.load()
 yy = data.lwage
 g = data.nr
 y_g = pd.concat([yy, g], axis=1)
-x_g = sm.add_constant(data[['expersq', 'nr']])
+x_g = sm.add_constant(data[['expersq', 'married', 'nr']])
 
-simple_panel_ols(y_g, x_g, 'nr')
+simple_panel_ols(y_g, x_g, 'nr')['b'][1][0]
 
 from nrobust.utils import panel_ols
 
-panel_ols(dependent, exog)['b']
+panel_ols(dependent, exog)['b'][1]
 
 
 # mock example
