@@ -5,14 +5,13 @@ import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
-from nrobust.utils import simple_panel_ols
 from nrobust.bootstrap_utils import stripped_ols
-from nrobust.bootstrap_utils import stripped_panel_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
 from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
 from nrobust.utils import panel_ols
+from nrobust.utils import group_demean
 from nrobust.prototypes import MissingValueWarning
 import warnings
 
@@ -173,11 +172,12 @@ class OLSRobust(Protomodel):
                                                for i in range(0,
                                                               draws))))
                     else:
+                        if group:
+                            comb = group_demean(comb, group=group)
                         (b_discard, p_discard,
-                         aic_i, bic_i, hqic_i) = self._full_est(comb,
-                                                                group)
+                         aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
                         b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                              (delayed(self._strap_est)
+                                              (delayed(self._strap_OLS)
                                                (comb,
                                                 group,
                                                 sample_size,
@@ -239,11 +239,12 @@ class OLSRobust(Protomodel):
                                            for i in range(0,
                                                           draws))))
                 else:
+                    if group:
+                        comb = group_demean(comb, group=group)
                     (b_discard, p_discard,
-                     aic_i, bic_i, hqic_i) = self._full_est(comb,
-                                                            group)
+                     aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                          (delayed(self._strap_est)
+                                          (delayed(self._strap_OLS)
                                            (comb,
                                             group,
                                             sample_size,
@@ -288,9 +289,9 @@ class OLSRobust(Protomodel):
                         x=x)
         return out['b'][0], out['p'][0]
 
-    def _full_est(self, comb_var, group):
+    def _full_sample_OLS(self, comb_var):
         '''
-        This method calls stripped_ols() or stripped_panel_ols()
+        This method calls stripped_ols()
         over the full data contaning y, x and controls.
         Returns a single value for each returning variable.
 
@@ -299,8 +300,6 @@ class OLSRobust(Protomodel):
         comb_var : Array
                 ND array like object (pandas dataframe of numpy array)
                 contaning the data for y, x, and controls.
-        group : str
-            Grouping variable. If provided a Fixed Effects model is estimated.
 
         Returns
         -------
@@ -315,35 +314,21 @@ class OLSRobust(Protomodel):
         HQIC : float
           Hannan-Quinn information criteria value for the model.
         '''
-        if group is None:
-            y = comb_var.iloc[:, [0]]
-            x = comb_var.drop(comb_var.columns[0], axis=1)
-            out = simple_ols(y=y,
-                             x=x)
-            return (out['b'][0][0],
-                    out['p'][0][0],
-                    out['aic'][0][0],
-                    out['bic'][0][0],
-                    out['hqic'][0][0])
-        else:
-            g = comb_var.loc[:, [group]]
-            y = comb_var.iloc[:, [0]]
-            y_g = pd.concat([y, g], axis=1)
-            x_g = comb_var.drop(comb_var.columns[0], axis=1)
-            out = simple_panel_ols(y=y_g,
-                                   x=x_g,
-                                   group=group)
-            return (out['b'][0][0],
-                    out['p'][0][0],
-                    out['aic'][0][0],
-                    out['bic'][0][0],
-                    out['hqic'][0][0])
+        y = comb_var.iloc[:, [0]]
+        x = comb_var.drop(comb_var.columns[0], axis=1)
+        out = simple_ols(y=y,
+                         x=x)
+        return (out['b'][0][0],
+                out['p'][0][0],
+                out['aic'][0][0],
+                out['bic'][0][0],
+                out['hqic'][0][0])
 
-    def _strap_est(self, comb_var, group, sample_size, replace):
+    def _strap_OLS(self, comb_var, group, sample_size, replace):
 
         '''
-        This method calls stripped_ols() or stripped_panel_ols()
-        over a random sample of the data contaning y, x and controls.
+        This method calls stripped_ols() over a random sample
+        of the data contaning y, x and controls.
         Returns a single value for each returning variable.
 
         Parameters
@@ -352,7 +337,8 @@ class OLSRobust(Protomodel):
                 ND array like object (pandas dataframe of numpy array)
                 contaning the data for y, x, and controls.
         group : str
-            Grouping variable. If provided a Fixed Effects model is estimated.
+            Grouping variable. If provided sampling is performed over
+            the group variable.
         sample_size : int
                   Optional: Sample size to use in the bootstrap. If not
                   provided, sample size is obtained from the length
@@ -380,14 +366,14 @@ class OLSRobust(Protomodel):
         else:
             #samp_df = comb_var.groupby(group).sample(frac=0.3, replace=replace)
             # @TODO generalize the frac to the function call
+
             idx = np.random.choice(comb_var[group].unique(), sample_size)
             select = comb_var[comb_var[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
-            g = no_singleton.loc[:, [group]]
+            no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
-            y_g = pd.concat([y, g], axis=1)
-            x_g = no_singleton.drop(no_singleton.columns[0], axis=1)
-            output = stripped_panel_ols(y_g, x_g, group)
+            x = no_singleton.drop(no_singleton.columns[0], axis=1)
+            output = stripped_ols(y, x)
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]

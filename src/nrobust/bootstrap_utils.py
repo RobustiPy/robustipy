@@ -3,15 +3,8 @@ import scipy
 np.seterr(divide='ignore', invalid='ignore')
 
 
-def group_demean(x, group=None):
-    data = x.copy()
-    if group is None:
-        return data - np.mean(data)
-    data_gm = data.groupby([group]).transform(np.mean)
-    return data.drop(columns=group) - data_gm
-
-
 def stripped_ols(y, x) -> dict:
+    x['const'] = 1
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
@@ -32,12 +25,3 @@ def stripped_ols(y, x) -> dict:
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
     return {'b': b,
             'p': p}
-
-
-def stripped_panel_ols(y, x, group):
-    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
-        raise ValueError("Inputs must not be empty.")
-    y_c = group_demean(y, group)
-    x_c = group_demean(x, group)
-    x_c['const'] = 1
-    return stripped_ols(y_c, x_c)

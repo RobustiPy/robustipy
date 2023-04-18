@@ -22,6 +22,7 @@ def all_subsets(ss):
 
 
 def simple_ols(y, x) -> dict:
+    x['const'] = 1  # constant
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
@@ -61,16 +62,8 @@ def group_demean(x, group=None):
     if group is None:
         return data - np.mean(data)
     data_gm = data.groupby([group]).transform(np.mean)
-    return data.drop(columns=group) - data_gm
-
-
-def simple_panel_ols(y, x, group):
-    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
-        raise ValueError("Inputs must not be empty.")
-    y_c = group_demean(y, group)
-    x_c = group_demean(x, group)
-    x_c['const'] = 1
-    return simple_ols(y_c, x_c)
+    out = data.drop(columns=group) - data_gm
+    return pd.concat([out, data.pidp], axis=1)
 
 
 def save_myrobust(beta, p, aic, bic, example_path):

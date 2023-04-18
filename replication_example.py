@@ -9,9 +9,7 @@ def union_example():
     y, c, x, data = prepare_union(os.path.join('data',
                                                'input',
                                                'nlsw88.dta'))
-    data['const'] = 1
-    x = ['union', 'const']
-    union_robust = OLSRobust(y=[y], x=x, data=data)
+    union_robust = OLSRobust(y=[y], x=[x], data=data)
     union_robust.fit(controls=c,
                      draws=500,
                      replace=True)
