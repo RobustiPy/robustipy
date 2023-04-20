@@ -5,6 +5,8 @@ import matplotlib.cm as cm
 #import matplotlib
 from nrobust.utils import get_selection_key
 from nrobust.utils import get_colors
+from nrobust.utils import get_default_colormap
+import pandas as pd
 #matplotlib.use('TkAgg')
 
 
@@ -91,7 +93,7 @@ def plot_ic(results_object,
 def plot_bdist(results_object,
                specs=None,
                ax=None,
-               colormap='Set1',
+               colormap=None,
                colorset=None):
     if ax is None:
         ax = plt.gca()
@@ -99,8 +101,15 @@ def plot_bdist(results_object,
     df.columns = results_object.specs_names
     idx = get_selection_key(specs)
     if colorset is None:
-        colors = get_colors(specs=specs, color_set_name=colormap)
-        return df[idx].plot(kind='density', ax=ax, color=colors, legend=False)
+        colors = get_default_colormap(specs)
+        plot = df[idx].plot(kind='density',
+                            ax=ax,
+                            color=colors,
+                            legend=False)
+        plot = df.iloc[:, -1:].plot(kind='density',
+                                    legend=False,
+                                    color='k', ax=ax)
+        return plot
     else:
         return df[idx].plot(kind='density', ax=ax, legend=False)
 
