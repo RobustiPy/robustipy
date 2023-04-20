@@ -13,6 +13,7 @@ from nrobust.figures import plot_results
 from nrobust.utils import panel_ols
 from nrobust.utils import group_demean
 from nrobust.prototypes import MissingValueWarning
+import _pickle
 import warnings
 
 
@@ -36,6 +37,15 @@ class OLSResult(Protoresult):
         self.summary_df['hqic'] = pd.Series(hqic_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
+
+    def save(self, filename):
+        with open(filename, 'wb') as f:
+            _pickle.dump(self, f, -1)
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as f:
+            return _pickle.load(f)
 
     def summary(self):
         pass
