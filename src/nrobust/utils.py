@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 import os
 import matplotlib
+from matplotlib.colors import ListedColormap
 import pandas as pd
 from itertools import chain, combinations
 # temporary solution to get PanelOLS estimates
@@ -154,6 +155,17 @@ def get_selection_key(specs):
         return target
     else:
         raise ValueError('Argument `specs` must be a list of list.')
+
+
+def get_default_colormap(specs):
+    default_cm = ListedColormap(["#fd8d59", "#92bfdb",
+                                 "#1ceaf9", "#1d866d",
+                                 "#38e278", "#98d595",
+                                 "#5b8313", "#abd533",
+                                 "#7d4400", "#417caa"])
+    if all(isinstance(ele, list) for ele in specs):
+        colors = default_cm.resampled(len(specs)).colors
+    return colors
 
 
 def get_colors(specs, color_set_name=None):

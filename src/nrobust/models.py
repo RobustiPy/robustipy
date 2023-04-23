@@ -21,6 +21,7 @@ class OLSResult(Protoresult):
     def __init__(self, *,
                  y,
                  specs,
+                 draws,
                  estimates,
                  p_values,
                  aic_array,
@@ -29,6 +30,7 @@ class OLSResult(Protoresult):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
+        self.draws = draws
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
         self.summary_df = compute_summary(self.estimates)
@@ -210,6 +212,7 @@ class OLSRobust(Protomodel):
 
             results = OLSResult(y=y_names,
                                 specs=specs,
+                                draws=draws,
                                 estimates=np.vstack(list_b_array),
                                 p_values=np.vstack(list_p_array),
                                 aic_array=np.hstack(list_aic_array),
@@ -271,6 +274,7 @@ class OLSRobust(Protomodel):
 
             results = OLSResult(y=self.y[0],
                                 specs=specs,
+                                draws=draws,
                                 estimates=b_array,
                                 p_values=p_array,
                                 aic_array=aic_array,

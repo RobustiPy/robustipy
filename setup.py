@@ -31,6 +31,7 @@ setup(
         'joypy>=0.2.6',
         'linearmodels>=4.27',
         'matplotlib==3.6.1',
+        'seaborn'
     ],
     zip_safe=False
 )
