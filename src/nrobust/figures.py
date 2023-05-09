@@ -17,12 +17,12 @@ def plot_curve(results_object,
     if colormap is None:
         colormap = 'Set1'
     df = results_object.summary_df.copy()
+    full_spec = list(results_object.specs_names.iloc[-1])
+    full_spec_key = get_selection_key([full_spec])
+    df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
     if specs:
         key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
         df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
     df['median'].plot(ax=ax,
