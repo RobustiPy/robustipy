@@ -8,9 +8,7 @@ from nrobust.utils import simple_ols
 from nrobust.bootstrap_utils import stripped_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
-from nrobust.utils import compute_summary
 from nrobust.figures import plot_results
-from nrobust.utils import panel_ols
 from nrobust.utils import group_demean
 from nrobust.prototypes import MissingValueWarning
 import _pickle
@@ -21,8 +19,12 @@ class OLSResult(Protoresult):
     def __init__(self, *,
                  y,
                  specs,
+                 all_predictors,
+                 controls,
                  draws,
                  estimates,
+                 all_b,
+                 all_p,
                  p_values,
                  aic_array,
                  bic_array,
@@ -30,15 +32,20 @@ class OLSResult(Protoresult):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
+        self.all_predictors = all_predictors
+        self.controls = controls
         self.draws = draws
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
-        self.summary_df = compute_summary(self.estimates)
+        self.all_b = all_b
+        self.all_p = all_p
+        self.summary_df = self._compute_summary()
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
+        self.summary_bma = self._compute_bma()
 
     def save(self, filename):
         with open(filename, 'wb') as f:
@@ -64,6 +71,43 @@ class OLSResult(Protoresult):
                             colormap=colormap,
                             colorset=colorset,
                             figsize=figsize)
+
+    def _compute_summary(self):
+        data = self.estimates.copy()
+        out = pd.DataFrame()
+        out['median'] = data.median(axis=1)
+        out['max'] = data.max(axis=1)
+        out['min'] = data.min(axis=1)
+        out['ci_up'] = data.quantile(q=0.975, axis=1, interpolation='nearest')
+        out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
+        return out
+
+    def _compute_bma(self):
+        likelihood_per_var = []
+        weigthed_coefs = []
+        models_likelihood = np.exp(-self.summary_df.bic/2)
+        sum_likelihoods = models_likelihood.sum()
+        coefs = [[i[0] for i in x] for x in self.all_b]
+        coefs = [i for sl in coefs for i in sl]
+        var_names = [i for sl in self.all_predictors for i in sl]
+        coefs_df = pd.DataFrame({'coef': coefs, 'var_name': var_names})
+        for ele in self.controls:
+            idx = []
+            for spec in self.specs_names:
+                idx.append(ele in spec)
+            likelihood_per_var.append(models_likelihood[idx].sum())
+            coefs = coefs_df[coefs_df.var_name == ele].coef.to_numpy()
+            likelihood = models_likelihood[idx].to_numpy()
+            weigthed_coef = coefs * likelihood
+            weigthed_coefs.append(weigthed_coef.sum())
+        probs = likelihood_per_var / sum_likelihoods
+        final_coefs = weigthed_coefs / sum_likelihoods
+        summary_bma = pd.DataFrame({
+            'control_var': self.controls,
+            'probs': probs,
+            'average_coefs': final_coefs
+        })
+        return summary_bma
 
 
 class OLSRobust(Protomodel):
@@ -113,7 +157,6 @@ class OLSRobust(Protomodel):
     def fit(self,
             *,
             controls,
-            type='ols',
             group: str = None,
             draws=500,
             sample_size=None,
@@ -141,7 +184,7 @@ class OLSRobust(Protomodel):
 
         if sample_size is None:
             sample_size = self.data.shape[0]
-            
+
         if len(self.y) > 1:
             self.multiple_y()
             list_b_array = []
@@ -172,30 +215,18 @@ class OLSRobust(Protomodel):
                     comb = pd.concat([y, comb], axis=1)
                     comb = comb.dropna()
 
-                    # hotfix
-                    if type == 'fe':
-                        (b_discard, p_discard,
-                         aic_i, bic_i, hqic_i) = self._hotfix_full(comb)
-                        b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                              (delayed(self._hotfix_strap)
-                                               (comb,
-                                                sample_size,
-                                                replace)
-                                               for i in range(0,
-                                                              draws))))
-                    else:
-                        if group:
-                            comb = group_demean(comb, group=group)
-                        (b_discard, p_discard,
-                         aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
-                        b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                              (delayed(self._strap_OLS)
-                                               (comb,
-                                                group,
-                                                sample_size,
-                                                replace)
-                                               for i in range(0,
-                                                              draws))))
+                    if group:
+                        comb = group_demean(comb, group=group)
+                    (b_all, p_all,
+                     aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
+                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                          (delayed(self._strap_OLS)
+                                           (comb,
+                                            group,
+                                            sample_size,
+                                            replace)
+                                           for i in range(0,
+                                                          draws))))
                     y_names.append(y_name)
                     specs.append(frozenset(spec))
                     b_array[index, :] = b_list
@@ -213,6 +244,8 @@ class OLSRobust(Protomodel):
             results = OLSResult(y=y_names,
                                 specs=specs,
                                 draws=draws,
+                                all_b=b_all,
+                                all_p=p_all,
                                 estimates=np.vstack(list_b_array),
                                 p_values=np.vstack(list_p_array),
                                 aic_array=np.hstack(list_aic_array),
@@ -224,6 +257,9 @@ class OLSRobust(Protomodel):
         else:
             space_n = space_size(controls)
             specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
             b_array = np.empty([space_n, draws])
             p_array = np.empty([space_n, draws])
             aic_array = np.empty([space_n])
@@ -240,41 +276,36 @@ class OLSRobust(Protomodel):
 
                 comb = comb.dropna()
 
-                # hot fix for fixed effects problem
-                if type == 'fe':
-                    (b_discard, p_discard,
-                     aic_i, bic_i, hqic_i) = self._hotfix_full(comb)
-                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                          (delayed(self._hotfix_strap)
-                                           (comb,
-                                            sample_size,
-                                            replace)
-                                           for i in range(0,
-                                                          draws))))
-                else:
-                    if group:
-                        comb = group_demean(comb, group=group)
-                    (b_discard, p_discard,
-                     aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
-                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                          (delayed(self._strap_OLS)
-                                           (comb,
-                                            group,
-                                            sample_size,
-                                            replace)
-                                           for i in range(0,
-                                                          draws))))
+                if group:
+                    comb = group_demean(comb, group=group)
+                (b_all, p_all,
+                 aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
+                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                                      (delayed(self._strap_OLS)
+                                       (comb,
+                                        group,
+                                        sample_size,
+                                        replace)
+                                       for i in range(0,
+                                                      draws))))
 
                 specs.append(frozenset(spec))
+                all_predictors.append(self.x + list(spec) + ['const'])
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
+                b_all_list.append(b_all)
+                p_all_list.append(p_all)
 
             results = OLSResult(y=self.y[0],
                                 specs=specs,
+                                all_predictors=all_predictors,
+                                controls=controls,
                                 draws=draws,
+                                all_b=b_all_list,
+                                all_p=p_all_list,
                                 estimates=b_array,
                                 p_values=p_array,
                                 aic_array=aic_array,
@@ -282,26 +313,6 @@ class OLSRobust(Protomodel):
                                 hqic_array=hqic_array)
 
             self.results = results
-
-    def _hotfix_full(self, comb_var):
-        y = comb_var.iloc[:, [0]]
-        x = comb_var.drop(comb_var.columns[0], axis=1)
-        out = panel_ols(y=y,
-                        x=x)
-        return (out['b'][0],
-                out['p'][0],
-                out['aic'],
-                out['bic'],
-                out['hqic'])
-
-    def _hotfix_strap(self, comb_var, sample_size, replace):
-        samp_df = comb_var.sample(n=sample_size, replace=replace)
-        # @TODO generalize the frac to the function call
-        y = samp_df.iloc[:, [0]]
-        x = samp_df.drop(samp_df.columns[0], axis=1)
-        out = panel_ols(y=y,
-                        x=x)
-        return out['b'][0], out['p'][0]
 
     def _full_sample_OLS(self, comb_var):
         '''
@@ -332,8 +343,8 @@ class OLSRobust(Protomodel):
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = simple_ols(y=y,
                          x=x)
-        return (out['b'][0][0],
-                out['p'][0][0],
+        return (out['b'],
+                out['p'],
                 out['aic'][0][0],
                 out['bic'][0][0],
                 out['hqic'][0][0])
@@ -378,7 +389,8 @@ class OLSRobust(Protomodel):
             p = output['p']
             return b[0][0], p[0][0]
         else:
-            #samp_df = comb_var.groupby(group).sample(frac=0.3, replace=replace)
+            # samp_df = comb_var.groupby(group).sample(frac=0.3,
+            # replace=replace)
             # @TODO generalize the frac to the function call
 
             idx = np.random.choice(comb_var[group].unique(), sample_size)

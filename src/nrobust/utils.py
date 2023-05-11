@@ -139,16 +139,6 @@ def decorator_timer(some_function):
     return wrapper
 
 
-def compute_summary(data):
-    out = pd.DataFrame()
-    out['median'] = data.median(axis=1)
-    out['max'] = data.max(axis=1)
-    out['min'] = data.min(axis=1)
-    out['ci_up'] = data.quantile(q=0.975, axis=1, interpolation='nearest')
-    out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
-    return out
-
-
 def get_selection_key(specs):
     if all(isinstance(ele, list) for ele in specs):
         target = [frozenset(x) for x in specs]
