@@ -26,6 +26,7 @@ class OLSResult(Protoresult):
                  all_b,
                  all_p,
                  p_values,
+                 ll_array,
                  aic_array,
                  bic_array,
                  hqic_array):
@@ -40,12 +41,12 @@ class OLSResult(Protoresult):
         self.all_b = all_b
         self.all_p = all_p
         self.summary_df = self._compute_summary()
+        self.summary_df['ll'] = pd.Series(ll_array)
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
-        self.summary_bma = self._compute_bma()
 
     def save(self, filename):
         with open(filename, 'wb') as f:
@@ -82,11 +83,16 @@ class OLSResult(Protoresult):
         out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
         return out
 
-    def _compute_bma(self):
+    def compute_bma(self):
+        """
+        Bayesian model averaging using BIC implied priors
+        """
         likelihood_per_var = []
         weigthed_coefs = []
-        models_likelihood = np.exp(-self.summary_df.bic/2)
-        sum_likelihoods = models_likelihood.sum()
+        max_ll = np.max(-self.summary_df.bic/2)
+        shifted_ll = (-self.summary_df.bic/2) - max_ll
+        models_likelihood = np.exp(shifted_ll)
+        sum_likelihoods = np.nansum(models_likelihood)
         coefs = [[i[0] for i in x] for x in self.all_b]
         coefs = [i for sl in coefs for i in sl]
         var_names = [i for sl in self.all_predictors for i in sl]
@@ -95,11 +101,11 @@ class OLSResult(Protoresult):
             idx = []
             for spec in self.specs_names:
                 idx.append(ele in spec)
-            likelihood_per_var.append(models_likelihood[idx].sum())
+            likelihood_per_var.append(np.nansum(models_likelihood[idx]))
             coefs = coefs_df[coefs_df.var_name == ele].coef.to_numpy()
-            likelihood = models_likelihood[idx].to_numpy()
+            likelihood = models_likelihood[idx]
             weigthed_coef = coefs * likelihood
-            weigthed_coefs.append(weigthed_coef.sum())
+            weigthed_coefs.append(np.nansum(weigthed_coef))
         probs = likelihood_per_var / sum_likelihoods
         final_coefs = weigthed_coefs / sum_likelihoods
         summary_bma = pd.DataFrame({
@@ -162,7 +168,7 @@ class OLSRobust(Protomodel):
             sample_size=None,
             replace=False):
 
-        '''
+        """
         Fit the OLS models into the specification space
         as well as over the bootstrapped samples.
 
@@ -180,7 +186,7 @@ class OLSRobust(Protomodel):
         -------
         self : Object
              Object class OLSRobust containing the fitted estimators.
-        '''
+        """
 
         if sample_size is None:
             sample_size = self.data.shape[0]
@@ -262,6 +268,7 @@ class OLSRobust(Protomodel):
             p_all_list = []
             b_array = np.empty([space_n, draws])
             p_array = np.empty([space_n, draws])
+            ll_array = np.empty([space_n])
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
@@ -278,7 +285,7 @@ class OLSRobust(Protomodel):
 
                 if group:
                     comb = group_demean(comb, group=group)
-                (b_all, p_all,
+                (b_all, p_all, ll_i,
                  aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                       (delayed(self._strap_OLS)
@@ -293,6 +300,7 @@ class OLSRobust(Protomodel):
                 all_predictors.append(self.x + list(spec) + ['const'])
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
+                ll_array[index] = ll_i
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
@@ -308,6 +316,7 @@ class OLSRobust(Protomodel):
                                 all_p=p_all_list,
                                 estimates=b_array,
                                 p_values=p_array,
+                                ll_array=ll_array,
                                 aic_array=aic_array,
                                 bic_array=bic_array,
                                 hqic_array=hqic_array)
@@ -315,7 +324,7 @@ class OLSRobust(Protomodel):
             self.results = results
 
     def _full_sample_OLS(self, comb_var):
-        '''
+        """
         This method calls stripped_ols()
         over the full data contaning y, x and controls.
         Returns a single value for each returning variable.
@@ -338,20 +347,21 @@ class OLSRobust(Protomodel):
           Bayesian information criteria value for the model.
         HQIC : float
           Hannan-Quinn information criteria value for the model.
-        '''
+        """
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = simple_ols(y=y,
                          x=x)
         return (out['b'],
                 out['p'],
+                out['ll'][0][0],
                 out['aic'][0][0],
                 out['bic'][0][0],
                 out['hqic'][0][0])
 
     def _strap_OLS(self, comb_var, group, sample_size, replace):
 
-        '''
+        """
         This method calls stripped_ols() over a random sample
         of the data contaning y, x and controls.
         Returns a single value for each returning variable.
@@ -377,7 +387,7 @@ class OLSRobust(Protomodel):
             Estimate for x.
         p : float
          P value for x.
-        '''
+        """
 
         if group is None:
             samp_df = comb_var.sample(n=sample_size, replace=replace)
