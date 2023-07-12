@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from nrobust.utils import get_selection_key
 from nrobust.utils import get_default_colormap
 from matplotlib.gridspec import GridSpec
@@ -288,3 +289,68 @@ def plot_results(results_object,
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     return fig, ax1, ax2, ax3
+
+
+def vars_line_plot(summary_df, var_name, bin_size):
+    """
+    Plots the density of the specification with the selected covariate
+    along the index of the specification, ordered by median.
+
+    Use:
+    vars_line_plot(df, 'grade', 20)
+    plt.show()
+    """
+    df = summary_df.sort_values(by='median').copy()
+    count_bool = [var_name in ele for ele in df.spec_name]
+    count_list = [int(ele) for ele in count_bool]
+    bin_sums = []
+    index = []
+    for i, ele in enumerate(count_list):
+        if i % bin_size == 0:
+            bin_sum = np.sum(count_list[i-bin_size:i])
+            bin_sums.append(bin_sum)
+            index.append(i)
+    return plt.plot(index, bin_sums)
+
+
+def vars_scatter_plot(summary_df, var_name, bin_size):
+    """
+    Plots the density of the specification with the selected covariate
+    along the index of the specification, ordered by median.
+
+    Use:
+
+    vars_scatter_plot(df, 'south', 1)
+    plt.show()
+    """
+    df = summary_df.sort_values(by='median').copy()
+    count_bool = [var_name in ele for ele in df.spec_name]
+    index = []
+    for i, ele in enumerate(count_bool):
+        if ele:
+            new_index = np.floor(i/bin_size)*bin_size
+            index.append(new_index)
+    x = index
+    y = np.zeros(len(x)) + np.random.normal(0, .05, size=len(x))
+    plt.scatter(x, y, alpha=.2, s=100, linewidth=0)
+    return plt.ylim(-1, 1)
+
+
+def vars_hist_plot(summary_df, var_name, bin_size):
+    """
+    Plots the density of the specification with the selected covariate
+    along the index of the specification, ordered by median.
+
+    Use:
+    vars_hist_plot(df, 'south', 20)
+    plt.show()
+    """
+    df = summary_df.sort_values(by='median').copy()
+    count_bool = [var_name in ele for ele in df.spec_name]
+    index = []
+    for i, ele in enumerate(count_bool):
+        if ele:
+            new_index = np.floor(i/1)*1
+            index.append(new_index)
+    x = index
+    plt.hist(x, bin_size)
