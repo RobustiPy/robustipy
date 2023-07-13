@@ -13,6 +13,8 @@ from nrobust.utils import group_demean
 from nrobust.prototypes import MissingValueWarning
 import _pickle
 import warnings
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error
 
 
 class OLSResult(Protoresult):
@@ -29,7 +31,8 @@ class OLSResult(Protoresult):
                  ll_array,
                  aic_array,
                  bic_array,
-                 hqic_array):
+                 hqic_array,
+                 av_k_metric_array):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
@@ -45,6 +48,7 @@ class OLSResult(Protoresult):
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
+        self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
 
@@ -272,6 +276,7 @@ class OLSRobust(Protomodel):
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
             for spec, index in zip(all_subsets(controls),
                                    tqdm(range(0, space_n))):
                 if len(spec) == 0:
@@ -286,7 +291,7 @@ class OLSRobust(Protomodel):
                 if group:
                     comb = group_demean(comb, group=group)
                 (b_all, p_all, ll_i,
-                 aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
+                 aic_i, bic_i, hqic_i, av_k_metric_i) = self._full_sample_OLS(comb)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                       (delayed(self._strap_OLS)
                                        (comb,
@@ -304,6 +309,7 @@ class OLSRobust(Protomodel):
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
+                av_k_metric_array[index] = av_k_metric_i
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
 
@@ -319,9 +325,13 @@ class OLSRobust(Protomodel):
                                 ll_array=ll_array,
                                 aic_array=aic_array,
                                 bic_array=bic_array,
-                                hqic_array=hqic_array)
+                                hqic_array=hqic_array,
+                                av_k_metric_array=av_k_metric_array)
 
             self.results = results
+
+    def _predict(self, x_test, betas):
+        return np.dot(x_test, betas)
 
     def _full_sample_OLS(self, comb_var):
         """
@@ -352,12 +362,23 @@ class OLSRobust(Protomodel):
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = simple_ols(y=y,
                          x=x)
+        k_fold = KFold(5)
+        metrics = []
+        for k, (train, test) in enumerate(k_fold.split(x, y)):
+            out_k = simple_ols(y=y.loc[train],
+                               x=x.loc[train])
+            y_pred = self._predict(x.loc[test], out_k['b'])
+            y_true = y.loc[test]
+            k_rmse = mean_squared_error(y_true, y_pred, squared=False)
+            metrics.append(k_rmse)
+        av_k_metric = np.mean(metrics)
         return (out['b'],
                 out['p'],
                 out['ll'][0][0],
                 out['aic'][0][0],
                 out['bic'][0][0],
-                out['hqic'][0][0])
+                out['hqic'][0][0],
+                av_k_metric)
 
     def _strap_OLS(self, comb_var, group, sample_size, replace):
 
