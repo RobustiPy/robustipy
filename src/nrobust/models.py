@@ -32,7 +32,7 @@ class OLSResult(Protoresult):
                  aic_array,
                  bic_array,
                  hqic_array,
-                 av_k_metric_array):
+                 av_k_metric_array=None):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
@@ -83,8 +83,10 @@ class OLSResult(Protoresult):
         out['median'] = data.median(axis=1)
         out['max'] = data.max(axis=1)
         out['min'] = data.min(axis=1)
-        out['ci_up'] = data.quantile(q=0.975, axis=1, interpolation='nearest')
-        out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
+        out['ci_up'] = data.quantile(q=0.975, axis=1,
+                                     interpolation='nearest')
+        out['ci_down'] = data.quantile(q=0.025, axis=1,
+                                       interpolation='nearest')
         return out
 
     def compute_bma(self):
@@ -153,6 +155,9 @@ class OLSRobust(Protomodel):
         return self.results
 
     def multiple_y(self):
+        """
+        Cumputes composity y based on multiple indicators provided.
+        """
         self.y_specs = []
         self.y_composites = []
         print("Calculating Composite Ys")
@@ -170,7 +175,8 @@ class OLSRobust(Protomodel):
             group: str = None,
             draws=500,
             sample_size=None,
-            replace=False):
+            replace=False,
+            kfold=False):
 
         """
         Fit the OLS models into the specification space
@@ -202,6 +208,7 @@ class OLSRobust(Protomodel):
             list_aic_array = []
             list_bic_array = []
             list_hqic_array = []
+            list_av_k_metric_array = []
             y_names = []
             specs = []
             for y, y_name in zip(self.y_composites,
@@ -212,6 +219,7 @@ class OLSRobust(Protomodel):
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
+                av_k_metric_array = np.empty([space_n])
 
                 for spec, index in zip(all_subsets(controls),
                                        tqdm(range(0, space_n))):
@@ -228,7 +236,9 @@ class OLSRobust(Protomodel):
                     if group:
                         comb = group_demean(comb, group=group)
                     (b_all, p_all,
-                     aic_i, bic_i, hqic_i) = self._full_sample_OLS(comb)
+                     aic_i, bic_i, hqic_i,
+                     av_k_metric_i) = self._full_sample_OLS(comb,
+                                                            kfold=kfold)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                           (delayed(self._strap_OLS)
                                            (comb,
@@ -244,23 +254,28 @@ class OLSRobust(Protomodel):
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
                     hqic_array[index] = hqic_i
+                    av_k_metric_array[index] = av_k_metric_i
 
                 list_b_array.append(b_array)
                 list_p_array.append(p_array)
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
                 list_hqic_array.append(hqic_array)
+                list_av_k_metric_array.append(av_k_metric_array)
 
-            results = OLSResult(y=y_names,
-                                specs=specs,
-                                draws=draws,
-                                all_b=b_all,
-                                all_p=p_all,
-                                estimates=np.vstack(list_b_array),
-                                p_values=np.vstack(list_p_array),
-                                aic_array=np.hstack(list_aic_array),
-                                bic_array=np.hstack(list_bic_array),
-                                hqic_array=np.hstack(list_hqic_array))
+            results = OLSResult(
+                y=y_names,
+                specs=specs,
+                draws=draws,
+                all_b=b_all,
+                all_p=p_all,
+                estimates=np.vstack(list_b_array),
+                p_values=np.vstack(list_p_array),
+                aic_array=np.hstack(list_aic_array),
+                bic_array=np.hstack(list_bic_array),
+                hqic_array=np.hstack(list_hqic_array),
+                av_k_metric_array=np.hstack(list_av_k_metric_array)
+                )
 
             self.results = results
 
@@ -291,7 +306,9 @@ class OLSRobust(Protomodel):
                 if group:
                     comb = group_demean(comb, group=group)
                 (b_all, p_all, ll_i,
-                 aic_i, bic_i, hqic_i, av_k_metric_i) = self._full_sample_OLS(comb)
+                 aic_i, bic_i, hqic_i,
+                 av_k_metric_i) = self._full_sample_OLS(comb,
+                                                        kfold=kfold)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                                       (delayed(self._strap_OLS)
                                        (comb,
@@ -333,7 +350,7 @@ class OLSRobust(Protomodel):
     def _predict(self, x_test, betas):
         return np.dot(x_test, betas)
 
-    def _full_sample_OLS(self, comb_var):
+    def _full_sample_OLS(self, comb_var, kfold):
         """
         This method calls stripped_ols()
         over the full data contaning y, x and controls.
@@ -344,6 +361,8 @@ class OLSRobust(Protomodel):
         comb_var : Array
                 ND array like object (pandas dataframe of numpy array)
                 contaning the data for y, x, and controls.
+        kfold : Boolead
+                Whether or not to calculate kfold corssvalidation.
 
         Returns
         -------
@@ -362,16 +381,18 @@ class OLSRobust(Protomodel):
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = simple_ols(y=y,
                          x=x)
-        k_fold = KFold(5)
-        metrics = []
-        for k, (train, test) in enumerate(k_fold.split(x, y)):
-            out_k = simple_ols(y=y.loc[train],
-                               x=x.loc[train])
-            y_pred = self._predict(x.loc[test], out_k['b'])
-            y_true = y.loc[test]
-            k_rmse = mean_squared_error(y_true, y_pred, squared=False)
-            metrics.append(k_rmse)
-        av_k_metric = np.mean(metrics)
+        av_k_metric = None
+        if kfold:
+            k_fold = KFold(5)
+            metrics = []
+            for k, (train, test) in enumerate(k_fold.split(x, y)):
+                out_k = simple_ols(y=y.loc[train],
+                                   x=x.loc[train])
+                y_pred = self._predict(x.loc[test], out_k['b'])
+                y_true = y.loc[test]
+                k_rmse = mean_squared_error(y_true, y_pred, squared=False)
+                metrics.append(k_rmse)
+            av_k_metric = np.mean(metrics)
         return (out['b'],
                 out['p'],
                 out['ll'][0][0],
