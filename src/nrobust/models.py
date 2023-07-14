@@ -203,8 +203,10 @@ class OLSRobust(Protomodel):
 
         if len(self.y) > 1:
             self.multiple_y()
+            list_all_predictors = []
             list_b_array = []
             list_p_array = []
+            list_ll_array = []
             list_aic_array = []
             list_bic_array = []
             list_hqic_array = []
@@ -216,9 +218,11 @@ class OLSRobust(Protomodel):
                 space_n = space_size(controls)
                 b_array = np.empty([space_n, draws])
                 p_array = np.empty([space_n, draws])
+                ll_array = np.empty([space_n])
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
+                all_predictors = []
                 av_k_metric_array = np.empty([space_n])
 
                 for spec, index in zip(all_subsets(controls),
@@ -235,7 +239,7 @@ class OLSRobust(Protomodel):
 
                     if group:
                         comb = group_demean(comb, group=group)
-                    (b_all, p_all,
+                    (b_all, p_all, ll_i,
                      aic_i, bic_i, hqic_i,
                      av_k_metric_i) = self._full_sample_OLS(comb,
                                                             kfold=kfold)
@@ -248,16 +252,20 @@ class OLSRobust(Protomodel):
                                            for i in range(0,
                                                           draws))))
                     y_names.append(y_name)
-                    specs.append(frozenset(spec))
+                    specs.append(frozenset(list(y_name) + list(spec)))
+                    all_predictors.append(self.x + list(spec) + ['const'])
                     b_array[index, :] = b_list
                     p_array[index, :] = p_list
+                    ll_array[index] = ll_i
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
                     hqic_array[index] = hqic_i
                     av_k_metric_array[index] = av_k_metric_i
 
+                list_all_predictors.append(all_predictors)
                 list_b_array.append(b_array)
                 list_p_array.append(p_array)
+                list_ll_array.append(ll_array)
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
                 list_hqic_array.append(hqic_array)
@@ -266,11 +274,14 @@ class OLSRobust(Protomodel):
             results = OLSResult(
                 y=y_names,
                 specs=specs,
+                all_predictors=list_all_predictors,
+                controls=controls,
                 draws=draws,
                 all_b=b_all,
                 all_p=p_all,
                 estimates=np.vstack(list_b_array),
                 p_values=np.vstack(list_p_array),
+                ll_array=np.hstack(list_ll_array),
                 aic_array=np.hstack(list_aic_array),
                 bic_array=np.hstack(list_bic_array),
                 hqic_array=np.hstack(list_hqic_array),
