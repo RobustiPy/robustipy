@@ -11,7 +11,7 @@ def union_example():
                                                'nlsw88.dta'))
     union_robust = OLSRobust(y=[y], x=[x], data=data)
     union_robust.fit(controls=c,
-                     draws=500,
+                     draws=100,
                      replace=True)
     union_results = union_robust.get_results()
 
@@ -32,12 +32,17 @@ def asc_example():
 
     myrobust_panel = OLSRobust(y=[y], x=x, data=data)
     myrobust_panel.fit(controls=c,
-                       draws=500,
+                       draws=100,
                        group=g,
                        replace=True)
     asc_results = myrobust_panel.get_results()
 
-    fig, ax1, ax2, ax3 = asc_results.plot()
+    fig, ax1, ax2, ax3 = asc_results.plot(
+        specs=[['married'],
+               ['widowed', 'disable']],
+        ic='bic',
+        figsize=(16, 8)
+    )
 
     plt.savefig(os.path.join(os.getcwd(), 'figures',
                              'ASC_example',
