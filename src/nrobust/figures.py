@@ -291,39 +291,17 @@ def plot_results(results_object,
     return fig, ax1, ax2, ax3
 
 
-def vars_line_plot(summary_df, var_name, bin_size):
+def vars_scatter_plot(results_object,
+                      var_name,
+                      ax=None,
+                      bin_size=1):
     """
     Plots the density of the specification with the selected covariate
     along the index of the specification, ordered by median.
-
-    Use:
-    vars_line_plot(df, 'grade', 20)
-    plt.show()
     """
-    df = summary_df.sort_values(by='median').copy()
-    count_bool = [var_name in ele for ele in df.spec_name]
-    count_list = [int(ele) for ele in count_bool]
-    bin_sums = []
-    index = []
-    for i, ele in enumerate(count_list):
-        if i % bin_size == 0:
-            bin_sum = np.sum(count_list[i-bin_size:i])
-            bin_sums.append(bin_sum)
-            index.append(i)
-    return plt.plot(index, bin_sums)
-
-
-def vars_scatter_plot(summary_df, var_name, bin_size):
-    """
-    Plots the density of the specification with the selected covariate
-    along the index of the specification, ordered by median.
-
-    Use:
-
-    vars_scatter_plot(df, 'south', 1)
-    plt.show()
-    """
-    df = summary_df.sort_values(by='median').copy()
+    if ax is None:
+        ax = plt.gca()
+    df = results_object.summary_df.sort_values(by='median').copy()
     count_bool = [var_name in ele for ele in df.spec_name]
     index = []
     for i, ele in enumerate(count_bool):
@@ -331,21 +309,26 @@ def vars_scatter_plot(summary_df, var_name, bin_size):
             new_index = np.floor(i/bin_size)*bin_size
             index.append(new_index)
     x = index
-    y = np.zeros(len(x)) + np.random.normal(0, .05, size=len(x))
-    plt.scatter(x, y, alpha=.2, s=100, linewidth=0)
-    return plt.ylim(-1, 1)
+    y = np.zeros(len(x)) + np.random.normal(0, .01, size=len(x))
+    ax.scatter(x, y, alpha=.2, s=50, linewidth=0, color='black')
+    ax.axis(ymin=-1, ymax=1)
+    ax.set_title(var_name)
+    ax.yaxis.label.set(rotation='horizontal', ha='right')
+    ax.tick_params(grid_alpha=0, colors='w')
+    return ax
 
 
-def vars_hist_plot(summary_df, var_name, bin_size):
+def vars_hist_plot(results_object,
+                   var_name,
+                   ax=None,
+                   bin_size=50):
     """
     Plots the density of the specification with the selected covariate
     along the index of the specification, ordered by median.
-
-    Use:
-    vars_hist_plot(df, 'south', 20)
-    plt.show()
     """
-    df = summary_df.sort_values(by='median').copy()
+    if ax is None:
+        ax = plt.gca()
+    df = results_object.summary_df.sort_values(by='median').copy()
     count_bool = [var_name in ele for ele in df.spec_name]
     index = []
     for i, ele in enumerate(count_bool):
@@ -353,4 +336,37 @@ def vars_hist_plot(summary_df, var_name, bin_size):
             new_index = np.floor(i/1)*1
             index.append(new_index)
     x = index
-    plt.hist(x, bin_size)
+    ax.hist(x, bin_size, color='black')
+    ax.set_title(var_name)
+    ax.yaxis.label.set(rotation='horizontal', ha='right')
+    ax.tick_params(grid_alpha=0, colors='w')
+    return ax
+
+
+def vars_line_plot(results_object,
+                   var_name,
+                   ax=None,
+                   bin_size=None):
+    """
+    Plots the density of the specification with the selected covariate
+    along the index of the specification, ordered by median.
+    """
+    if ax is None:
+        ax = plt.gca()
+    df = results_object.summary_df.sort_values(by='median').copy()
+    count_bool = [var_name in ele for ele in df.spec_name]
+    count_list = [int(ele) for ele in count_bool]
+    bin_sums = []
+    index = []
+    if bin_size is None:
+        bin_size = 50
+    for i, ele in enumerate(count_list):
+        if i % bin_size == 0:
+            bin_sum = np.sum(count_list[i-bin_size:i])
+            bin_sums.append(bin_sum)
+            index.append(i)
+    ax.plot(index, bin_sums, color='black')
+    ax.set_title(var_name)
+    ax.yaxis.label.set(rotation='horizontal', ha='right')
+    ax.tick_params(grid_alpha=0, colors='w')
+    return ax
