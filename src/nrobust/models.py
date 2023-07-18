@@ -176,7 +176,7 @@ class OLSRobust(Protomodel):
             draws=500,
             sample_size=None,
             replace=False,
-            kfold=False):
+            kfold=None):
 
         """
         Fit the OLS models into the specification space
@@ -361,7 +361,9 @@ class OLSRobust(Protomodel):
     def _predict(self, x_test, betas):
         return np.dot(x_test, betas)
 
-    def _full_sample_OLS(self, comb_var, kfold):
+    def _full_sample_OLS(self,
+                         comb_var,
+                         kfold):
         """
         This method calls stripped_ols()
         over the full data contaning y, x and controls.
@@ -394,7 +396,7 @@ class OLSRobust(Protomodel):
                          x=x)
         av_k_metric = None
         if kfold:
-            k_fold = KFold(5)
+            k_fold = KFold(kfold)
             metrics = []
             for k, (train, test) in enumerate(k_fold.split(x, y)):
                 out_k = simple_ols(y=y.loc[train],
@@ -412,7 +414,11 @@ class OLSRobust(Protomodel):
                 out['hqic'][0][0],
                 av_k_metric)
 
-    def _strap_OLS(self, comb_var, group, sample_size, replace):
+    def _strap_OLS(self,
+                   comb_var,
+                   group,
+                   sample_size,
+                   replace):
 
         """
         This method calls stripped_ols() over a random sample
