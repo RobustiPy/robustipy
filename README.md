@@ -18,7 +18,7 @@ pip install nrobust
 To install directly from Github run:
 
 ```
-git glone https://github.com/centre-for-care/nrobust.git
+git clone https://github.com/centre-for-care/nrobust.git
 cd nrobust
 pip install .
 ```
