@@ -5,20 +5,12 @@ This project is in early stages of development and its functionally and API migh
 
 # Installation
 
-## From PyPI
-
-On a terminal run:
-
-```
-pip install nrobust
-```
-
 ## From GitHub
 
 To install directly from Github run:
 
 ```
-git glone https://github.com/centre-for-care/nrobust.git
+git clone https://github.com/centre-for-care/nrobust.git
 cd nrobust
 pip install .
 ```
@@ -43,7 +35,9 @@ Where `y` is a list of variables names used to create your dependent variable, a
 
 # Example
 
-A working usage example `replication_example.py` is provided cloning this repository. 
+A working usage example `replication_example.py` is provided cloning this repository.
+
+![Union dataset example](./figures/union_example/union_curve.png)
 
 
 @TODO next: implement weighting and selection over the loaded outcome spaces
