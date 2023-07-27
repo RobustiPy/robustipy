@@ -15,11 +15,11 @@ def union_example():
                      replace=True)
     union_results = union_robust.get_results()
 
-    fig, ax1, ax2, ax3 = union_results.plot(specs=[['hours', 'collgrad'],
-                                                   ['collgrad'],
-                                                   ['hours', 'age']],
-                                            ic='hqic',
-                                            figsize=(16, 8))
+    fig = union_results.plot(specs=[['hours', 'collgrad'],
+                                    ['collgrad'],
+                                    ['hours', 'age']],
+                             ic='hqic',
+                             figsize=(16, 8))
     plt.savefig(os.path.join(os.getcwd(), 'figures',
                              'union_example',
                              'union_curve.png'))
@@ -37,7 +37,7 @@ def asc_example():
                        replace=True)
     asc_results = myrobust_panel.get_results()
 
-    fig, ax1, ax2, ax3 = asc_results.plot(
+    fig = asc_results.plot(
         specs=[['married'],
                ['widowed', 'disable']],
         ic='bic',

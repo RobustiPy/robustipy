@@ -229,3 +229,27 @@ def scipy_ols(y, x) -> dict:
             'll': ll,
             'aic': aic,
             'bic': bic}
+
+
+def join_sig_test(results_target,
+                  results_shuffled,
+                  sig_level=0.05,
+                  positive=True):
+    if positive:
+        target_sig_n = sum(results_target.summary_df.ci_down > 0)
+        n_draws = []
+        for col in results_shuffled.estimates:
+            idx = results_shuffled.estimates[col] > 0
+            n_draw = sum(results_shuffled.p_values[col][idx] < sig_level)
+            n_draws.append(n_draw)
+        shuffle_sig_n = sum(np.array(n_draws) >= target_sig_n)
+        return shuffle_sig_n/results_shuffled.estimates.shape[1]
+    else:
+        target_sig_n = sum(results_target.summary_df.ci_up < 0)
+        n_draws = []
+        for col in results_shuffled.estimates:
+            idx = results_shuffled.estimates[col] < 0
+            n_draw = sum(results_shuffled.p_values[col][idx] < sig_level)
+            n_draws.append(n_draw)
+        shuffle_sig_n = sum(np.array(n_draws) >= target_sig_n)
+        return shuffle_sig_n/results_shuffled.estimates.shape[1]

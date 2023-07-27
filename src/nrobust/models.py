@@ -176,7 +176,8 @@ class OLSRobust(Protomodel):
             draws=500,
             sample_size=None,
             replace=False,
-            kfold=None):
+            kfold=None,
+            shuffle=False):
 
         """
         Fit the OLS models into the specification space
@@ -248,7 +249,8 @@ class OLSRobust(Protomodel):
                                            (comb,
                                             group,
                                             sample_size,
-                                            replace)
+                                            replace,
+                                            shuffle)
                                            for i in range(0,
                                                           draws))))
                     y_names.append(y_name)
@@ -325,7 +327,8 @@ class OLSRobust(Protomodel):
                                        (comb,
                                         group,
                                         sample_size,
-                                        replace)
+                                        replace,
+                                        shuffle)
                                        for i in range(0,
                                                       draws))))
 
@@ -418,7 +421,8 @@ class OLSRobust(Protomodel):
                    comb_var,
                    group,
                    sample_size,
-                   replace):
+                   replace,
+                   shuffle):
 
         """
         This method calls stripped_ols() over a random sample
@@ -439,6 +443,8 @@ class OLSRobust(Protomodel):
                   of the self.data.
         replace : bool
               Whether to use replace on sampling.
+        shuffle : bool
+              Whether to use shuffle y var to estimate join significant test.
 
         Returns
         -------
@@ -447,9 +453,17 @@ class OLSRobust(Protomodel):
         p : float
          P value for x.
         """
+        temp_data = comb_var.copy()
+
+        if shuffle:
+            y = temp_data.iloc[:, [0]]
+            idx_y = np.random.permutation(y.index)
+            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
+            x = temp_data.drop(temp_data.columns[0], axis=1)
+            temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = comb_var.sample(n=sample_size, replace=replace)
+            samp_df = temp_data.sample(n=sample_size, replace=replace)
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
@@ -458,12 +472,8 @@ class OLSRobust(Protomodel):
             p = output['p']
             return b[0][0], p[0][0]
         else:
-            # samp_df = comb_var.groupby(group).sample(frac=0.3,
-            # replace=replace)
-            # @TODO generalize the frac to the function call
-
-            idx = np.random.choice(comb_var[group].unique(), sample_size)
-            select = comb_var[comb_var[group].isin(idx)]
+            idx = np.random.choice(temp_data[group].unique(), sample_size)
+            select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]

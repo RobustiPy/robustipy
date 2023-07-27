@@ -213,7 +213,7 @@ def plot_results(results_object,
                  figsize=(26, 8)
                  ):
     fig = plt.figure(figsize=figsize)
-    gs = GridSpec(2, 4, wspace=0.1, hspace=.3)
+    gs = GridSpec(3, 4, wspace=0.1, hspace=.3)
     ax1 = fig.add_subplot(gs[:, :-1])
     ax2 = fig.add_subplot(gs[:-1, -1])
     ax3 = fig.add_subplot(gs[-1, -1])
@@ -288,7 +288,7 @@ def plot_results(results_object,
     ax1.set_xlim(0, len(results_object.specs_names))
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
-    return fig, ax1, ax2, ax3
+    return fig
 
 
 def vars_scatter_plot(results_object,
