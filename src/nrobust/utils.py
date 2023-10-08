@@ -231,10 +231,37 @@ def scipy_ols(y, x) -> dict:
             'bic': bic}
 
 
-def join_sig_test(results_target,
+def join_sig_test(*,
+                  results_target,
                   results_shuffled,
-                  sig_level=0.05,
-                  positive=True):
+                  sig_level,
+                  positive):
+    """
+    Helper function to calculate joint significance test
+    for the whole spec curve.
+
+    Parameters
+    ----------
+    results_target : OLSResult object
+        Results object from the nrobust library with the original
+        results.
+
+    results_shuffled : OLSResult object
+        Results object from the nrobust library with shuffled
+        results.
+
+    sig_level : float
+        Significance level threshold for the specifications.
+
+    possitive : Boolean
+        Either possitive or negative direction to test
+        in the joint sig test.
+
+    Returns
+    -------
+    p value : float
+        Estimate for the p value of the joint significance test.
+    """
     if positive:
         target_sig_n = sum(results_target.summary_df.ci_down > 0)
         n_draws = []

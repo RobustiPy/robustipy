@@ -377,7 +377,7 @@ class OLSRobust(Protomodel):
         comb_var : Array
                 ND array like object (pandas dataframe of numpy array)
                 contaning the data for y, x, and controls.
-        kfold : Boolead
+        kfold : Boolean
                 Whether or not to calculate kfold corssvalidation.
 
         Returns
