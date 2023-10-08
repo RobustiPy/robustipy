@@ -12,6 +12,20 @@ def plot_curve(results_object,
                ax=None,
                colormap=None,
                colorset=None):
+    """
+    Plots the curve of median, confidence intervals, minimum, and maximum
+    coefficient estimates for a given results object.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        specs (list, optional): List of specification names to be highlighted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        colormap (str, optional): Colormap to use for highlighting specifications.
+        colorset (list, optional): List of colors for specification highlighting.
+
+    Returns:
+        matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted curve.
+    """
     colors_curve = ['#001c54', 'goldenrod']
     if ax is None:
         ax = plt.gca()
@@ -135,6 +149,20 @@ def plot_ic(results_object,
             ax=None,
             colormap=None,
             colorset=None):
+    """
+    Plots the information criterion (IC) curve for the given results object.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        ic (str): Information criterion to plot ('aic', 'bic', etc.).
+        specs (list, optional): List of specification names to be highlighted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        colormap (str, optional): Colormap to use for highlighting specifications.
+        colorset (list, optional): List of colors for specification highlighting.
+
+    Returns:
+        matplotlib.lines.Line2D: IC curve plot.
+    """
     if ax is None:
         ax = plt.gca()
     df = results_object.summary_df.copy()
@@ -186,6 +214,19 @@ def plot_bdist(results_object,
                ax=None,
                colormap=None,
                colorset=None):
+    """
+    Plots the distribution of coefficient estimates for the specified specifications.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        specs (list, optional): List of specification names to be highlighted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        colormap (str, optional): Colormap to use for highlighting specifications.
+        colorset (list, optional): List of colors for specification highlighting.
+
+    Returns:
+        matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted distribution.
+    """
     if ax is None:
         ax = plt.gca()
     df = results_object.estimates.T
@@ -212,6 +253,20 @@ def plot_results(results_object,
                  colorset=None,
                  figsize=(26, 8)
                  ):
+    """
+    Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        specs (list, optional): List of specification names to be highlighted.
+        ic (str, optional): Information criterion to plot ('aic', 'bic', etc.).
+        colormap (str, optional): Colormap to use for highlighting specifications.
+        colorset (list, optional): List of colors for specification highlighting.
+        figsize (tuple, optional): Figure size (width, height) in inches.
+
+    Returns:
+        matplotlib.figure.Figure: Figure containing the plotted results.
+    """
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(3, 4, wspace=0.1, hspace=.3)
     ax1 = fig.add_subplot(gs[:, :-1])
@@ -296,8 +351,16 @@ def vars_scatter_plot(results_object,
                       ax=None,
                       bin_size=1):
     """
-    Plots the density of the specification with the selected covariate
-    along the index of the specification, ordered by median.
+    Plots the scatter plot of the specified covariate in the specifications.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        var_name (str): Name of the covariate to be plotted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        bin_size (int, optional): Size of bins for scatter plot.
+
+    Returns:
+        matplotlib.axes._subplots.AxesSubplot: Axes containing the scatter plot.
     """
     if ax is None:
         ax = plt.gca()
@@ -323,8 +386,16 @@ def vars_hist_plot(results_object,
                    ax=None,
                    bin_size=50):
     """
-    Plots the density of the specification with the selected covariate
-    along the index of the specification, ordered by median.
+    Plots the histogram of the specified covariate in the specifications.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        var_name (str): Name of the covariate to be plotted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        bin_size (int, optional): Size of bins for histogram.
+
+    Returns:
+        matplotlib.axes._subplots.AxesSubplot: Axes containing the histogram plot.
     """
     if ax is None:
         ax = plt.gca()
@@ -348,8 +419,16 @@ def vars_line_plot(results_object,
                    ax=None,
                    bin_size=None):
     """
-    Plots the density of the specification with the selected covariate
-    along the index of the specification, ordered by median.
+    Plots the line plot of the specified covariate in the specifications.
+
+    Parameters:
+        results_object (object): Object containing the results data.
+        var_name (str): Name of the covariate to be plotted.
+        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
+        bin_size (int, optional): Size of bins for the line plot.
+
+    Returns:
+        matplotlib.axes._subplots.AxesSubplot: Axes containing the line plot.
     """
     if ax is None:
         ax = plt.gca()

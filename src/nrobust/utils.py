@@ -2,27 +2,52 @@
 
 import numpy as np
 import scipy
-import os
 import matplotlib
 from matplotlib.colors import ListedColormap
 import pandas as pd
 from itertools import chain, combinations
-# temporary solution to get PanelOLS estimates
-from linearmodels.panel import PanelOLS
-import warnings
 
 
 def space_size(iterable) -> int:
+    """
+    Calculate the size of the power set of the given iterable.
+
+    Parameters:
+    iterable (iterable): Input iterable.
+
+    Returns:
+    int: Size of the power set of the input iterable.
+    """
     n = len(iterable)
     return int(2**n)
 
 
 def all_subsets(ss):
+    """
+    Generate all subsets of a given iterable.
+
+    Parameters:
+    ss (iterable): Input iterable.
+
+    Returns:
+    itertools.chain: A chain object containing all subsets of the input iterable.
+    """
     return chain(*map(lambda x: combinations(ss, x),
                       range(0, len(ss) + 1)))
 
 
 def simple_ols(y, x) -> dict:
+    """
+    Perform simple ordinary least squares regression.
+
+    Parameters:
+    y (array-like): Dependent variable.
+    x (array-like): Independent variables.
+
+    Returns:
+    dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
+          AIC, BIC, and HQIC.
+    """
     x['const'] = 1  # constant
     x = np.asarray(x)
     y = np.asarray(y)
@@ -59,6 +84,16 @@ def simple_ols(y, x) -> dict:
 
 
 def group_demean(x, group=None):
+    """
+    Demean the input data within groups.
+
+    Parameters:
+    x (pd.DataFrame): Input DataFrame.
+    group (str, optional): Column name for grouping. Default is None.
+
+    Returns:
+    pd.DataFrame: Demeaned DataFrame.
+    """
     data = x.copy()
     if group is None:
         return data - np.mean(data)
@@ -67,68 +102,16 @@ def group_demean(x, group=None):
     return pd.concat([out, data.pidp], axis=1)
 
 
-def save_myrobust(beta, p, aic, bic, example_path):
-    if os.path.exists(example_path) is False:
-        os.mkdir(example_path)
-    np.savetxt(os.path.join(example_path, 'betas.csv'),
-               beta, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'p.csv'),
-               p, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'aic.csv'),
-               aic, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'bic.csv'),
-               bic, delimiter=",")
-
-
-def save_spec(b_spec, p_spec, aic_spec, bic_spec, example_path):
-    np.savetxt(os.path.join(example_path, 'b_spec.csv'),
-               b_spec, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'p_spec.csv'),
-               p_spec, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'aic_spec.csv'),
-               aic_spec, delimiter=",")
-    np.savetxt(os.path.join(example_path, 'bic_spec.csv'),
-               bic_spec, delimiter=",")
-
-
-def load_myrobust(d_path):
-    beta = pd.read_csv(os.path.join(d_path, 'betas.csv'), header=None)
-    p = pd.read_csv(os.path.join(d_path, 'p.csv'), header=None)
-    aic = pd.read_csv(os.path.join(d_path, 'aic.csv'), header=None)
-    bic = pd.read_csv(os.path.join(d_path, 'bic.csv'), header=None)
-    list_df = []
-    summary_df = pd.DataFrame(columns=['beta_med',
-                                       'beta_max',
-                                       'beta_min',
-                                       'beta_std'])
-    # the operation performed with this loop can be done with built-in pandas
-    # functions for better performance. See function compute_summary bellow.
-    # Use the decorator_timer to measure the execution time.
-    for strap in range(0, beta.shape[0]):
-        new_df = pd.DataFrame()
-        new_df['betas'] = beta.values[strap]
-        new_df['p'] = p.values[strap]
-        new_df['aic'] = aic.values[strap]
-        new_df['bic'] = bic.values[strap]
-        list_df.append(new_df)
-        summary_df.at[strap, 'beta_med'] = np.median(beta.values[strap])
-        summary_df.at[strap, 'beta_min'] = np.min(beta.values[strap])
-        summary_df.at[strap, 'beta_max'] = np.max(beta.values[strap])
-        summary_df.at[strap, 'beta_std'] = np.std(beta.values[strap])
-        summary_df.at[strap, 'beta_std_plus'] = np.median(beta.values[strap]) + np.std(beta.values[strap])
-        summary_df.at[strap, 'beta_std_minus'] = np.median(beta.values[strap]) - np.std(beta.values[strap])
-    return beta, summary_df, list_df
-
-
-def load_spec(example_path):
-    beta = pd.read_csv(os.path.join(example_path, 'b_spec.csv'), header=None)
-    p = pd.read_csv(os.path.join(example_path, 'p_spec.csv'), header=None)
-    aic = pd.read_csv(os.path.join(example_path, 'aic_spec.csv'), header=None)
-    bic = pd.read_csv(os.path.join(example_path, 'bic_spec.csv'), header=None)
-    return beta, p, aic, bic
-
-
 def decorator_timer(some_function):
+    """
+    Decorator function to measure the execution time of a function.
+
+    Parameters:
+    some_function (function): Input function to be timed.
+
+    Returns:
+    function: Wrapped function with timing functionality.
+    """
     from time import time
 
     def wrapper(*args, **kwargs):
@@ -140,6 +123,15 @@ def decorator_timer(some_function):
 
 
 def get_selection_key(specs):
+    """
+    Generate selection keys for specifications.
+
+    Parameters:
+    specs (list): List of lists containing specifications.
+
+    Returns:
+    list: List of frozen sets representing selection keys.
+    """
     if all(isinstance(ele, list) for ele in specs):
         target = [frozenset(x) for x in specs]
         return target
@@ -148,6 +140,15 @@ def get_selection_key(specs):
 
 
 def get_default_colormap(specs):
+    """
+    Generate default colormap for visualizing specifications.
+
+    Parameters:
+    specs (list): List of lists containing specifications.
+
+    Returns:
+    list: List of colors from the default colormap.
+    """
     default_cm = ListedColormap(["#fd8d59", "#92bfdb",
                                  "#1ceaf9", "#1d866d",
                                  "#38e278", "#98d595",
@@ -159,6 +160,16 @@ def get_default_colormap(specs):
 
 
 def get_colors(specs, color_set_name=None):
+    """
+    Generate colors for visualizing specifications.
+
+    Parameters:
+    specs (list): List of lists containing specifications.
+    color_set_name (str, optional): Name of the colormap. Default is 'Set1'.
+
+    Returns:
+    list: List of colors based on the specified colormap.
+    """
     if color_set_name is None:
         color_set_name = 'Set1'
     if all(isinstance(ele, list) for ele in specs):
@@ -169,98 +180,22 @@ def get_colors(specs, color_set_name=None):
         raise ValueError('Argument `specs` must be a list of list.')
 
 
-def panel_ols(y, x):
-    if np.asarray(x).size == 0 or np.asarray(y).size == 0:
-        raise ValueError("Inputs must not be empty.")
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            mod = PanelOLS(y,
-                           x,
-                           entity_effects=True,
-                           drop_absorbed=True,
-                           # necessary because we dont always have
-                           # full rank on some resamples...
-                           # @TODO: a better way to handle this?
-                           #                    check_rank=False
-                           )
-            res = mod.fit(cov_type='clustered',
-                          cluster_entity=True)
-        nobs = y.shape[0]  # number of observations
-        ncoef = x.shape[1]  # number of coef.
-        ll = res.loglik
-        aic = (-2 * ll) + (2 * ncoef)
-        bic = (-2 * ll) + (ncoef * np.log(nobs))
-        hqic = (-2.0 * ll) + 2 * np.log(np.log(nobs)) * ncoef
-        try:
-        # @TODO: necessary due to a singular matrix error
-        # due to resampling of the ASC data. Not sure what
-        # else to do.
-            p = res.pvalues
-        except:
-            p = np.nan
-        b = res.params
-        return {'b': b,
-                'p': p,
-                'll': ll,
-                'aic': aic,
-                'bic': bic,
-                'hqic': hqic}
-    except ValueError:
-        return {'b': np.nan,
-                'p': np.nan,
-                'll': np.nan,
-                'aic': np.nan,
-                'bic': np.nan,
-                'hqic': np.nan}
-
-
-def scipy_ols(y, x) -> dict:
-    x = np.asarray(x)
-    y = np.asarray(y)
-    if x.size == 0 or y.size == 0:
-        raise ValueError("Inputs must not be empty.")
-    b, res, rnk, s = scipy.linalg.lstsq(x,
-                                        y,
-                                        lapack_driver='gelsy',
-                                        check_finite=False)
-    return {'b': b,
-            'p': p,
-            'll': ll,
-            'aic': aic,
-            'bic': bic}
-
-
 def join_sig_test(*,
                   results_target,
                   results_shuffled,
                   sig_level,
                   positive):
     """
-    Helper function to calculate joint significance test
-    for the whole spec curve.
+    Calculate joint significance test for the entire specification curve.
 
-    Parameters
-    ----------
-    results_target : OLSResult object
-        Results object from the nrobust library with the original
-        results.
+    Parameters:
+    results_target (OLSResult): Results object from the original analysis.
+    results_shuffled (OLSResult): Results object from shuffled analysis.
+    sig_level (float): Significance level threshold for specifications.
+    positive (bool): Direction of the joint significance test.
 
-    results_shuffled : OLSResult object
-        Results object from the nrobust library with shuffled
-        results.
-
-    sig_level : float
-        Significance level threshold for the specifications.
-
-    possitive : Boolean
-        Either possitive or negative direction to test
-        in the joint sig test.
-
-    Returns
-    -------
-    p value : float
-        Estimate for the p value of the joint significance test.
+    Returns:
+    float: Estimated p-value for the joint significance test.
     """
     if positive:
         target_sig_n = sum(results_target.summary_df.ci_down > 0)
@@ -280,3 +215,107 @@ def join_sig_test(*,
             n_draws.append(n_draw)
         shuffle_sig_n = sum(np.array(n_draws) >= target_sig_n)
         return shuffle_sig_n/results_shuffled.estimates.shape[1]
+
+
+def prepare_union(path_to_union):
+    """
+    Prepare data for union example.
+
+    Reads a Stata file from the given path, processes the data, and prepares it for
+    regression analysis. The function creates binary indicators for categorical variables,
+    augments the input data with a log-transformed wage variable, and handles missing
+    values.
+
+    Parameters:
+    path_to_union (str): File path to the Stata file containing union data.
+
+    Returns:
+    tuple: A tuple containing the dependent variable ('y'), list of control variables ('c'),
+           independent variable ('x'), and the prepared DataFrame ('final_data').
+
+    Raises:
+    FileNotFoundError: If the file specified in 'path_to_union' does not exist.
+    """
+    union_df = pd.read_stata(path_to_union)
+    union_df.loc[:, 'log_wage'] = np.log(union_df['wage'].copy()) * 100
+    union_df = union_df[union_df['union'].notnull()].copy()
+    union_df.loc[:, 'union'] = np.where(union_df['union'] == 'union', 1, 0)
+    union_df.loc[:, 'married'] = np.where(union_df['married'] == 'married', 1, 0)
+    union_df.loc[:, 'collgrad'] = np.where(union_df['collgrad'] == 'college grad', 1, 0)
+    union_df.loc[:, 'smsa'] = np.where(union_df['smsa'] == 'SMSA', 1, 0)
+    indep_list = ['hours',
+                  'age',
+                  'grade',
+                  'collgrad',
+                  'married',
+                  'south',
+                  'smsa',
+                  'c_city',
+                  'ttl_exp',
+                  'tenure']
+    for var in indep_list:
+        union_df = union_df[union_df[var].notnull()]
+    y = 'log_wage'
+    c = indep_list
+    x = 'union'
+    final_data = pd.merge(union_df[y],
+                          union_df[x],
+                          how='left',
+                          left_index=True,
+                          right_index=True)
+    final_data = pd.merge(final_data,
+                          union_df[indep_list],
+                          how='left',
+                          left_index=True,
+                          right_index=True)
+    final_data = final_data.reset_index(drop=True)
+    return y, c, x, final_data
+
+
+def prepare_asc(asc_path):
+    """
+    Prepare data for ASC example.
+
+    Reads a Stata file from the given path, processes the data, creates binary indicators
+    for categorical variables, and handles missing values. One-hot encodes the 'year' column
+    and computes interaction terms for specific columns.
+
+    Parameters:
+    asc_path (str): File path to the Stata file containing ASC data.
+
+    Returns:
+    tuple: A tuple containing the dependent variable ('y'), list of continuous variables ('x'),
+           list of control variables ('c'), grouping variable ('group'), and the prepared DataFrame.
+
+    Raises:
+    FileNotFoundError: If the file specified in 'asc_path' does not exist.
+    """
+    ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
+    one_hot = pd.get_dummies(ASC_df['year'])
+    ASC_df = ASC_df.join(one_hot)
+    #ASC_df = ASC_df.set_index(['pidp', 'year'])
+    ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew'] * ASC_df['lrealgs']
+    #ASC_df['constant'] = 1
+    ASC_df = ASC_df[['wellbeing_kikert', 'lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
+                     'DR', 'lgva', 'Mtotp', 'ddgree', 'age',
+                     2005, 2006.0, 2007.0, 2009.0,
+                     2010.0, 2011.0, 2012.0, 2013.0, 2014.0,
+                     2015.0, 2016.0, 2017.0, 2018.0,
+                     'married', 'widowed', 'disable', 'lrealtinc_m',
+                     'house_ownership', 'hhsize', 'work', 'retired',
+                     #'constant'
+                     'pidp'
+                     ]]
+    #ASC_df = ASC_df.dropna()
+    y = 'wellbeing_kikert'
+    x = ['lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
+         'DR', 'lgva', 'Mtotp', 'ddgree', 'age',
+         2005, 2006.0, 2007.0, 2009.0,
+         2010.0, 2011.0, 2012.0, 2013.0, 2014.0,
+         2015.0, 2016.0, 2017.0, 2018.0]
+    c = ['married', 'widowed', 'disable', 'lrealtinc_m',
+         'house_ownership', 'hhsize', 'work', 'retired'
+         ]
+    group = 'pidp'
+
+    return y, c, x, group, ASC_df

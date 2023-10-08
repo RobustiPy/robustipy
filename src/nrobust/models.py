@@ -18,6 +18,57 @@ from sklearn.metrics import mean_squared_error
 
 
 class OLSResult(Protoresult):
+    """
+    Result class containing the the output of the OLSRobust class.
+
+    Parameters:
+        y (str): The name of the dependent variable.
+        specs (list of str): List of specification names.
+        all_predictors (list of lists of str): List of predictor variable names for each specification.
+        controls (list of str): List of control variable names.
+        draws (int): Number of draws in the analysis.
+        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.
+        all_b (list of lists): List of coefficient estimates for each specification and draw.
+        all_p (list of lists): List of p-values for each specification and draw.
+        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.
+        ll_array (list): List of log-likelihood values for each specification.
+        aic_array (list): List of AIC values for each specification.
+        bic_array (list): List of BIC values for each specification.
+        hqic_array (list): List of HQIC values for each specification.
+        av_k_metric_array (list, optional): List of average Kullback-Leibler divergence metrics.
+
+    Methods:
+        save(filename):
+            Save the OLSResult object to a file using pickle.
+
+        load(filename):
+            Load an OLSResult object from a file using pickle.
+
+        summary():
+            Placeholder for a method to generate a summary of the OLS results.
+
+        plot(specs=None, ic=None, colormap=None, colorset=None, figsize=(12, 6)):
+            Generate plots of the OLS results.
+
+        compute_bma():
+            Perform Bayesian model averaging using BIC implied priors and return the results.
+
+        merge(result_obj, prefix):
+            Merge two OLSResult objects into one.
+
+    Attributes:
+        y_name (str): The name of the dependent variable.
+        specs_names (pd.Series): Series containing specification names.
+        all_predictors (list of lists of str): List of predictor variable names for each specification.
+        controls (list of str): List of control variable names.
+        draws (int): Number of draws in the analysis.
+        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.
+        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.
+        all_b (list of lists): List of coefficient estimates for each specification and draw.
+        all_p (list of lists): List of p-values for each specification and draw.
+        summary_df (pd.DataFrame): DataFrame containing summary statistics of coefficient estimates.
+        summary_bma (pd.DataFrame, optional): DataFrame containing Bayesian model averaging results.
+    """
     def __init__(self, *,
                  y,
                  specs,
@@ -53,15 +104,33 @@ class OLSResult(Protoresult):
         self.summary_df['y'] = self.y_name
 
     def save(self, filename):
+        """
+        Saves the OLSResult object to a binary file.
+
+        Args:
+            filename (str): Name of the file to which the object will be saved.
+        """
         with open(filename, 'wb') as f:
             _pickle.dump(self, f, -1)
 
     @classmethod
     def load(cls, filename):
+        """
+        Loads an OLSResult object from a binary file.
+
+        Args:
+            filename (str): Name of the file from which the object will be loaded.
+
+        Returns:
+            OLSResult: Loaded OLSResult object.
+        """
         with open(filename, 'rb') as f:
             return _pickle.load(f)
 
     def summary(self):
+        """
+        Generates a summary of the regression results (not implemented).
+        """
         pass
 
     def plot(self,
@@ -70,6 +139,19 @@ class OLSResult(Protoresult):
              colormap=None,
              colorset=None,
              figsize=(12, 6)):
+        """
+        Plots the regression results using specified options.
+
+        Args:
+            specs (list, optional): List of specification names to include in the plot.
+            ic (str, optional): Information criterion to use for model selection (e.g., 'bic', 'aic').
+            colormap (str, optional): Colormap to use for the plot.
+            colorset (list, optional): List of colors to use for different specifications.
+            figsize (tuple, optional): Size of the figure (width, height) in inches.
+
+        Returns:
+            matplotlib.figure.Figure: Plot showing the regression results.
+        """
         return plot_results(results_object=self,
                             specs=specs,
                             ic=ic,
@@ -78,6 +160,12 @@ class OLSResult(Protoresult):
                             figsize=figsize)
 
     def _compute_summary(self):
+        """
+        Computes summary statistics based on coefficient estimates.
+
+        Returns:
+            pd.DataFrame: DataFrame containing summary statistics.
+        """
         data = self.estimates.copy()
         out = pd.DataFrame()
         out['median'] = data.median(axis=1)
@@ -91,7 +179,10 @@ class OLSResult(Protoresult):
 
     def compute_bma(self):
         """
-        Bayesian model averaging using BIC implied priors
+        Performs Bayesian Model Averaging (BMA) using BIC implied priors.
+
+        Returns:
+            pd.DataFrame: DataFrame containing BMA results.
         """
         likelihood_per_var = []
         weigthed_coefs = []
@@ -120,7 +211,22 @@ class OLSResult(Protoresult):
             'average_coefs': final_coefs
         })
         return summary_bma
+    
+    def merge(self, result_obj, prefix):
+        """
+        Merges two OLSResult objects into one.
 
+        Args:
+            result_obj (OLSResult): OLSResult object to be merged.
+            prefix (str): Prefix to differentiate columns from different OLSResult objects.
+
+        Raises:
+            TypeError: If the input object is not an instance of OLSResult.
+        """
+        if not isinstance(result_obj, OLSResult):
+            raise TypeError('Invalid object type. Expected an instance of OLSResult.')
+        prefix = prefix
+        
 
 class OLSRobust(Protomodel):
     """
@@ -142,6 +248,18 @@ class OLSRobust(Protomodel):
     """
 
     def __init__(self, *, y, x, data):
+        """
+        Initialize the OLSRobust object.
+
+        Parameters
+        ----------
+        y : str
+            Name of the dependent variable.
+        x : str or list<str>
+            List of names of the independent variable(s).
+        data : DataFrame
+            DataFrame containing all the data to be used in the model.
+        """
         super().__init__()
         if data.isnull().values.any():
             warnings.warn('Missing values found in data. Listwise deletion will be applied',
@@ -152,6 +270,14 @@ class OLSRobust(Protomodel):
         self.results = None
 
     def get_results(self):
+        """
+        Get the results of the OLS regression.
+
+        Returns
+        -------
+        results : OLSResult
+            Object containing the regression results.
+        """
         return self.results
 
     def multiple_y(self):
@@ -178,27 +304,31 @@ class OLSRobust(Protomodel):
             replace=False,
             kfold=None,
             shuffle=False):
-
         """
-        Fit the OLS models into the specification space
-        as well as over the bootstrapped samples.
+        Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
         Parameters
         ----------
         controls : list<str>
-                List containing all the names of the  possible
-                control variables of the model.
+            List containing all the names of the possible control variables of the model.
         sample_size : int
-              Number of bootstrap samples to collect.
+            Number of bootstrap samples to collect.
         group : str
-            Grouping variable. If provided a Fixed Effects model is estimated.
+            Grouping variable. If provided, a Fixed Effects model is estimated.
+        draws : int, optional
+            Number of draws for bootstrapping. Default is 500.
+        replace : bool, optional
+            Whether to use replacement during bootstrapping. Default is False.
+        kfold : int, optional
+            Number of folds for k-fold cross-validation. Default is None.
+        shuffle : bool, optional
+            Whether to shuffle y variable to estimate joint significance test. Default is False.
 
         Returns
         -------
         self : Object
-             Object class OLSRobust containing the fitted estimators.
+            Object class OLSRobust containing the fitted estimators.
         """
-
         if sample_size is None:
             sample_size = self.data.shape[0]
 
@@ -362,36 +492,48 @@ class OLSRobust(Protomodel):
             self.results = results
 
     def _predict(self, x_test, betas):
+        """
+        Predict the dependent variable based on the test data and coefficients.
+
+        Parameters
+        ----------
+        x_test : array-like
+            Test data for independent variables.
+        betas : array-like
+            Coefficients obtained from the regression.
+
+        Returns
+        -------
+        y_pred : array
+            Predicted values for the dependent variable.
+        """
         return np.dot(x_test, betas)
 
     def _full_sample_OLS(self,
                          comb_var,
                          kfold):
         """
-        This method calls stripped_ols()
-        over the full data contaning y, x and controls.
-        Returns a single value for each returning variable.
+        Call stripped_ols() over the full data containing y, x, and controls.
 
         Parameters
         ----------
         comb_var : Array
-                ND array like object (pandas dataframe of numpy array)
-                contaning the data for y, x, and controls.
+            ND array-like object containing the data for y, x, and controls.
         kfold : Boolean
-                Whether or not to calculate kfold corssvalidation.
+            Whether or not to calculate k-fold cross-validation.
 
         Returns
         -------
         beta : float
             Estimate for x.
         p : float
-         P value for x.
+            P value for x.
         AIC : float
-          Akaike information criteria value for the model.
+            Akaike information criteria value for the model.
         BIC : float
-          Bayesian information criteria value for the model.
+            Bayesian information criteria value for the model.
         HQIC : float
-          Hannan-Quinn information criteria value for the model.
+            Hannan-Quinn information criteria value for the model.
         """
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
@@ -423,35 +565,28 @@ class OLSRobust(Protomodel):
                    sample_size,
                    replace,
                    shuffle):
-
         """
-        This method calls stripped_ols() over a random sample
-        of the data contaning y, x and controls.
-        Returns a single value for each returning variable.
+        Call stripped_ols() over a random sample of the data containing y, x, and controls.
 
         Parameters
         ----------
         comb_var : Array
-                ND array like object (pandas dataframe of numpy array)
-                contaning the data for y, x, and controls.
+            ND array-like object containing the data for y, x, and controls.
         group : str
-            Grouping variable. If provided sampling is performed over
-            the group variable.
+            Grouping variable. If provided, sampling is performed over the group variable.
         sample_size : int
-                  Optional: Sample size to use in the bootstrap. If not
-                  provided, sample size is obtained from the length
-                  of the self.data.
+            Sample size to use in the bootstrap.
         replace : bool
-              Whether to use replace on sampling.
+            Whether to use replacement on sampling.
         shuffle : bool
-              Whether to use shuffle y var to estimate join significant test.
+            Whether to shuffle y var to estimate joint significant test.
 
         Returns
         -------
         beta : float
             Estimate for x.
         p : float
-         P value for x.
+            P value for x.
         """
         temp_data = comb_var.copy()
 

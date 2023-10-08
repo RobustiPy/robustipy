@@ -1,5 +1,5 @@
 import os
-from nrobust.replication_data_prep import prepare_union,\
+from nrobust.utils import prepare_union,\
     prepare_asc
 import matplotlib.pyplot as plt
 from nrobust.models import OLSRobust
