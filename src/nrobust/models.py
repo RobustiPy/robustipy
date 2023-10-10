@@ -2,7 +2,7 @@ from nrobust.prototypes import Protomodel
 from nrobust.prototypes import Protoresult
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
+from rich.progress import track
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
 from nrobust.bootstrap_utils import stripped_ols
@@ -287,8 +287,8 @@ class OLSRobust(Protomodel):
         self.y_specs = []
         self.y_composites = []
         print("Calculating Composite Ys")
-        for spec, index in zip(all_subsets(self.y),
-                               tqdm(range(0, space_size(self.y)))):
+        for spec, index in track(zip(all_subsets(self.y),
+                               range(0, space_size(self.y))), total=space_size(self.y)):
             if len(spec) > 1:
                 subset = self.data[list(spec)]
                 subset = (subset-subset.mean())/subset.std()
@@ -356,8 +356,7 @@ class OLSRobust(Protomodel):
                 all_predictors = []
                 av_k_metric_array = np.empty([space_n])
 
-                for spec, index in zip(all_subsets(controls),
-                                       tqdm(range(0, space_n))):
+                for spec, index in track(zip(all_subsets(controls),range(0, space_n)), total=space_n):
                     if len(spec) == 0:
                         comb = self.data[self.x]
                     else:
@@ -435,8 +434,7 @@ class OLSRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-            for spec, index in zip(all_subsets(controls),
-                                   tqdm(range(0, space_n))):
+            for spec, index in track(zip(all_subsets(controls),range(0, space_n)), total=space_n):
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
                 else:
