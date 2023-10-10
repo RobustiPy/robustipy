@@ -260,7 +260,20 @@ class OLSRobust(Protomodel):
         data : DataFrame
             DataFrame containing all the data to be used in the model.
         """
-        super().__init__()
+        super().__init__()            
+        if not isinstance(y, list) or not isinstance(x, list):
+            raise TypeError("'y' and 'x' must be lists.")
+
+        if not all(isinstance(var, str) for var in y) or not all(isinstance(var, str) for var in x):
+            raise TypeError("'y' and 'x' must be lists of strings.")
+    
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("'data' must be a pandas DataFrame.")
+    
+        all_vars = set(data.columns)
+        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
+            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
+        
         if data.isnull().values.any():
             warnings.warn('Missing values found in data. Listwise deletion will be applied',
                           MissingValueWarning)
