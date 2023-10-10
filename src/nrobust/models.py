@@ -263,9 +263,6 @@ class OLSRobust(Protomodel):
         super().__init__()            
         if not isinstance(y, list) or not isinstance(x, list):
             raise TypeError("'y' and 'x' must be lists.")
-
-        if not all(isinstance(var, str) for var in y) or not all(isinstance(var, str) for var in x):
-            raise TypeError("'y' and 'x' must be lists of strings.")
     
         if not isinstance(data, pd.DataFrame):
             raise TypeError("'data' must be a pandas DataFrame.")
@@ -311,7 +308,7 @@ class OLSRobust(Protomodel):
     def fit(self,
             *,
             controls,
-            group: str = None,
+            group=None,
             draws=500,
             sample_size=None,
             replace=False,
@@ -342,6 +339,17 @@ class OLSRobust(Protomodel):
         self : Object
             Object class OLSRobust containing the fitted estimators.
         """
+        if not isinstance(controls, list):
+            raise TypeError("'controls' must be a list.")
+    
+        all_vars = set(self.data.columns)
+        if not all(var in all_vars for var in controls):
+            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
+        
+        if group is not None:
+            if not group in all_vars:
+                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+        
         if sample_size is None:
             sample_size = self.data.shape[0]
 
