@@ -226,6 +226,7 @@ class OLSResult(Protoresult):
         if not isinstance(result_obj, OLSResult):
             raise TypeError('Invalid object type. Expected an instance of OLSResult.')
         prefix = prefix
+        pass
         
 
 class OLSRobust(Protomodel):
