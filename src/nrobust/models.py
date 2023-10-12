@@ -78,7 +78,7 @@ class MergedResult(Protoresult):
                    colorset=colorset)
         return fig
     
-    def merge(self, result_obj, left_prefix, right_prefix) -> MergedResult:
+    def merge(self, result_obj, left_prefix, right_prefix):
         """
         Merges two OLSResult objects into one.
 
