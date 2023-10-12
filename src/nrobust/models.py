@@ -2,19 +2,116 @@ from nrobust.prototypes import Protomodel
 from nrobust.prototypes import Protoresult
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from rich.progress import track
 from joblib import Parallel, delayed
 from nrobust.utils import simple_ols
 from nrobust.bootstrap_utils import stripped_ols
 from nrobust.utils import space_size
 from nrobust.utils import all_subsets
-from nrobust.figures import plot_results
+from nrobust.figures import plot_results, plot_curve
 from nrobust.utils import group_demean
 from nrobust.prototypes import MissingValueWarning
 import _pickle
 import warnings
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
+
+
+class MergedResult(Protoresult):
+    def __init__(self, *,
+                 y,
+                 specs,
+                 estimates,
+                 p_values,):
+        super().__init__()
+        self.y_name = y
+        self.specs_names = pd.Series(specs)
+        self.estimates = pd.DataFrame(estimates)
+        self.p_values = pd.DataFrame(p_values)
+        self.summary_df = self._compute_summary()
+        self.summary_df['spec_name'] = self.specs_names
+
+    def summary(self):
+        """
+        Generates a summary of the regression results (not implemented).
+        """
+        pass
+
+    def _compute_summary(self):
+        """
+        Computes summary statistics based on coefficient estimates.
+
+        Returns:
+            pd.DataFrame: DataFrame containing summary statistics.
+        """
+        data = self.estimates.copy()
+        out = pd.DataFrame()
+        out['median'] = data.median(axis=1)
+        out['max'] = data.max(axis=1)
+        out['min'] = data.min(axis=1)
+        out['ci_up'] = data.quantile(q=0.975, axis=1,
+                                     interpolation='nearest')
+        out['ci_down'] = data.quantile(q=0.025, axis=1,
+                                       interpolation='nearest')
+        return out
+    
+    def plot(self,
+             specs=None,
+             colormap=None,
+             colorset=None,
+             figsize=(12, 6)):
+        
+        fig, ax = plt.subplots(figsize=figsize)
+
+        if specs is not None:
+            if not all(isinstance(l, list) for l in specs):    
+                raise TypeError("'specs' must be a list of lists.")
+        
+            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
+                raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
+
+        plot_curve(results_object=self,
+                   specs=specs,
+                   ax=ax,
+                   colormap=colormap,
+                   colorset=colorset)
+        return fig
+    
+    def merge(self, result_obj, left_prefix, right_prefix) -> MergedResult:
+        """
+        Merges two OLSResult objects into one.
+
+        Args:
+            result_obj (OLSResult): OLSResult object to be merged.
+            left_prefix (str): Prefix for the orignal result object.
+            right_prefix (str): Prefix fort the new result object.
+
+        Raises:
+            TypeError: If the input object is not an instance of OLSResult.
+        """
+        if not isinstance(result_obj, OLSResult):
+            raise TypeError("'result_obj' must be an instance of OLSResult.")
+
+        if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
+            raise TypeError("'prefixes' must be of type 'str.'")
+        
+        if self.y_name != result_obj.y_name:
+            raise ValueError('Dependent variable names must match.')
+        
+        specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
+        specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
+        y = self.y_name
+        specs = specs_original + specs_new
+        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True) 
+        p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
+        
+        return MergedResult(
+            y = y,
+            specs=specs,
+            estimates=estimates,
+            p_values=p_values
+        )
 
 
 class OLSResult(Protoresult):
@@ -155,11 +252,12 @@ class OLSResult(Protoresult):
 
         valid_ic = ['bic', 'aic', 'hqic']
 
-        if not all(isinstance(l, list) for l in specs):    
-            raise TypeError("'specs' must be a list of lists.")
+        if specs is not None:
+            if not all(isinstance(l, list) for l in specs):    
+                raise TypeError("'specs' must be a list of lists.")
         
-        if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
-            raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
+            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
+                raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
         
         if ic not in valid_ic:
             raise ValueError(f"'ic' must be one of the following: {valid_ic}")
@@ -224,13 +322,14 @@ class OLSResult(Protoresult):
         })
         return summary_bma
     
-    def merge(self, result_obj, prefix):
+    def merge(self, result_obj, left_prefix, right_prefix) -> MergedResult:
         """
         Merges two OLSResult objects into one.
 
         Args:
             result_obj (OLSResult): OLSResult object to be merged.
-            prefix (str): Prefix to differentiate columns from different OLSResult objects.
+            left_prefix (str): Prefix for the orignal result object.
+            right_prefix (str): Prefix fort the new result object.
 
         Raises:
             TypeError: If the input object is not an instance of OLSResult.
@@ -238,28 +337,27 @@ class OLSResult(Protoresult):
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
 
-        if not isinstance(prefix, str):
-            raise TypeError("'prefix' must be of type 'str.'")
+        if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
+            raise TypeError("'prefixes' must be of type 'str.'")
         
-        self.y_name = y
-        self.specs_names = pd.Series(specs)
-        self.all_predictors = all_predictors
-        self.controls = controls
-        self.draws = draws
-        self.estimates = pd.DataFrame(estimates)
-        self.p_values = pd.DataFrame(p_values)
-        self.all_b = all_b
-        self.all_p = all_p
-        self.summary_df = self._compute_summary()
-        self.summary_df['ll'] = pd.Series(ll_array)
-        self.summary_df['aic'] = pd.Series(aic_array)
-        self.summary_df['bic'] = pd.Series(bic_array)
-        self.summary_df['hqic'] = pd.Series(hqic_array)
-        self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
-        self.summary_df['spec_name'] = self.specs_names
-        self.summary_df['y'] = self.y_name
+        if self.y_name != result_obj.y_name:
+            raise ValueError('Dependent variable names must match.')
+        
+        specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
+        specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
+        y = self.y_name
+        specs = specs_original + specs_new
+        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True) 
+        p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
+        
+        return MergedResult(
+            y = y,
+            specs=specs,
+            estimates=estimates,
+            p_values=p_values
+        )
 
-        pass
+        
         
 
 class OLSRobust(Protomodel):
