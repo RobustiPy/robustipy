@@ -135,7 +135,7 @@ class OLSResult(Protoresult):
 
     def plot(self,
              specs=None,
-             ic=None,
+             ic='aic',
              colormap=None,
              colorset=None,
              figsize=(12, 6)):
@@ -143,7 +143,7 @@ class OLSResult(Protoresult):
         Plots the regression results using specified options.
 
         Args:
-            specs (list, optional): List of specification names to include in the plot.
+            specs (list, optional): List of list of specification names to include in the plot.
             ic (str, optional): Information criterion to use for model selection (e.g., 'bic', 'aic').
             colormap (str, optional): Colormap to use for the plot.
             colorset (list, optional): List of colors to use for different specifications.
@@ -152,6 +152,18 @@ class OLSResult(Protoresult):
         Returns:
             matplotlib.figure.Figure: Plot showing the regression results.
         """
+
+        valid_ic = ['bic', 'aic', 'hqic']
+
+        if not all(isinstance(l, list) for l in specs):    
+            raise TypeError("'specs' must be a list of lists.")
+        
+        if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
+            raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
+        
+        if ic not in valid_ic:
+            raise ValueError(f"'ic' must be one of the following: {valid_ic}")
+
         return plot_results(results_object=self,
                             specs=specs,
                             ic=ic,
@@ -224,8 +236,29 @@ class OLSResult(Protoresult):
             TypeError: If the input object is not an instance of OLSResult.
         """
         if not isinstance(result_obj, OLSResult):
-            raise TypeError('Invalid object type. Expected an instance of OLSResult.')
-        prefix = prefix
+            raise TypeError("'result_obj' must be an instance of OLSResult.")
+
+        if not isinstance(prefix, str):
+            raise TypeError("'prefix' must be of type 'str.'")
+        
+        self.y_name = y
+        self.specs_names = pd.Series(specs)
+        self.all_predictors = all_predictors
+        self.controls = controls
+        self.draws = draws
+        self.estimates = pd.DataFrame(estimates)
+        self.p_values = pd.DataFrame(p_values)
+        self.all_b = all_b
+        self.all_p = all_p
+        self.summary_df = self._compute_summary()
+        self.summary_df['ll'] = pd.Series(ll_array)
+        self.summary_df['aic'] = pd.Series(aic_array)
+        self.summary_df['bic'] = pd.Series(bic_array)
+        self.summary_df['hqic'] = pd.Series(hqic_array)
+        self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
+        self.summary_df['spec_name'] = self.specs_names
+        self.summary_df['y'] = self.y_name
+
         pass
         
 
