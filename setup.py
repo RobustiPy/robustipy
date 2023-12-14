@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='nrobust',
+    name='robustify',
     version='0.0.1.dev5',
     description='Multiversal estimation for robust inference.',
     long_description='Multiversal estimation for robust inference.',
@@ -12,11 +12,11 @@ setup(
         'Programming Language :: Python :: 3.10',
         'Topic :: Scientific/Engineering',
     ],
-    url='https://github.com/centre-for-care/nrobust',
+    url='https://github.com/dhvalden/robustify.git',
     author='Charles Rahal, Daniel Valdenegro',
     author_email='charles.rahal@demography.ox.ac.uk, daniel.valdenegro@demography.ox.ac.uk',
     license='GPLv3',
-    packages=['nrobust'],
+    packages=['robustify'],
     package_dir={'': 'src'},
     python_requires='>=3.9',
     install_requires=[

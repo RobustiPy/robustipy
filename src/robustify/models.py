@@ -1,17 +1,17 @@
-from nrobust.prototypes import Protomodel
-from nrobust.prototypes import Protoresult
+from robustify.prototypes import Protomodel
+from robustify.prototypes import Protoresult
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from rich.progress import track
 from joblib import Parallel, delayed
-from nrobust.utils import simple_ols
-from nrobust.bootstrap_utils import stripped_ols
-from nrobust.utils import space_size
-from nrobust.utils import all_subsets
-from nrobust.figures import plot_results, plot_curve
-from nrobust.utils import group_demean
-from nrobust.prototypes import MissingValueWarning
+from robustify.utils import simple_ols
+from robustify.bootstrap_utils import stripped_ols
+from robustify.utils import space_size
+from robustify.utils import all_subsets
+from robustify.figures import plot_results, plot_curve
+from robustify.utils import group_demean
+from robustify.prototypes import MissingValueWarning
 import _pickle
 import warnings
 from sklearn.model_selection import KFold

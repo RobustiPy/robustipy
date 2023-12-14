@@ -1,6 +1,7 @@
 # Module containing utility functions for the library
 
 import numpy as np
+import random
 import scipy
 import matplotlib
 from matplotlib.colors import ListedColormap
@@ -97,7 +98,7 @@ def group_demean(x, group=None):
     data = x.copy()
     if group is None:
         return data - np.mean(data)
-    data_gm = data.groupby([group]).transform(np.mean)
+    data_gm = data.groupby([group]).transform('mean')
     out = data.drop(columns=group) - data_gm
     return pd.concat([out, data.pidp], axis=1)
 
@@ -319,3 +320,15 @@ def prepare_asc(asc_path):
     group = 'pidp'
 
     return y, c, x, group, ASC_df
+
+
+def reservoir_sampling(generator, k):
+    reservoir = []
+    for i, item in enumerate(generator):
+        if i < k:
+            reservoir.append(item)
+        else:
+            j = random.randint(0, i)  # Randomly choose an index from 0 to i
+            if j < k:
+                reservoir[j] = item  # Replace element at the chosen index with new item
+    return reservoir

@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from nrobust.utils import get_selection_key
-from nrobust.utils import get_default_colormap
+from robustify.utils import get_selection_key
+from robustify.utils import get_default_colormap
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import FancyArrowPatch
 
