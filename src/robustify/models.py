@@ -424,14 +424,14 @@ class OLSRobust(Protomodel):
 
     def multiple_y(self):
         """
-        Cumputes composity y based on multiple indicators provided.
+        Cumputes composite y based on multiple indicators provided.
         """
         self.y_specs = []
         self.y_composites = []
         print("Calculating Composite Ys")
         for spec, index in track(zip(all_subsets(self.y),
                                range(0, space_size(self.y))), total=space_size(self.y)):
-            if len(spec) > 1:
+            if len(spec) > 0:
                 subset = self.data[list(spec)]
                 subset = (subset-subset.mean())/subset.std()
                 self.y_composites.append(subset.mean(axis=1))
