@@ -11,7 +11,7 @@ To install directly from Github run:
 
 ```
 git clone https://github.com/dhvalden/robustify.git
-cd nrobust
+cd robustify
 pip install .
 ```
 
