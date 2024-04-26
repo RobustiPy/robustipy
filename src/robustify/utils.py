@@ -7,8 +7,9 @@ import matplotlib
 from matplotlib.colors import ListedColormap
 import pandas as pd
 from itertools import chain, combinations
-
-
+import statsmodels.api as sm
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
 def space_size(iterable) -> int:
     """
     Calculate the size of the power set of the given iterable.
@@ -35,6 +36,101 @@ def all_subsets(ss):
     """
     return chain(*map(lambda x: combinations(ss, x),
                       range(0, len(ss) + 1)))
+
+
+def logistic_regression_sm(y, x) -> dict:
+    """
+    Perform logistic regression using statsmodels.
+    """
+    X_const = sm.add_constant(x, prepend=False)
+    model = sm.Logit(y, X_const)
+    result = model.fit(disp=0)
+    n = result.nobs
+    k = result.df_model + 1
+    ll = result.llf
+    hqic = -2 * ll + 2 * k * np.log(np.log(n))
+    return {'b': [[x] for x in result.params.values],
+            'p': [[x] for x in result.pvalues.values],
+            'll': ll,
+            'aic': result.aic,
+            'bic': result.bic,
+            'hqic': hqic}
+
+def logistic_regression_sm_stripped(y, x) -> dict:
+    X_const = sm.add_constant(x, prepend=False)
+    model = sm.Logit(y, X_const)
+    result = model.fit(disp=0)
+    return {'b': [[x] for x in result.params.values],
+            'p': [[x] for x in result.pvalues.values]}
+
+def logistic_regression_sk_stripped(y, x) -> dict:
+    def adjust_p_and_b(b, p_values):
+        b = b[1:] + [b[0]]
+        p_values = p_values[1:] + [p_values[0]]
+        return b, p_values
+
+    scaler = StandardScaler()
+    x = scaler.fit_transform(x)
+    y = np.array(y).ravel()
+    model = LogisticRegression(fit_intercept=True, random_state=1000000, max_iter=1000, penalty=None)
+    model.fit(y=y, X=x)
+
+    pred_probs = model.predict_proba(x)[:, 1]
+    b = [[model.intercept_[0]]] + [[model.coef_[0][x]] for x in range(0, len(model.coef_[0]))]  # we will reverse the order in the end
+
+    # Compute p-values
+    W = np.diag(pred_probs * (1 - pred_probs))
+    X_design = np.hstack([np.ones((x.shape[0], 1)), x])
+    cov_matrix = np.linalg.inv(X_design.T @ W @ X_design)
+    standard_errors = np.sqrt(np.diag(cov_matrix))
+
+    wald_stats = np.array([b[x][0] / standard_errors[x] for x in range(0, len(b))])
+    p_values = [[x] for x in scipy.stats.norm.sf(abs(wald_stats)) * 2]  # two-sided p-value = P(Z > |z|) * 2
+
+    b, p_values = adjust_p_and_b(b, p_values)
+    return {'b': b,
+            'p': p_values}
+
+def logistic_regression_sk(y, x) -> dict:
+    def adjust_p_and_b(b, p_values):
+        b = b[1:] + [b[0]]
+        p_values = p_values[1:] + [p_values[0]]
+        return b, p_values
+
+    scaler = StandardScaler()
+    x = scaler.fit_transform(x)
+    y = np.array(y).ravel()
+    model = LogisticRegression(fit_intercept=True, random_state=1000000, max_iter=1000, penalty=None)
+    model.fit(y=y, X=x)
+
+    pred_probs = model.predict_proba(x)[:, 1]
+    b = [[model.intercept_[0]]] + [[model.coef_[0][x]] for x in range(0, len(model.coef_[0]))]  # we will reverse the order in the end
+
+    # Compute p-values
+    W = np.diag(pred_probs * (1 - pred_probs))
+    X_design = np.hstack([np.ones((x.shape[0], 1)), x])
+    cov_matrix = np.linalg.inv(X_design.T @ W @ X_design)
+    standard_errors = np.sqrt(np.diag(cov_matrix))
+
+    wald_stats = np.array([b[x][0] / standard_errors[x] for x in range(0, len(b))])
+    p_values = [[x] for x in scipy.stats.norm.sf(abs(wald_stats)) * 2]  # two-sided p-value = P(Z > |z|) * 2
+
+    b, p_values = adjust_p_and_b(b, p_values)
+    # Compute log-likelihood
+    ll = np.sum(y * np.log(pred_probs) + (1 - y) * np.log(1 - pred_probs))
+    n = len(x)
+    k = model.coef_.shape[1] + 1
+
+    # Compute AIC, BIC, and HQIC
+    aic = -2 * ll + 2 * k
+    bic = -2 * ll + k * np.log(n)
+    hqic = -2 * ll + 2 * k * np.log(np.log(n))
+    return {'b': b,
+            'p': p_values,
+            'll': ll,
+            'aic': aic,
+            'bic': bic,
+            'hqic': hqic}
 
 
 def simple_ols(y, x) -> dict:
@@ -238,12 +334,14 @@ def prepare_union(path_to_union):
     FileNotFoundError: If the file specified in 'path_to_union' does not exist.
     """
     union_df = pd.read_stata(path_to_union)
+    union_df[['smsa','collgrad','married','union']]= union_df[['smsa','collgrad','married','union']].astype('str')
     union_df.loc[:, 'log_wage'] = np.log(union_df['wage'].copy()) * 100
     union_df = union_df[union_df['union'].notnull()].copy()
     union_df.loc[:, 'union'] = np.where(union_df['union'] == 'union', 1, 0)
     union_df.loc[:, 'married'] = np.where(union_df['married'] == 'married', 1, 0)
     union_df.loc[:, 'collgrad'] = np.where(union_df['collgrad'] == 'college grad', 1, 0)
     union_df.loc[:, 'smsa'] = np.where(union_df['smsa'] == 'SMSA', 1, 0)
+    union_df[['smsa', 'collgrad', 'married', 'union']] = union_df[['smsa', 'collgrad', 'married', 'union']].astype('category')
     indep_list = ['hours',
                   'age',
                   'grade',

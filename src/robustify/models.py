@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from rich.progress import track
 from joblib import Parallel, delayed
-from robustify.utils import simple_ols
+from robustify.utils import simple_ols, logistic_regression_sm, logistic_regression_sm_stripped,logistic_regression_sk,logistic_regression_sk_stripped
 from robustify.bootstrap_utils import stripped_ols
 from robustify.utils import space_size
 from robustify.utils import all_subsets
@@ -23,7 +23,7 @@ class MergedResult(Protoresult):
                  y,
                  specs,
                  estimates,
-                 p_values,):
+                 p_values, ):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
@@ -55,20 +55,20 @@ class MergedResult(Protoresult):
         out['ci_down'] = data.quantile(q=0.025, axis=1,
                                        interpolation='nearest')
         return out
-    
+
     def plot(self,
              specs=None,
              colormap=None,
              colorset=None,
              figsize=(12, 6)):
-        
+
         fig, ax = plt.subplots(figsize=figsize)
 
         if specs is not None:
-            if not all(isinstance(l, list) for l in specs):    
+            if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
-        
-            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
+
+            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
 
         plot_curve(results_object=self,
@@ -77,7 +77,7 @@ class MergedResult(Protoresult):
                    colormap=colormap,
                    colorset=colorset)
         return fig
-    
+
     def merge(self, result_obj, left_prefix, right_prefix):
         """
         Merges two OLSResult objects into one.
@@ -95,19 +95,19 @@ class MergedResult(Protoresult):
 
         if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
             raise TypeError("'prefixes' must be of type 'str.'")
-        
+
         if self.y_name != result_obj.y_name:
             raise ValueError('Dependent variable names must match.')
-        
+
         specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
         specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
         y = self.y_name
         specs = specs_original + specs_new
-        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True) 
+        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True)
         p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
-        
+
         return MergedResult(
-            y = y,
+            y=y,
             specs=specs,
             estimates=estimates,
             p_values=p_values
@@ -116,7 +116,7 @@ class MergedResult(Protoresult):
 
 class OLSResult(Protoresult):
     """
-    Result class containing the the output of the OLSRobust class.
+    Result class containing the output of the OLSRobust class.
 
     Parameters:
         y (str): The name of the dependent variable.
@@ -166,6 +166,7 @@ class OLSResult(Protoresult):
         summary_df (pd.DataFrame): DataFrame containing summary statistics of coefficient estimates.
         summary_bma (pd.DataFrame, optional): DataFrame containing Bayesian model averaging results.
     """
+
     def __init__(self, *,
                  y,
                  specs,
@@ -253,12 +254,12 @@ class OLSResult(Protoresult):
         valid_ic = ['bic', 'aic', 'hqic']
 
         if specs is not None:
-            if not all(isinstance(l, list) for l in specs):    
+            if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
-        
-            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):     
+
+            if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
-        
+
         if ic not in valid_ic:
             raise ValueError(f"'ic' must be one of the following: {valid_ic}")
 
@@ -296,8 +297,8 @@ class OLSResult(Protoresult):
         """
         likelihood_per_var = []
         weigthed_coefs = []
-        max_ll = np.max(-self.summary_df.bic/2)
-        shifted_ll = (-self.summary_df.bic/2) - max_ll
+        max_ll = np.max(-self.summary_df.bic / 2)
+        shifted_ll = (-self.summary_df.bic / 2) - max_ll
         models_likelihood = np.exp(shifted_ll)
         sum_likelihoods = np.nansum(models_likelihood)
         coefs = [[i[0] for i in x] for x in self.all_b]
@@ -321,7 +322,7 @@ class OLSResult(Protoresult):
             'average_coefs': final_coefs
         })
         return summary_bma
-    
+
     def merge(self, result_obj, left_prefix, right_prefix) -> MergedResult:
         """
         Merges two OLSResult objects into one.
@@ -339,26 +340,24 @@ class OLSResult(Protoresult):
 
         if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
             raise TypeError("'prefixes' must be of type 'str.'")
-        
+
         if self.y_name != result_obj.y_name:
             raise ValueError('Dependent variable names must match.')
-        
+
         specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
         specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
         y = self.y_name
         specs = specs_original + specs_new
-        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True) 
+        estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True)
         p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
-        
+
         return MergedResult(
-            y = y,
+            y=y,
             specs=specs,
             estimates=estimates,
             p_values=p_values
         )
 
-        
-        
 
 class OLSRobust(Protomodel):
     """
@@ -385,24 +384,24 @@ class OLSRobust(Protomodel):
 
         Parameters
         ----------
-        y : str
+        y : list<str>
             Name of the dependent variable.
-        x : str or list<str>
+        x : list<str>
             List of names of the independent variable(s).
         data : DataFrame
             DataFrame containing all the data to be used in the model.
         """
-        super().__init__()            
+        super().__init__()
         if not isinstance(y, list) or not isinstance(x, list):
             raise TypeError("'y' and 'x' must be lists.")
-    
+
         if not isinstance(data, pd.DataFrame):
             raise TypeError("'data' must be a pandas DataFrame.")
-    
+
         all_vars = set(data.columns)
         if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
             raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
-        
+
         if data.isnull().values.any():
             warnings.warn('Missing values found in data. Listwise deletion will be applied',
                           MissingValueWarning)
@@ -430,10 +429,10 @@ class OLSRobust(Protomodel):
         self.y_composites = []
         print("Calculating Composite Ys")
         for spec, index in track(zip(all_subsets(self.y),
-                               range(0, space_size(self.y))), total=space_size(self.y)):
+                                     range(0, space_size(self.y))), total=space_size(self.y)):
             if len(spec) > 0:
                 subset = self.data[list(spec)]
-                subset = (subset-subset.mean())/subset.std()
+                subset = (subset - subset.mean()) / subset.std()
                 self.y_composites.append(subset.mean(axis=1))
                 self.y_specs.append(spec)
 
@@ -473,15 +472,15 @@ class OLSRobust(Protomodel):
         """
         if not isinstance(controls, list):
             raise TypeError("'controls' must be a list.")
-    
+
         all_vars = set(self.data.columns)
         if not all(var in all_vars for var in controls):
             raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
-        
+
         if group is not None:
-            if not group in all_vars:
+            if not isinstance(group,str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-        
+
         if sample_size is None:
             sample_size = self.data.shape[0]
 
@@ -509,7 +508,7 @@ class OLSRobust(Protomodel):
                 all_predictors = []
                 av_k_metric_array = np.empty([space_n])
 
-                for spec, index in track(zip(all_subsets(controls),range(0, space_n)), total=space_n):
+                for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                     if len(spec) == 0:
                         comb = self.data[self.x]
                     else:
@@ -527,14 +526,14 @@ class OLSRobust(Protomodel):
                      av_k_metric_i) = self._full_sample_OLS(comb,
                                                             kfold=kfold)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                          (delayed(self._strap_OLS)
-                                           (comb,
-                                            group,
-                                            sample_size,
-                                            replace,
-                                            shuffle)
-                                           for i in range(0,
-                                                          draws))))
+                    (delayed(self._strap_OLS)
+                     (comb,
+                      group,
+                      sample_size,
+                      replace,
+                      shuffle)
+                     for i in range(0,
+                                    draws))))
                     y_names.append(y_name)
                     specs.append(frozenset(list(y_name) + list(spec)))
                     all_predictors.append(self.x + list(spec) + ['const'])
@@ -570,7 +569,7 @@ class OLSRobust(Protomodel):
                 bic_array=np.hstack(list_bic_array),
                 hqic_array=np.hstack(list_hqic_array),
                 av_k_metric_array=np.hstack(list_av_k_metric_array)
-                )
+            )
 
             self.results = results
 
@@ -587,7 +586,7 @@ class OLSRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-            for spec, index in track(zip(all_subsets(controls),range(0, space_n)), total=space_n):
+            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
                 else:
@@ -604,14 +603,14 @@ class OLSRobust(Protomodel):
                  av_k_metric_i) = self._full_sample_OLS(comb,
                                                         kfold=kfold)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
-                                      (delayed(self._strap_OLS)
-                                       (comb,
-                                        group,
-                                        sample_size,
-                                        replace,
-                                        shuffle)
-                                       for i in range(0,
-                                                      draws))))
+                (delayed(self._strap_OLS)
+                 (comb,
+                  group,
+                  sample_size,
+                  replace,
+                  shuffle)
+                 for i in range(0,
+                                draws))))
 
                 specs.append(frozenset(spec))
                 all_predictors.append(self.x + list(spec) + ['const'])
@@ -768,3 +767,505 @@ class OLSRobust(Protomodel):
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]
+
+
+class LRobust_sm(Protomodel):
+    """
+    A class to perform robust logistic regression analysis.
+
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable values.
+    x : array-like
+        Independent variable values. The matrix should be shaped as
+        (number of observations, number of independent variables).
+    data : DataFrame
+        A pandas DataFrame containing the variables in the model.
+
+    Attributes
+    ----------
+    y : array-like
+        Dependent variable values.
+    x : array-like
+        Independent variable values.
+    data : DataFrame
+        A pandas DataFrame containing the variables in the model.
+    results : dict
+        A dictionary containing regression coefficients ('b') and corresponding
+        p-values ('p') for each independent variable.
+    """
+
+    def __init__(self, *, y, x, data, model_name='LR_sm'):  # same as OLSRobust
+        """
+        Initialize the LRobust object.
+
+        Parameters
+        ----------
+        y : str
+            Name of the dependent variable.
+        x : str or list<str>
+            List of names of the independent variable(s).
+        data : DataFrame
+            DataFrame containing all the data to be used in the model.
+        """
+        super().__init__()
+        if not isinstance(y, list) or not isinstance(x, list):
+            raise TypeError("'y' and 'x' must be lists.")
+
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("'data' must be a pandas DataFrame.")
+
+        all_vars = set(data.columns)
+        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
+            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
+
+        if data.isnull().values.any():
+            warnings.warn('Missing values found in data. Listwise deletion will be applied',
+                          MissingValueWarning)
+        self.y = y
+        self.x = x
+        self.data = data
+        self.results = None  # same as OLO
+        self.model_name = model_name
+
+    def get_results(self):
+        """
+        Get the results of the OLS regression.
+
+        Returns
+        -------
+        results : OLSResult
+            Object containing the regression results.
+        """
+        return self.results
+
+    def multiple_y(self):
+        raise NotImplementedError("Not implemented yet")
+
+    def _full_sample(self, comb_var, kfold):
+        """
+        Call stripped_ols() over the full data containing y, x, and controls.
+
+        Parameters
+        ----------
+        comb_var : Array
+            ND array-like object containing the data for y, x, and controls.
+        kfold : Boolean
+            Whether or not to calculate k-fold cross-validation.
+
+        Returns
+        -------
+        beta : float
+            Estimate for x.
+        p : float
+            P value for x.
+        AIC : float
+            Akaike information criteria value for the model.
+        BIC : float
+            Bayesian information criteria value for the model.
+        HQIC : float
+            Hannan-Quinn information criteria value for the model.
+        """
+        y = comb_var.iloc[:, [0]]
+        x = comb_var.drop(comb_var.columns[0], axis=1)
+
+        out = logistic_regression_sm(y=y, x=x)
+        av_k_metric = None
+        if kfold:
+            k_fold = KFold(kfold)
+            metrics = []
+            for k, (train, test) in enumerate(k_fold.split(x, y)):
+                out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
+                y_pred = self._predict_LR(x.loc[test], out_k['b'])
+                y_true = y.loc[test]
+                k_rmse = mean_squared_error(y_true, y_pred, squared=False)
+                metrics.append(k_rmse)
+            av_k_metric = np.mean(metrics)
+        return (out['b'],
+                out['p'],
+                out['ll'],  # TODO: check is this correct?
+                out['aic'],
+                out['bic'],
+                out['hqic'],
+                av_k_metric)
+
+    def _predict_LR(self, x_test, betas):
+        """
+        Predict the dependent variable using the estimated coefficients.
+        """
+        return 1 / (1 + np.exp(-x_test.dot(betas)))
+    def fit(self,
+            *,
+            controls,
+            group=None,
+            draws=500,
+            sample_size=None,
+            replace=False,
+            kfold=None,
+            shuffle=False):
+        if not isinstance(controls, list):
+            raise TypeError("'controls' must be a list.")
+
+        all_vars = set(self.data.columns)
+        if not all(var in all_vars for var in controls):
+            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
+
+        if group is not None:
+            if not group in all_vars:
+                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+
+        if sample_size is None:
+            sample_size = self.data.shape[0]
+        if len(self.y) > 1:
+            raise NotImplementedError("Not implemented yet for logistic regression")
+        else:
+            space_n = space_size(controls)
+            specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
+            b_array = np.empty([space_n, draws])
+            p_array = np.empty([space_n, draws])
+            ll_array = np.empty([space_n])
+            aic_array = np.empty([space_n])
+            bic_array = np.empty([space_n])
+            hqic_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
+
+            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+
+                if len(spec) == 0:
+                    comb = self.data[self.y + self.x]
+                else:
+                    comb = self.data[self.y + self.x + list(spec)]
+
+                if group:
+                    comb = self.data[self.y + self.x + [group] + list(spec)]
+
+                comb = comb.dropna()
+
+                if group:
+                    comb = group_demean(comb, group=group)
+                (b_all, p_all, ll_i,
+                 aic_i, bic_i, hqic_i,
+                 av_k_metric_i) = self._full_sample(comb, kfold=kfold)
+
+                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                (delayed(self._strap_regression)
+                 (comb,
+                  group,
+                  sample_size,
+                  replace,
+                  shuffle)
+                 for i in range(0, draws))))
+
+                specs.append(frozenset(spec))
+                all_predictors.append(self.x + list(spec) + ['const'])
+                b_array[index, :] = b_list
+                p_array[index, :] = p_list
+                ll_array[index] = ll_i
+                aic_array[index] = aic_i
+                bic_array[index] = bic_i
+                hqic_array[index] = hqic_i
+                av_k_metric_array[index] = av_k_metric_i
+                b_all_list.append(b_all)
+                p_all_list.append(p_all)
+
+            results = OLSResult(y=self.y[0],
+                                       specs=specs,
+                                       all_predictors=all_predictors,
+                                       controls=controls,
+                                       draws=draws,
+                                       all_b=b_all_list,
+                                       all_p=p_all_list,
+                                       estimates=b_array,
+                                       p_values=p_array,
+                                       ll_array=ll_array,
+                                       aic_array=aic_array,
+                                       bic_array=bic_array,
+                                       hqic_array=hqic_array,
+                                       av_k_metric_array=av_k_metric_array)
+            self.results = results
+
+    def _strap_regression(self,
+                          comb_var,
+                          group,
+                          sample_size,
+                          replace,
+                          shuffle):
+        temp_data = comb_var.copy()
+
+        if shuffle:
+            y = temp_data.iloc[:, [0]]
+            idx_y = np.random.permutation(y.index)
+            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
+            x = temp_data.drop(temp_data.columns[0], axis=1)
+            temp_data = pd.concat([y, x], axis=1)
+
+        if group is None:
+            samp_df = temp_data.sample(n=sample_size, replace=replace)
+            y = samp_df.iloc[:, [0]]
+            x = samp_df.drop(samp_df.columns[0], axis=1)
+            output = logistic_regression_sm_stripped(y, x)
+            return output['b'][0][0], output['p'][0][0]
+        else:
+            idx = np.random.choice(temp_data[group].unique(), sample_size)
+            select = temp_data[temp_data[group].isin(idx)]
+            no_singleton = select[select.groupby(group).transform('size') > 1]
+            no_singleton = no_singleton.drop(columns=[group])
+            y = no_singleton.iloc[:, [0]]
+            x = no_singleton.drop(no_singleton.columns[0], axis=1)
+            output = logistic_regression_sm(y, x)
+            return output['b'][0][0], output['p'][0][0]
+
+
+class LRobust_sklearn(Protomodel):
+    """
+    A class to perform robust logistic regression analysis.
+
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable values.
+    x : array-like
+        Independent variable values. The matrix should be shaped as
+        (number of observations, number of independent variables).
+    data : DataFrame
+        A pandas DataFrame containing the variables in the model.
+
+    Attributes
+    ----------
+    y : array-like
+        Dependent variable values.
+    x : array-like
+        Independent variable values.
+    data : DataFrame
+        A pandas DataFrame containing the variables in the model.
+    results : dict
+        A dictionary containing regression coefficients ('b') and corresponding
+        p-values ('p') for each independent variable.
+    """
+
+    def __init__(self, *, y, x, data, model_name='LR_sm'):  # same as OLSRobust
+        """
+        Initialize the LRobust object.
+
+        Parameters
+        ----------
+        y : str
+            Name of the dependent variable.
+        x : str or list<str>
+            List of names of the independent variable(s).
+        data : DataFrame
+            DataFrame containing all the data to be used in the model.
+        """
+        super().__init__()
+        if not isinstance(y, list) or not isinstance(x, list):
+            raise TypeError("'y' and 'x' must be lists.")
+
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("'data' must be a pandas DataFrame.")
+
+        all_vars = set(data.columns)
+        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
+            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
+
+        if data.isnull().values.any():
+            warnings.warn('Missing values found in data. Listwise deletion will be applied',
+                          MissingValueWarning)
+        self.y = y
+        self.x = x
+        self.data = data
+        self.results = None  # same as OLO
+        self.model_name = model_name
+
+    def get_results(self):
+        """
+        Get the results of the OLS regression.
+
+        Returns
+        -------
+        results : OLSResult
+            Object containing the regression results.
+        """
+        return self.results
+
+    def multiple_y(self):
+        raise NotImplementedError("Not implemented yet")
+
+    def _full_sample(self, comb_var, kfold):
+        """
+        Call stripped_ols() over the full data containing y, x, and controls.
+
+        Parameters
+        ----------
+        comb_var : Array
+            ND array-like object containing the data for y, x, and controls.
+        kfold : Boolean
+            Whether or not to calculate k-fold cross-validation.
+
+        Returns
+        -------
+        beta : float
+            Estimate for x.
+        p : float
+            P value for x.
+        AIC : float
+            Akaike information criteria value for the model.
+        BIC : float
+            Bayesian information criteria value for the model.
+        HQIC : float
+            Hannan-Quinn information criteria value for the model.
+        """
+        y = comb_var.iloc[:, [0]]
+        x = comb_var.drop(comb_var.columns[0], axis=1)
+
+        out = logistic_regression_sk(y=y, x=x)
+        av_k_metric = None
+        if kfold:
+            k_fold = KFold(kfold)
+            metrics = []
+            for k, (train, test) in enumerate(k_fold.split(x, y)):
+                out_k = logistic_regression_sk(y=y.loc[train], x=x.loc[train])
+                y_pred = self._predict_LR(x.loc[test], out_k['b'])
+                y_true = y.loc[test]
+                k_rmse = mean_squared_error(y_true, y_pred, squared=False)
+                metrics.append(k_rmse)
+            av_k_metric = np.mean(metrics)
+        return (out['b'],
+                out['p'],
+                out['ll'],  # TODO: check is this correct?
+                out['aic'],
+                out['bic'],
+                out['hqic'],
+                av_k_metric)
+
+    def _predict_LR(self, x_test, betas):
+        """
+        Predict the dependent variable using the estimated coefficients.
+        """
+        return 1 / (1 + np.exp(-x_test.dot(betas)))
+    def fit(self,
+            *,
+            controls,
+            group=None,
+            draws=500,
+            sample_size=None,
+            replace=False,
+            kfold=None,
+            shuffle=False):
+        if not isinstance(controls, list):
+            raise TypeError("'controls' must be a list.")
+
+        all_vars = set(self.data.columns)
+        if not all(var in all_vars for var in controls):
+            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
+
+        if group is not None:
+            if not group in all_vars:
+                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+
+        if sample_size is None:
+            sample_size = self.data.shape[0]
+        if len(self.y) > 1:
+            raise NotImplementedError("Not implemented yet for logistic regression")
+        else:
+            space_n = space_size(controls)
+            specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
+            b_array = np.empty([space_n, draws])
+            p_array = np.empty([space_n, draws])
+            ll_array = np.empty([space_n])
+            aic_array = np.empty([space_n])
+            bic_array = np.empty([space_n])
+            hqic_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
+
+            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+
+                if len(spec) == 0:
+                    comb = self.data[self.y + self.x]
+                else:
+                    comb = self.data[self.y + self.x + list(spec)]
+
+                if group:
+                    comb = self.data[self.y + self.x + [group] + list(spec)]
+
+                comb = comb.dropna()
+
+                if group:
+                    comb = group_demean(comb, group=group)
+                (b_all, p_all, ll_i,
+                 aic_i, bic_i, hqic_i,
+                 av_k_metric_i) = self._full_sample(comb, kfold=kfold)
+
+                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                (delayed(self._strap_regression)
+                 (comb,
+                  group,
+                  sample_size,
+                  replace,
+                  shuffle)
+                 for i in range(0, draws))))
+
+                specs.append(frozenset(spec))
+                all_predictors.append(self.x + list(spec) + ['const'])
+                b_array[index, :] = b_list
+                p_array[index, :] = p_list
+                ll_array[index] = ll_i
+                aic_array[index] = aic_i
+                bic_array[index] = bic_i
+                hqic_array[index] = hqic_i
+                av_k_metric_array[index] = av_k_metric_i
+                b_all_list.append(b_all)
+                p_all_list.append(p_all)
+
+            results = OLSResult(y=self.y[0],
+                                       specs=specs,
+                                       all_predictors=all_predictors,
+                                       controls=controls,
+                                       draws=draws,
+                                       all_b=b_all_list,
+                                       all_p=p_all_list,
+                                       estimates=b_array,
+                                       p_values=p_array,
+                                       ll_array=ll_array,
+                                       aic_array=aic_array,
+                                       bic_array=bic_array,
+                                       hqic_array=hqic_array,
+                                       av_k_metric_array=av_k_metric_array)
+            self.results = results
+
+    def _strap_regression(self,
+                          comb_var,
+                          group,
+                          sample_size,
+                          replace,
+                          shuffle):
+        temp_data = comb_var.copy()
+
+        if shuffle:
+            y = temp_data.iloc[:, [0]]
+            idx_y = np.random.permutation(y.index)
+            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
+            x = temp_data.drop(temp_data.columns[0], axis=1)
+            temp_data = pd.concat([y, x], axis=1)
+
+        if group is None:
+            samp_df = temp_data.sample(n=sample_size, replace=replace)
+            y = samp_df.iloc[:, [0]]
+            x = samp_df.drop(samp_df.columns[0], axis=1)
+            output = logistic_regression_sk_stripped(y, x)
+            return output['b'][0][0], output['p'][0][0]
+        else:
+            idx = np.random.choice(temp_data[group].unique(), sample_size)
+            select = temp_data[temp_data[group].isin(idx)]
+            no_singleton = select[select.groupby(group).transform('size') > 1]
+            no_singleton = no_singleton.drop(columns=[group])
+            y = no_singleton.iloc[:, [0]]
+            x = no_singleton.drop(no_singleton.columns[0], axis=1)
+            output = logistic_regression_sk_stripped(y, x)
+            return output['b'][0][0], output['p'][0][0]
