@@ -1,4 +1,4 @@
-# Robustify
+# RobustiPy
 
 A set of packages for a robust, certain and stable model space.
 This project is in early stages of development and its functionally and API might change without notice.
@@ -10,8 +10,8 @@ This project is in early stages of development and its functionally and API migh
 To install directly from Github run:
 
 ```
-git clone https://github.com/dhvalden/robustify.git
-cd robustify
+git clone git https://github.com/RobustiPy/robustipy.git
+cd robustipy
 pip install .
 ```
 
@@ -19,7 +19,7 @@ pip install .
 
 In a Python script import OLSRobust class running:
 ```python
-from robustify.models import OLSRobust
+from robustipy.models import OLSRobust
 
 model_robust = OLSRobust(y=y, x=x, data=data)
 
