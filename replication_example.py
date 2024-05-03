@@ -1,7 +1,7 @@
 import os
-from robustify.utils import prepare_union, prepare_asc
+from robustipy.utils import prepare_union, prepare_asc
 import matplotlib.pyplot as plt
-from robustify.models import OLSRobust
+from robustipy.models import OLSRobust
 
 
 def union_example():

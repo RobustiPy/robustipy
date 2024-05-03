@@ -1,17 +1,17 @@
-from robustify.prototypes import Protomodel
-from robustify.prototypes import Protoresult
+from robustipy.prototypes import Protomodel
+from robustipy.prototypes import Protoresult
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from rich.progress import track
 from joblib import Parallel, delayed
-from robustify.utils import simple_ols, logistic_regression_sm, logistic_regression_sm_stripped,logistic_regression_sk,logistic_regression_sk_stripped
-from robustify.bootstrap_utils import stripped_ols
-from robustify.utils import space_size
-from robustify.utils import all_subsets
-from robustify.figures import plot_results, plot_curve
-from robustify.utils import group_demean
-from robustify.prototypes import MissingValueWarning
+from robustipy.utils import simple_ols, logistic_regression_sm, logistic_regression_sm_stripped,logistic_regression_sk,logistic_regression_sk_stripped
+from robustipy.bootstrap_utils import stripped_ols
+from robustipy.utils import space_size
+from robustipy.utils import all_subsets
+from robustipy.figures import plot_results, plot_curve
+from robustipy.utils import group_demean
+from robustipy.prototypes import MissingValueWarning
 import _pickle
 import warnings
 from sklearn.model_selection import KFold
