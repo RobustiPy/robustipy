@@ -24,7 +24,6 @@ setup(
         'pandas>=1.4.3',
         'scipy>=1.9.0',
         'statsmodels>=0.13.2',
-        'tqdm>=4.64.0',
         'joblib>=1.2.0',
         'joypy>=0.2.6',
         'linearmodels>=4.27',
