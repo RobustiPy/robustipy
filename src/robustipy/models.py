@@ -442,7 +442,6 @@ class OLSRobust(Protomodel):
             group=None,
             draws=500,
             sample_size=None,
-            replace=False,
             kfold=None,
             shuffle=False):
         """
@@ -458,8 +457,6 @@ class OLSRobust(Protomodel):
             Grouping variable. If provided, a Fixed Effects model is estimated.
         draws : int, optional
             Number of draws for bootstrapping. Default is 500.
-        replace : bool, optional
-            Whether to use replacement during bootstrapping. Default is False.
         kfold : int, optional
             Number of folds for k-fold cross-validation. Default is None.
         shuffle : bool, optional
@@ -530,7 +527,6 @@ class OLSRobust(Protomodel):
                      (comb,
                       group,
                       sample_size,
-                      replace,
                       shuffle)
                      for i in range(0,
                                     draws))))
@@ -607,7 +603,6 @@ class OLSRobust(Protomodel):
                  (comb,
                   group,
                   sample_size,
-                  replace,
                   shuffle)
                  for i in range(0,
                                 draws))))
@@ -713,7 +708,6 @@ class OLSRobust(Protomodel):
                    comb_var,
                    group,
                    sample_size,
-                   replace,
                    shuffle):
         """
         Call stripped_ols() over a random sample of the data containing y, x, and controls.
@@ -726,8 +720,6 @@ class OLSRobust(Protomodel):
             Grouping variable. If provided, sampling is performed over the group variable.
         sample_size : int
             Sample size to use in the bootstrap.
-        replace : bool
-            Whether to use replacement on sampling.
         shuffle : bool
             Whether to shuffle y var to estimate joint significant test.
 
@@ -748,7 +740,7 @@ class OLSRobust(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size, replace=replace)
+            samp_df = temp_data.sample(n=sample_size)
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
@@ -901,7 +893,6 @@ class LRobust_sm(Protomodel):
             group=None,
             draws=500,
             sample_size=None,
-            replace=False,
             kfold=None,
             shuffle=False):
         if not isinstance(controls, list):
@@ -956,7 +947,6 @@ class LRobust_sm(Protomodel):
                  (comb,
                   group,
                   sample_size,
-                  replace,
                   shuffle)
                  for i in range(0, draws))))
 
@@ -992,7 +982,6 @@ class LRobust_sm(Protomodel):
                           comb_var,
                           group,
                           sample_size,
-                          replace,
                           shuffle):
         temp_data = comb_var.copy()
 
@@ -1004,7 +993,7 @@ class LRobust_sm(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size, replace=replace)
+            samp_df = temp_data.sample(n=sample_size)
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
             output = logistic_regression_sm_stripped(y, x)
@@ -1152,7 +1141,6 @@ class LRobust_sklearn(Protomodel):
             group=None,
             draws=500,
             sample_size=None,
-            replace=False,
             kfold=None,
             shuffle=False):
         if not isinstance(controls, list):
@@ -1207,7 +1195,6 @@ class LRobust_sklearn(Protomodel):
                  (comb,
                   group,
                   sample_size,
-                  replace,
                   shuffle)
                  for i in range(0, draws))))
 
@@ -1243,7 +1230,6 @@ class LRobust_sklearn(Protomodel):
                           comb_var,
                           group,
                           sample_size,
-                          replace,
                           shuffle):
         temp_data = comb_var.copy()
 
@@ -1255,7 +1241,7 @@ class LRobust_sklearn(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size, replace=replace)
+            samp_df = temp_data.sample(n=sample_size)
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
             output = logistic_regression_sk_stripped(y, x)
