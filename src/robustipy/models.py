@@ -447,7 +447,6 @@ class OLSRobust(Protomodel):
             controls,
             group=None,
             draws=500,
-            sample_size=None,
             kfold=None,
             shuffle=False):
         """
@@ -457,8 +456,6 @@ class OLSRobust(Protomodel):
         ----------
         controls : list<str>
             List containing all the names of the possible control variables of the model.
-        sample_size : int
-            Number of bootstrap samples to collect.
         group : str
             Grouping variable. If provided, a Fixed Effects model is estimated.
         draws : int, optional
@@ -484,8 +481,7 @@ class OLSRobust(Protomodel):
             if not isinstance(group,str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
 
-        if sample_size is None:
-            sample_size = self.data.shape[0]
+        sample_size = self.data.shape[0]
 
         if len(self.y) > 1:
             self.multiple_y()
@@ -746,7 +742,7 @@ class OLSRobust(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size)
+            samp_df = temp_data.sample(n=sample_size, replace=True)
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
@@ -999,7 +995,7 @@ class LRobust_sm(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size)
+            samp_df = temp_data.sample(n=sample_size, replace=True)
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
             output = logistic_regression_sm_stripped(y, x)
@@ -1247,7 +1243,7 @@ class LRobust_sklearn(Protomodel):
             temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size)
+            samp_df = temp_data.sample(n=sample_size, replace=True)
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
             output = logistic_regression_sk_stripped(y, x)
