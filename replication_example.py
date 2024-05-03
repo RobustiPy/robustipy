@@ -10,8 +10,7 @@ def union_example():
                                                'nlsw88.dta'))
     union_robust = OLSRobust(y=[y], x=[x], data=data)
     union_robust.fit(controls=c,
-                     draws=100,
-                     replace=True)
+                     draws=100)
     union_results = union_robust.get_results()
 
     union_results.plot(specs=[['hours', 'collgrad'],
@@ -32,8 +31,7 @@ def asc_example():
     myrobust_panel = OLSRobust(y=[y], x=x, data=data)
     myrobust_panel.fit(controls=c,
                        draws=100,
-                       group=g,
-                       replace=True)
+                       group=g)
     asc_results = myrobust_panel.get_results()
 
     asc_results.plot(
