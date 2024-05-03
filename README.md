@@ -25,8 +25,7 @@ model_robust = OLSRobust(y=y, x=x, data=data)
 
 model_robust.fit(controls=c,
 	             draws=100,
-                 sample_size=100,
-                 replace=True)
+                 sample_size=100)
 
 model_results = model_robust.get_results()
 
