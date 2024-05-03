@@ -357,6 +357,12 @@ class OLSResult(Protoresult):
             estimates=estimates,
             p_values=p_values
         )
+    
+    def save_to_csv(self, path: str):
+        """
+        Function to save summary dataframe to a csv
+        """
+        self.summary_df.to_csv(path)
 
 
 class OLSRobust(Protomodel):
