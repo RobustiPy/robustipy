@@ -311,17 +311,17 @@ def plot_bdist(results_object,
                                ymax=ymax,
                                color='k',
                                label='Full Model'))
-        ax.set_xlim(xmin - (np.abs(xmin) - (np.abs(xmax) - np.abs(xmin)) / 10), xmax)
-        ax.legend(handles=lines,
-                  frameon=True,
-                  edgecolor=(0, 0, 0, 1),
-                  fontsize=9,
-                  loc="upper left",
-                  ncols=1,
-                  framealpha=1,
-                  facecolor=((1, 1, 1, 0)
-                  )
-                  )
+        ax.set_xlim(xmin, xmax)
+#        ax.legend(handles=lines,
+#                  frameon=True,
+#                  edgecolor=(0, 0, 0, 1),
+#                  fontsize=9,
+#                  loc="upper left",
+#                  ncols=1,
+#                  framealpha=1,
+#                  facecolor=((1, 1, 1, 0)
+#                  )
+#                  )
         return plot
     else:
         return df[idx].plot(kind='density', ax=ax, legend=False)
