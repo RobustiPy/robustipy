@@ -331,9 +331,9 @@ def plot_kfolds(results_object,
                 ax):
     # @TODO: hardcoding these is bad
     colors = ['#001c54', '#E89818', '#8b0000']
-    sns.kdeplot(results.summary_df['av_k_metric'], ax=ax,
+    sns.kdeplot(results_object.summary_df['av_k_metric'], ax=ax,
                 color=colors[1])
-    sns.histplot(results.summary_df['av_k_metric'], ax=ax,
+    sns.histplot(results_object.summary_df['av_k_metric'], ax=ax,
                  color=colors[0],
                  bins=30, stat='density',
                  discrete=True)
