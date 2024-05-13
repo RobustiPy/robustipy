@@ -246,11 +246,9 @@ def get_default_colormap(specs):
     Returns:
     list: List of colors from the default colormap.
     """
-    default_cm = ListedColormap(["#fd8d59", "#92bfdb",
-                                 "#1ceaf9", "#1d866d",
-                                 "#38e278", "#98d595",
-                                 "#5b8313", "#abd533",
-                                 "#7d4400", "#417caa"])
+    from matplotlib.colors import ListedColormap
+    default_cm = ListedColormap(['#4D0009', '#007D59', '#734C95']
+                               )
     if all(isinstance(ele, list) for ele in specs):
         colors = default_cm.resampled(len(specs)).colors
     return colors
