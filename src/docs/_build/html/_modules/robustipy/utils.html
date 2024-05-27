@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>robustipy.utils &mdash; RobustiPy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            RobustiPy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../robustipy.html">robustipy package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RobustiPy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">robustipy.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for robustipy.utils</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Module containing utility functions for the library</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">scipy</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">ListedColormap</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">combinations</span>
+<span class="kn">import</span> <span class="nn">statsmodels.api</span> <span class="k">as</span> <span class="nn">sm</span>
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">StandardScaler</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LogisticRegression</span>
+<div class="viewcode-block" id="space_size">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.space_size">[docs]</a>
+<span class="k">def</span> <span class="nf">space_size</span><span class="p">(</span><span class="n">iterable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the size of the power set of the given iterable.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    iterable: iterable</span>
+<span class="sd">        Input iterable.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    int:</span>
+<span class="sd">        Size of the power set of the input iterable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">iterable</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">n</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="all_subsets">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.all_subsets">[docs]</a>
+<span class="k">def</span> <span class="nf">all_subsets</span><span class="p">(</span><span class="n">ss</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate all subsets of a given iterable.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ss: iterable</span>
+<span class="sd">        Input iterable.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    itertools.chain:</span>
+<span class="sd">        A chain object containing all subsets of the input iterable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">combinations</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
+                      <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="logistic_regression_sm">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.logistic_regression_sm">[docs]</a>
+<span class="k">def</span> <span class="nf">logistic_regression_sm</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform logistic regression based on statsmodels.Logit.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : array-like</span>
+<span class="sd">        Dependent variable values.</span>
+<span class="sd">    x : array-like</span>
+<span class="sd">        Independent variable values. The matrix should be shaped as (number of observations, number of independent variables).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,</span>
+<span class="sd">          AIC, BIC, and HQIC.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">X_const</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">prepend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X_const</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">nobs</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">df_model</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">ll</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">llf</span>
+    <span class="n">hqic</span> <span class="o">=</span> <span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ll</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">values</span><span class="p">],</span>
+            <span class="s1">&#39;p&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">pvalues</span><span class="o">.</span><span class="n">values</span><span class="p">],</span>
+            <span class="s1">&#39;ll&#39;</span><span class="p">:</span> <span class="n">ll</span><span class="p">,</span>
+            <span class="s1">&#39;aic&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">aic</span><span class="p">,</span>
+            <span class="s1">&#39;bic&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">bic</span><span class="p">,</span>
+            <span class="s1">&#39;hqic&#39;</span><span class="p">:</span> <span class="n">hqic</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="logistic_regression_sm_stripped">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.logistic_regression_sm_stripped">[docs]</a>
+<span class="k">def</span> <span class="nf">logistic_regression_sm_stripped</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform logistic regression using statsmodels with stripped output.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : array-like</span>
+<span class="sd">        Dependent variable values.</span>
+<span class="sd">    x: array-like</span>
+<span class="sd">        Independent variable values. The matrix should be shaped as</span>
+<span class="sd">                   (number of observations, number of independent variables).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dict: A dictionary containing regression coefficients (&#39;b&#39;) and corresponding</span>
+<span class="sd">          p-values (&#39;p&#39;) for each independent variable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">X_const</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">prepend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X_const</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">values</span><span class="p">],</span>
+            <span class="s1">&#39;p&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">pvalues</span><span class="o">.</span><span class="n">values</span><span class="p">]}</span></div>
+
+
+
+<div class="viewcode-block" id="simple_ols">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.simple_ols">[docs]</a>
+<span class="k">def</span> <span class="nf">simple_ols</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform simple ordinary least squares regression.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : array-like</span>
+<span class="sd">        Dependent variable.</span>
+<span class="sd">    x : array-like</span>
+<span class="sd">        Independent variables.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,</span>
+<span class="sd">          AIC, BIC, and HQIC.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">x</span><span class="p">[</span><span class="s1">&#39;const&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># constant</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">y</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Inputs must not be empty.&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">inv_xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+    <span class="k">except</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">:</span>
+        <span class="n">inv_xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+    <span class="n">xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">inv_xx</span><span class="p">,</span> <span class="n">xy</span><span class="p">)</span>  <span class="c1"># estimate coefficients</span>
+    <span class="n">nobs</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># number of observations</span>
+    <span class="n">ncoef</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># number of coef.</span>
+    <span class="n">df_e</span> <span class="o">=</span> <span class="n">nobs</span> <span class="o">-</span> <span class="n">ncoef</span>  <span class="c1"># degrees of freedom, error</span>
+    <span class="c1">#df_r = ncoef - 1  # degrees of freedom, regression</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>  <span class="c1"># residuals</span>
+    <span class="n">sse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="o">/</span> <span class="n">df_e</span>  <span class="c1"># SSE</span>
+    <span class="n">se</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diagonal</span><span class="p">(</span><span class="n">sse</span> <span class="o">*</span> <span class="n">inv_xx</span><span class="p">))</span>  <span class="c1"># coef. standard errors</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">b</span> <span class="o">/</span> <span class="n">se</span>  <span class="c1"># coef. t-statistics</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">scipy</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="n">df_e</span><span class="p">))</span> <span class="o">*</span> <span class="mi">2</span>  <span class="c1"># coef. p-values</span>
+    <span class="c1">#R2 = 1 - e.var() / y.var()  # model R-squared</span>
+    <span class="c1">#R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square</span>
+    <span class="n">ll</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">nobs</span> <span class="o">*</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">))</span> <span class="o">-</span> <span class="p">(</span><span class="n">nobs</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+          <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="o">/</span> <span class="n">nobs</span><span class="p">)))</span>
+    <span class="n">aic</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">ll</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ncoef</span><span class="p">)</span>
+    <span class="n">bic</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">ll</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">ncoef</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">nobs</span><span class="p">))</span>
+    <span class="n">hqic</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">ll</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">nobs</span><span class="p">))</span> <span class="o">*</span> <span class="n">ncoef</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span>
+            <span class="s1">&#39;p&#39;</span><span class="p">:</span> <span class="n">p</span><span class="p">,</span>
+            <span class="s1">&#39;ll&#39;</span><span class="p">:</span> <span class="n">ll</span><span class="p">,</span>
+            <span class="s1">&#39;aic&#39;</span><span class="p">:</span> <span class="n">aic</span><span class="p">,</span>
+            <span class="s1">&#39;bic&#39;</span><span class="p">:</span> <span class="n">bic</span><span class="p">,</span>
+            <span class="s1">&#39;hqic&#39;</span><span class="p">:</span> <span class="n">hqic</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="group_demean">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.group_demean">[docs]</a>
+<span class="k">def</span> <span class="nf">group_demean</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Demean the input data within groups.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x:  pd.DataFrame</span>
+<span class="sd">        Input DataFrame.</span>
+<span class="sd">    group : str, optional</span>
+<span class="sd">        Column name for grouping. Default is None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pd.DataFrame: Demeaned DataFrame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">data</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">data_gm</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="n">group</span><span class="p">])</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s1">&#39;mean&#39;</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">group</span><span class="p">)</span> <span class="o">-</span> <span class="n">data_gm</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">out</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">pidp</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="decorator_timer">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.decorator_timer">[docs]</a>
+<span class="k">def</span> <span class="nf">decorator_timer</span><span class="p">(</span><span class="n">some_function</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Decorator function to measure the execution time of a function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    some_function : function</span>
+<span class="sd">        Input function to be timed.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    function: Wrapped function with timing functionality.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">time</span>
+
+    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">some_function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span><span class="o">-</span><span class="n">t1</span>
+        <span class="k">return</span> <span class="n">result</span><span class="p">,</span> <span class="n">end</span>
+    <span class="k">return</span> <span class="n">wrapper</span></div>
+
+
+
+<div class="viewcode-block" id="get_selection_key">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.get_selection_key">[docs]</a>
+<span class="k">def</span> <span class="nf">get_selection_key</span><span class="p">(</span><span class="n">specs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate selection keys for specifications.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    specs: list</span>
+<span class="sd">        List of lists containing specifications.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    list: List of frozen sets representing selection keys.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ele</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">for</span> <span class="n">ele</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="p">[</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">target</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Argument `specs` must be a list of list.&#39;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_default_colormap">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.get_default_colormap">[docs]</a>
+<span class="k">def</span> <span class="nf">get_default_colormap</span><span class="p">(</span><span class="n">specs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate default colormap for visualizing specifications.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    specs: list</span>
+<span class="sd">        List of lists containing specifications.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    list: List of colors from the default colormap.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">ListedColormap</span>
+    <span class="n">default_cm</span> <span class="o">=</span> <span class="n">ListedColormap</span><span class="p">([</span><span class="s1">&#39;#4D0009&#39;</span><span class="p">,</span> <span class="s1">&#39;#007D59&#39;</span><span class="p">,</span> <span class="s1">&#39;#734C95&#39;</span><span class="p">]</span>
+                               <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ele</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">for</span> <span class="n">ele</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">default_cm</span><span class="o">.</span><span class="n">resampled</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">specs</span><span class="p">))</span><span class="o">.</span><span class="n">colors</span>
+    <span class="k">return</span> <span class="n">colors</span></div>
+
+
+
+<div class="viewcode-block" id="get_colors">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.get_colors">[docs]</a>
+<span class="k">def</span> <span class="nf">get_colors</span><span class="p">(</span><span class="n">specs</span><span class="p">,</span> <span class="n">color_set_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate colors for visualizing specifications.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    specs: list</span>
+<span class="sd">        List of lists containing specifications.</span>
+<span class="sd">    color_set_name (str, optional): Name of the colormap. Default is &#39;Set1&#39;.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    list: List of colors based on the specified colormap.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">color_set_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">color_set_name</span> <span class="o">=</span> <span class="s1">&#39;Set1&#39;</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">ele</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">for</span> <span class="n">ele</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+        <span class="n">colorset</span> <span class="o">=</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">colormaps</span><span class="p">[</span><span class="n">color_set_name</span><span class="p">]</span>
+        <span class="n">colorset</span> <span class="o">=</span> <span class="n">colorset</span><span class="o">.</span><span class="n">resampled</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">specs</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">colorset</span><span class="o">.</span><span class="n">colors</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Argument `specs` must be a list of list.&#39;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="join_sig_test">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.join_sig_test">[docs]</a>
+<span class="k">def</span> <span class="nf">join_sig_test</span><span class="p">(</span><span class="o">*</span><span class="p">,</span>
+                  <span class="n">results_target</span><span class="p">,</span>
+                  <span class="n">results_shuffled</span><span class="p">,</span>
+                  <span class="n">sig_level</span><span class="p">,</span>
+                  <span class="n">positive</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate joint significance test for the entire specification curve.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    results_target : OLSResult</span>
+<span class="sd">        Results object from the original analysis.</span>
+<span class="sd">    results_shuffled : OLSResult</span>
+<span class="sd">        Results object from shuffled analysis.</span>
+<span class="sd">    sig_level : float</span>
+<span class="sd">        Significance level threshold for specifications.</span>
+<span class="sd">    positive : bool</span>
+<span class="sd">        Direction of the joint significance test.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    float: Estimated p-value for the joint significance test.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">positive</span><span class="p">:</span>
+        <span class="n">target_sig_n</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">results_target</span><span class="o">.</span><span class="n">summary_df</span><span class="o">.</span><span class="n">ci_down</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">n_draws</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="n">n_draw</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">results_shuffled</span><span class="o">.</span><span class="n">p_values</span><span class="p">[</span><span class="n">col</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">sig_level</span><span class="p">)</span>
+            <span class="n">n_draws</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n_draw</span><span class="p">)</span>
+        <span class="n">shuffle_sig_n</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n_draws</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">target_sig_n</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">shuffle_sig_n</span><span class="o">/</span><span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">target_sig_n</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">results_target</span><span class="o">.</span><span class="n">summary_df</span><span class="o">.</span><span class="n">ci_up</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">n_draws</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span>
+            <span class="n">n_draw</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">results_shuffled</span><span class="o">.</span><span class="n">p_values</span><span class="p">[</span><span class="n">col</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">sig_level</span><span class="p">)</span>
+            <span class="n">n_draws</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n_draw</span><span class="p">)</span>
+        <span class="n">shuffle_sig_n</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n_draws</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">target_sig_n</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">shuffle_sig_n</span><span class="o">/</span><span class="n">results_shuffled</span><span class="o">.</span><span class="n">estimates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="prepare_union">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.prepare_union">[docs]</a>
+<span class="k">def</span> <span class="nf">prepare_union</span><span class="p">(</span><span class="n">path_to_union</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepare data for union example.</span>
+
+<span class="sd">    Reads a Stata file from the given path, processes the data, and prepares it for</span>
+<span class="sd">    regression analysis. The function creates binary indicators for categorical variables,</span>
+<span class="sd">    augments the input data with a log-transformed wage variable, and handles missing</span>
+<span class="sd">    values.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path_to_union : str</span>
+<span class="sd">        File path to the Stata file containing union data.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    tuple: A tuple containing the dependent variable (&#39;y&#39;), list of control variables (&#39;c&#39;),</span>
+<span class="sd">           independent variable (&#39;x&#39;), and the prepared DataFrame (&#39;final_data&#39;).</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ----------</span>
+<span class="sd">    FileNotFoundError: If the file specified in &#39;path_to_union&#39; does not exist.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">union_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_stata</span><span class="p">(</span><span class="n">path_to_union</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="p">[[</span><span class="s1">&#39;smsa&#39;</span><span class="p">,</span><span class="s1">&#39;collgrad&#39;</span><span class="p">,</span><span class="s1">&#39;married&#39;</span><span class="p">,</span><span class="s1">&#39;union&#39;</span><span class="p">]]</span><span class="o">=</span> <span class="n">union_df</span><span class="p">[[</span><span class="s1">&#39;smsa&#39;</span><span class="p">,</span><span class="s1">&#39;collgrad&#39;</span><span class="p">,</span><span class="s1">&#39;married&#39;</span><span class="p">,</span><span class="s1">&#39;union&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;str&#39;</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;log_wage&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;wage&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">union_df</span> <span class="o">=</span> <span class="n">union_df</span><span class="p">[</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;union&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">notnull</span><span class="p">()]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">union_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;union&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;union&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;union&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;married&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;married&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;married&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;collgrad&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;collgrad&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;college grad&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;smsa&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="s1">&#39;smsa&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;SMSA&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">union_df</span><span class="p">[[</span><span class="s1">&#39;smsa&#39;</span><span class="p">,</span> <span class="s1">&#39;collgrad&#39;</span><span class="p">,</span> <span class="s1">&#39;married&#39;</span><span class="p">,</span> <span class="s1">&#39;union&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">union_df</span><span class="p">[[</span><span class="s1">&#39;smsa&#39;</span><span class="p">,</span> <span class="s1">&#39;collgrad&#39;</span><span class="p">,</span> <span class="s1">&#39;married&#39;</span><span class="p">,</span> <span class="s1">&#39;union&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span>
+    <span class="n">indep_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;hours&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;age&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;grade&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;collgrad&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;married&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;south&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;smsa&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;c_city&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;ttl_exp&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;tenure&#39;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">indep_list</span><span class="p">:</span>
+        <span class="n">union_df</span> <span class="o">=</span> <span class="n">union_df</span><span class="p">[</span><span class="n">union_df</span><span class="p">[</span><span class="n">var</span><span class="p">]</span><span class="o">.</span><span class="n">notnull</span><span class="p">()]</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="s1">&#39;log_wage&#39;</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">indep_list</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="s1">&#39;union&#39;</span>
+    <span class="n">final_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">union_df</span><span class="p">[</span><span class="n">y</span><span class="p">],</span>
+                          <span class="n">union_df</span><span class="p">[</span><span class="n">x</span><span class="p">],</span>
+                          <span class="n">how</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">,</span>
+                          <span class="n">left_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                          <span class="n">right_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">final_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">final_data</span><span class="p">,</span>
+                          <span class="n">union_df</span><span class="p">[</span><span class="n">indep_list</span><span class="p">],</span>
+                          <span class="n">how</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">,</span>
+                          <span class="n">left_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                          <span class="n">right_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">final_data</span> <span class="o">=</span> <span class="n">final_data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">y</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">final_data</span></div>
+
+
+
+<div class="viewcode-block" id="prepare_asc">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.prepare_asc">[docs]</a>
+<span class="k">def</span> <span class="nf">prepare_asc</span><span class="p">(</span><span class="n">asc_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepare data for ASC example.</span>
+
+<span class="sd">    Reads a Stata file from the given path, processes the data, creates binary indicators</span>
+<span class="sd">    for categorical variables, and handles missing values. One-hot encodes the &#39;year&#39; column</span>
+<span class="sd">    and computes interaction terms for specific columns.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    asc_path (str): File path to the Stata file containing ASC data.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    tuple: A tuple containing the dependent variable (&#39;y&#39;), list of continuous variables (&#39;x&#39;),</span>
+<span class="sd">           list of control variables (&#39;c&#39;), grouping variable (&#39;group&#39;), and the prepared DataFrame.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">    FileNotFoundError: If the file specified in &#39;asc_path&#39; does not exist.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ASC_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_stata</span><span class="p">(</span><span class="n">asc_path</span><span class="p">,</span> <span class="n">convert_categoricals</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">one_hot</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">ASC_df</span><span class="p">[</span><span class="s1">&#39;year&#39;</span><span class="p">])</span>
+    <span class="n">ASC_df</span> <span class="o">=</span> <span class="n">ASC_df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">one_hot</span><span class="p">)</span>
+    <span class="c1">#ASC_df = ASC_df.set_index([&#39;pidp&#39;, &#39;year&#39;])</span>
+    <span class="n">ASC_df</span><span class="p">[</span><span class="s1">&#39;dcareNew*c.lrealgs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ASC_df</span><span class="p">[</span><span class="s1">&#39;dcareNew&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">ASC_df</span><span class="p">[</span><span class="s1">&#39;lrealgs&#39;</span><span class="p">]</span>
+    <span class="c1">#ASC_df[&#39;constant&#39;] = 1</span>
+    <span class="n">ASC_df</span> <span class="o">=</span> <span class="n">ASC_df</span><span class="p">[[</span><span class="s1">&#39;wellbeing_kikert&#39;</span><span class="p">,</span> <span class="s1">&#39;lrealgs&#39;</span><span class="p">,</span> <span class="s1">&#39;dcareNew*c.lrealgs&#39;</span><span class="p">,</span> <span class="s1">&#39;dcareNew&#39;</span><span class="p">,</span>
+                     <span class="s1">&#39;DR&#39;</span><span class="p">,</span> <span class="s1">&#39;lgva&#39;</span><span class="p">,</span> <span class="s1">&#39;Mtotp&#39;</span><span class="p">,</span> <span class="s1">&#39;ddgree&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span>
+                     <span class="mi">2005</span><span class="p">,</span> <span class="mf">2006.0</span><span class="p">,</span> <span class="mf">2007.0</span><span class="p">,</span> <span class="mf">2009.0</span><span class="p">,</span>
+                     <span class="mf">2010.0</span><span class="p">,</span> <span class="mf">2011.0</span><span class="p">,</span> <span class="mf">2012.0</span><span class="p">,</span> <span class="mf">2013.0</span><span class="p">,</span> <span class="mf">2014.0</span><span class="p">,</span>
+                     <span class="mf">2015.0</span><span class="p">,</span> <span class="mf">2016.0</span><span class="p">,</span> <span class="mf">2017.0</span><span class="p">,</span> <span class="mf">2018.0</span><span class="p">,</span>
+                     <span class="s1">&#39;married&#39;</span><span class="p">,</span> <span class="s1">&#39;widowed&#39;</span><span class="p">,</span> <span class="s1">&#39;disable&#39;</span><span class="p">,</span> <span class="s1">&#39;lrealtinc_m&#39;</span><span class="p">,</span>
+                     <span class="s1">&#39;house_ownership&#39;</span><span class="p">,</span> <span class="s1">&#39;hhsize&#39;</span><span class="p">,</span> <span class="s1">&#39;work&#39;</span><span class="p">,</span> <span class="s1">&#39;retired&#39;</span><span class="p">,</span>
+                     <span class="c1">#&#39;constant&#39;</span>
+                     <span class="s1">&#39;pidp&#39;</span>
+                     <span class="p">]]</span>
+    <span class="c1">#ASC_df = ASC_df.dropna()</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="s1">&#39;wellbeing_kikert&#39;</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lrealgs&#39;</span><span class="p">,</span> <span class="s1">&#39;dcareNew*c.lrealgs&#39;</span><span class="p">,</span> <span class="s1">&#39;dcareNew&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;DR&#39;</span><span class="p">,</span> <span class="s1">&#39;lgva&#39;</span><span class="p">,</span> <span class="s1">&#39;Mtotp&#39;</span><span class="p">,</span> <span class="s1">&#39;ddgree&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span>
+         <span class="mi">2005</span><span class="p">,</span> <span class="mf">2006.0</span><span class="p">,</span> <span class="mf">2007.0</span><span class="p">,</span> <span class="mf">2009.0</span><span class="p">,</span>
+         <span class="mf">2010.0</span><span class="p">,</span> <span class="mf">2011.0</span><span class="p">,</span> <span class="mf">2012.0</span><span class="p">,</span> <span class="mf">2013.0</span><span class="p">,</span> <span class="mf">2014.0</span><span class="p">,</span>
+         <span class="mf">2015.0</span><span class="p">,</span> <span class="mf">2016.0</span><span class="p">,</span> <span class="mf">2017.0</span><span class="p">,</span> <span class="mf">2018.0</span><span class="p">]</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;married&#39;</span><span class="p">,</span> <span class="s1">&#39;widowed&#39;</span><span class="p">,</span> <span class="s1">&#39;disable&#39;</span><span class="p">,</span> <span class="s1">&#39;lrealtinc_m&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;house_ownership&#39;</span><span class="p">,</span> <span class="s1">&#39;hhsize&#39;</span><span class="p">,</span> <span class="s1">&#39;work&#39;</span><span class="p">,</span> <span class="s1">&#39;retired&#39;</span>
+         <span class="p">]</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="s1">&#39;pidp&#39;</span>
+
+    <span class="k">return</span> <span class="n">y</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">ASC_df</span></div>
+
+
+
+<div class="viewcode-block" id="reservoir_sampling">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.utils.reservoir_sampling">[docs]</a>
+<span class="k">def</span> <span class="nf">reservoir_sampling</span><span class="p">(</span><span class="n">generator</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+    <span class="n">reservoir</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">generator</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">k</span><span class="p">:</span>
+            <span class="n">reservoir</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">j</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>  <span class="c1"># Randomly choose an index from 0 to i</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">k</span><span class="p">:</span>
+                <span class="n">reservoir</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">item</span>  <span class="c1"># Replace element at the chosen index with new item</span>
+    <span class="k">return</span> <span class="n">reservoir</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Daniel Valdenegro Ibarra, Charles Rahal, and Jiani Yan.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
