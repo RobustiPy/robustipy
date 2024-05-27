@@ -14,11 +14,15 @@ def space_size(iterable) -> int:
     """
     Calculate the size of the power set of the given iterable.
 
-    Parameters:
-    iterable (iterable): Input iterable.
+    Parameters
+    ----------
+    iterable: iterable
+        Input iterable.
 
-    Returns:
-    int: Size of the power set of the input iterable.
+    Returns
+    ----------
+    int:
+        Size of the power set of the input iterable.
     """
     n = len(iterable)
     return int(2**n)
@@ -28,11 +32,15 @@ def all_subsets(ss):
     """
     Generate all subsets of a given iterable.
 
-    Parameters:
-    ss (iterable): Input iterable.
+    Parameters
+    ----------
+    ss: iterable
+        Input iterable.
 
-    Returns:
-    itertools.chain: A chain object containing all subsets of the input iterable.
+    Returns
+    ----------
+    itertools.chain:
+        A chain object containing all subsets of the input iterable.
     """
     return chain(*map(lambda x: combinations(ss, x),
                       range(0, len(ss) + 1)))
@@ -40,7 +48,19 @@ def all_subsets(ss):
 
 def logistic_regression_sm(y, x) -> dict:
     """
-    Perform logistic regression using statsmodels.
+    Perform logistic regression based on statsmodels.Logit.
+
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable values.
+    x : array-like
+        Independent variable values. The matrix should be shaped as (number of observations, number of independent variables).
+
+    Returns
+    ----------
+    dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
+          AIC, BIC, and HQIC.
     """
     X_const = sm.add_constant(x, prepend=False)
     model = sm.Logit(y, X_const)
@@ -57,91 +77,42 @@ def logistic_regression_sm(y, x) -> dict:
             'hqic': hqic}
 
 def logistic_regression_sm_stripped(y, x) -> dict:
+    """
+    Perform logistic regression using statsmodels with stripped output.
+
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable values.
+    x: array-like
+        Independent variable values. The matrix should be shaped as
+                   (number of observations, number of independent variables).
+
+    Returns
+    ----------
+    dict: A dictionary containing regression coefficients ('b') and corresponding
+          p-values ('p') for each independent variable.
+    """
     X_const = sm.add_constant(x, prepend=False)
     model = sm.Logit(y, X_const)
     result = model.fit(disp=0)
     return {'b': [[x] for x in result.params.values],
             'p': [[x] for x in result.pvalues.values]}
 
-def logistic_regression_sk_stripped(y, x) -> dict:
-    def adjust_p_and_b(b, p_values):
-        b = b[1:] + [b[0]]
-        p_values = p_values[1:] + [p_values[0]]
-        return b, p_values
-
-    scaler = StandardScaler()
-    x = scaler.fit_transform(x)
-    y = np.array(y).ravel()
-    model = LogisticRegression(fit_intercept=True, random_state=1000000, max_iter=1000, penalty=None)
-    model.fit(y=y, X=x)
-
-    pred_probs = model.predict_proba(x)[:, 1]
-    b = [[model.intercept_[0]]] + [[model.coef_[0][x]] for x in range(0, len(model.coef_[0]))]  # we will reverse the order in the end
-
-    # Compute p-values
-    W = np.diag(pred_probs * (1 - pred_probs))
-    X_design = np.hstack([np.ones((x.shape[0], 1)), x])
-    cov_matrix = np.linalg.inv(X_design.T @ W @ X_design)
-    standard_errors = np.sqrt(np.diag(cov_matrix))
-
-    wald_stats = np.array([b[x][0] / standard_errors[x] for x in range(0, len(b))])
-    p_values = [[x] for x in scipy.stats.norm.sf(abs(wald_stats)) * 2]  # two-sided p-value = P(Z > |z|) * 2
-
-    b, p_values = adjust_p_and_b(b, p_values)
-    return {'b': b,
-            'p': p_values}
-
-def logistic_regression_sk(y, x) -> dict:
-    def adjust_p_and_b(b, p_values):
-        b = b[1:] + [b[0]]
-        p_values = p_values[1:] + [p_values[0]]
-        return b, p_values
-
-    scaler = StandardScaler()
-    x = scaler.fit_transform(x)
-    y = np.array(y).ravel()
-    model = LogisticRegression(fit_intercept=True, random_state=1000000, max_iter=1000, penalty=None)
-    model.fit(y=y, X=x)
-
-    pred_probs = model.predict_proba(x)[:, 1]
-    b = [[model.intercept_[0]]] + [[model.coef_[0][x]] for x in range(0, len(model.coef_[0]))]  # we will reverse the order in the end
-
-    # Compute p-values
-    W = np.diag(pred_probs * (1 - pred_probs))
-    X_design = np.hstack([np.ones((x.shape[0], 1)), x])
-    cov_matrix = np.linalg.inv(X_design.T @ W @ X_design)
-    standard_errors = np.sqrt(np.diag(cov_matrix))
-
-    wald_stats = np.array([b[x][0] / standard_errors[x] for x in range(0, len(b))])
-    p_values = [[x] for x in scipy.stats.norm.sf(abs(wald_stats)) * 2]  # two-sided p-value = P(Z > |z|) * 2
-
-    b, p_values = adjust_p_and_b(b, p_values)
-    # Compute log-likelihood
-    ll = np.sum(y * np.log(pred_probs) + (1 - y) * np.log(1 - pred_probs))
-    n = len(x)
-    k = model.coef_.shape[1] + 1
-
-    # Compute AIC, BIC, and HQIC
-    aic = -2 * ll + 2 * k
-    bic = -2 * ll + k * np.log(n)
-    hqic = -2 * ll + 2 * k * np.log(np.log(n))
-    return {'b': b,
-            'p': p_values,
-            'll': ll,
-            'aic': aic,
-            'bic': bic,
-            'hqic': hqic}
-
 
 def simple_ols(y, x) -> dict:
     """
     Perform simple ordinary least squares regression.
 
-    Parameters:
-    y (array-like): Dependent variable.
-    x (array-like): Independent variables.
+    Parameters
+    ----------
+    y : array-like
+        Dependent variable.
+    x : array-like
+        Independent variables.
 
-    Returns:
+    Returns
+    ----------
     dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
           AIC, BIC, and HQIC.
     """
@@ -184,11 +155,15 @@ def group_demean(x, group=None):
     """
     Demean the input data within groups.
 
-    Parameters:
-    x (pd.DataFrame): Input DataFrame.
-    group (str, optional): Column name for grouping. Default is None.
+    Parameters
+    ----------
+    x:  pd.DataFrame
+        Input DataFrame.
+    group : str, optional
+        Column name for grouping. Default is None.
 
-    Returns:
+    Returns
+    ----------
     pd.DataFrame: Demeaned DataFrame.
     """
     data = x.copy()
@@ -203,10 +178,13 @@ def decorator_timer(some_function):
     """
     Decorator function to measure the execution time of a function.
 
-    Parameters:
-    some_function (function): Input function to be timed.
+    Parameters
+    ----------
+    some_function : function
+        Input function to be timed.
 
-    Returns:
+    Returns
+    ----------
     function: Wrapped function with timing functionality.
     """
     from time import time
@@ -223,10 +201,13 @@ def get_selection_key(specs):
     """
     Generate selection keys for specifications.
 
-    Parameters:
-    specs (list): List of lists containing specifications.
+    Parameters
+    ----------
+    specs: list
+        List of lists containing specifications.
 
-    Returns:
+    Returns
+    ----------
     list: List of frozen sets representing selection keys.
     """
     if all(isinstance(ele, list) for ele in specs):
@@ -240,10 +221,13 @@ def get_default_colormap(specs):
     """
     Generate default colormap for visualizing specifications.
 
-    Parameters:
-    specs (list): List of lists containing specifications.
+    Parameters
+    ----------
+    specs: list
+        List of lists containing specifications.
 
-    Returns:
+    Returns
+    ----------
     list: List of colors from the default colormap.
     """
     from matplotlib.colors import ListedColormap
@@ -258,11 +242,14 @@ def get_colors(specs, color_set_name=None):
     """
     Generate colors for visualizing specifications.
 
-    Parameters:
-    specs (list): List of lists containing specifications.
+    Parameters
+    ----------
+    specs: list
+        List of lists containing specifications.
     color_set_name (str, optional): Name of the colormap. Default is 'Set1'.
 
-    Returns:
+    Returns
+    ----------
     list: List of colors based on the specified colormap.
     """
     if color_set_name is None:
@@ -283,13 +270,19 @@ def join_sig_test(*,
     """
     Calculate joint significance test for the entire specification curve.
 
-    Parameters:
-    results_target (OLSResult): Results object from the original analysis.
-    results_shuffled (OLSResult): Results object from shuffled analysis.
-    sig_level (float): Significance level threshold for specifications.
-    positive (bool): Direction of the joint significance test.
+    Parameters
+    ----------
+    results_target : OLSResult
+        Results object from the original analysis.
+    results_shuffled : OLSResult
+        Results object from shuffled analysis.
+    sig_level : float
+        Significance level threshold for specifications.
+    positive : bool
+        Direction of the joint significance test.
 
-    Returns:
+    Returns
+    ----------
     float: Estimated p-value for the joint significance test.
     """
     if positive:
@@ -321,14 +314,18 @@ def prepare_union(path_to_union):
     augments the input data with a log-transformed wage variable, and handles missing
     values.
 
-    Parameters:
-    path_to_union (str): File path to the Stata file containing union data.
+    Parameters
+    ----------
+    path_to_union : str
+        File path to the Stata file containing union data.
 
-    Returns:
+    Returns
+    ----------
     tuple: A tuple containing the dependent variable ('y'), list of control variables ('c'),
            independent variable ('x'), and the prepared DataFrame ('final_data').
 
-    Raises:
+    Raises
+    ----------
     FileNotFoundError: If the file specified in 'path_to_union' does not exist.
     """
     union_df = pd.read_stata(path_to_union)
