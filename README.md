@@ -25,7 +25,7 @@ In a Python script (or Jupyter Notebook), import the OLSRobust class running:
 from robustipy.models import OLSRobust
 model_robust = OLSRobust(y=y, x=x, data=data)
 model_robust.fit(controls=c,
-	             draws=100,
+	         draws=100,
                  sample_size=100)
 model_results = model_robust.get_results()
 ```
@@ -33,9 +33,9 @@ Where `y` is a list of variables names used to create your dependent variable, a
 
 ## Example
 
-A working usage example `replication_example.py` is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
+A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
 
-![Union dataset example](./figures/union_example/union_curve_new.png)
+![Union dataset example](./figures/union_example/union_curve.svg)
 
 ## Website
 
