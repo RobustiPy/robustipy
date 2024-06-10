@@ -362,6 +362,9 @@ def plot_kfolds(results_object,
 
 
 def plot_bma(results_object, ax_left, ax_right):
+    """
+    Plots the Bayesian Model Averaging (BMA) probabilities and average coefficients.
+    """
     colors = ['#001c54', '#E89818', '#8b0000']
     bma = results_object.compute_bma()
     bma = bma.set_index('control_var')
