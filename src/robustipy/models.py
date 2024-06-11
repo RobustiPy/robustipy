@@ -491,6 +491,9 @@ class OLSRobust(Protomodel):
         if group is not None:
             if not isinstance(group,str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+            
+        if kfold is not None and kfold < 2:
+            raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
 
         sample_size = self.data.shape[0]
 
@@ -920,6 +923,9 @@ class LRobust(Protomodel):
         if group is not None:
             if not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+            
+        if kfold is not None and kfold < 2:
+            raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
 
         if sample_size is None:
             sample_size = self.data.shape[0]
