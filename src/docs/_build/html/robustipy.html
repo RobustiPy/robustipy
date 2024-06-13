@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>robustipy package &mdash; RobustiPy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=d45e8c67"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Welcome to RobustiPy’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            RobustiPy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">robustipy package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-robustipy.bootstrap_utils">bootstrap_utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.bootstrap_utils.stripped_ols"><code class="docutils literal notranslate"><span class="pre">stripped_ols()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-robustipy.figures">figures module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_bdist"><code class="docutils literal notranslate"><span class="pre">plot_bdist()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_bma"><code class="docutils literal notranslate"><span class="pre">plot_bma()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_curve"><code class="docutils literal notranslate"><span class="pre">plot_curve()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_ic"><code class="docutils literal notranslate"><span class="pre">plot_ic()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_kfolds"><code class="docutils literal notranslate"><span class="pre">plot_kfolds()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.plot_results"><code class="docutils literal notranslate"><span class="pre">plot_results()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.vars_hist_plot"><code class="docutils literal notranslate"><span class="pre">vars_hist_plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.vars_line_plot"><code class="docutils literal notranslate"><span class="pre">vars_line_plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.figures.vars_scatter_plot"><code class="docutils literal notranslate"><span class="pre">vars_scatter_plot()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-robustipy.models">models module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.models.LRobust"><code class="docutils literal notranslate"><span class="pre">LRobust</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.y"><code class="docutils literal notranslate"><span class="pre">LRobust.y</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.x"><code class="docutils literal notranslate"><span class="pre">LRobust.x</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.data"><code class="docutils literal notranslate"><span class="pre">LRobust.data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.results"><code class="docutils literal notranslate"><span class="pre">LRobust.results</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.fit"><code class="docutils literal notranslate"><span class="pre">LRobust.fit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.get_results"><code class="docutils literal notranslate"><span class="pre">LRobust.get_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.LRobust.multiple_y"><code class="docutils literal notranslate"><span class="pre">LRobust.multiple_y()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.models.MergedResult"><code class="docutils literal notranslate"><span class="pre">MergedResult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.MergedResult.merge"><code class="docutils literal notranslate"><span class="pre">MergedResult.merge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.MergedResult.plot"><code class="docutils literal notranslate"><span class="pre">MergedResult.plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.MergedResult.summary"><code class="docutils literal notranslate"><span class="pre">MergedResult.summary()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.models.OLSResult"><code class="docutils literal notranslate"><span class="pre">OLSResult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.save"><code class="docutils literal notranslate"><span class="pre">OLSResult.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.load"><code class="docutils literal notranslate"><span class="pre">OLSResult.load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.summary"><code class="docutils literal notranslate"><span class="pre">OLSResult.summary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.plot"><code class="docutils literal notranslate"><span class="pre">OLSResult.plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.compute_bma"><code class="docutils literal notranslate"><span class="pre">OLSResult.compute_bma()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.merge"><code class="docutils literal notranslate"><span class="pre">OLSResult.merge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.y_name"><code class="docutils literal notranslate"><span class="pre">OLSResult.y_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.specs_names"><code class="docutils literal notranslate"><span class="pre">OLSResult.specs_names</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.all_predictors"><code class="docutils literal notranslate"><span class="pre">OLSResult.all_predictors</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.controls"><code class="docutils literal notranslate"><span class="pre">OLSResult.controls</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.draws"><code class="docutils literal notranslate"><span class="pre">OLSResult.draws</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.estimates"><code class="docutils literal notranslate"><span class="pre">OLSResult.estimates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.p_values"><code class="docutils literal notranslate"><span class="pre">OLSResult.p_values</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.all_b"><code class="docutils literal notranslate"><span class="pre">OLSResult.all_b</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.all_p"><code class="docutils literal notranslate"><span class="pre">OLSResult.all_p</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.summary_df"><code class="docutils literal notranslate"><span class="pre">OLSResult.summary_df</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.summary_bma"><code class="docutils literal notranslate"><span class="pre">OLSResult.summary_bma</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">OLSResult.compute_bma()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">OLSResult.load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">OLSResult.merge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">OLSResult.plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">OLSResult.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSResult.save_to_csv"><code class="docutils literal notranslate"><span class="pre">OLSResult.save_to_csv()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">OLSResult.summary()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.models.OLSRobust"><code class="docutils literal notranslate"><span class="pre">OLSRobust</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSRobust.fit"><code class="docutils literal notranslate"><span class="pre">OLSRobust.fit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSRobust.get_results"><code class="docutils literal notranslate"><span class="pre">OLSRobust.get_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.models.OLSRobust.multiple_y"><code class="docutils literal notranslate"><span class="pre">OLSRobust.multiple_y()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-robustipy.prototypes">prototypes module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.prototypes.MissingValueWarning"><code class="docutils literal notranslate"><span class="pre">MissingValueWarning</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.prototypes.Protomodel"><code class="docutils literal notranslate"><span class="pre">Protomodel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.prototypes.Protomodel.fit"><code class="docutils literal notranslate"><span class="pre">Protomodel.fit()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.prototypes.Protoresult"><code class="docutils literal notranslate"><span class="pre">Protoresult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.prototypes.Protoresult.plot"><code class="docutils literal notranslate"><span class="pre">Protoresult.plot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#robustipy.prototypes.Protoresult.summary"><code class="docutils literal notranslate"><span class="pre">Protoresult.summary()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-robustipy.utils">utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.all_subsets"><code class="docutils literal notranslate"><span class="pre">all_subsets()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.decorator_timer"><code class="docutils literal notranslate"><span class="pre">decorator_timer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.get_colors"><code class="docutils literal notranslate"><span class="pre">get_colors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.get_default_colormap"><code class="docutils literal notranslate"><span class="pre">get_default_colormap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.get_selection_key"><code class="docutils literal notranslate"><span class="pre">get_selection_key()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.group_demean"><code class="docutils literal notranslate"><span class="pre">group_demean()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.join_sig_test"><code class="docutils literal notranslate"><span class="pre">join_sig_test()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.logistic_regression_sm"><code class="docutils literal notranslate"><span class="pre">logistic_regression_sm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.logistic_regression_sm_stripped"><code class="docutils literal notranslate"><span class="pre">logistic_regression_sm_stripped()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.prepare_asc"><code class="docutils literal notranslate"><span class="pre">prepare_asc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.prepare_union"><code class="docutils literal notranslate"><span class="pre">prepare_union()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.reservoir_sampling"><code class="docutils literal notranslate"><span class="pre">reservoir_sampling()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.simple_ols"><code class="docutils literal notranslate"><span class="pre">simple_ols()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robustipy.utils.space_size"><code class="docutils literal notranslate"><span class="pre">space_size()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">RobustiPy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">robustipy package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/robustipy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="robustipy-package">
+<h1>robustipy package<a class="headerlink" href="#robustipy-package" title="Link to this heading"></a></h1>
+<section id="module-robustipy.bootstrap_utils">
+<span id="bootstrap-utils-module"></span><h2>bootstrap_utils module<a class="headerlink" href="#module-robustipy.bootstrap_utils" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.bootstrap_utils.stripped_ols">
+<span class="sig-prename descclassname"><span class="pre">robustipy.bootstrap_utils.</span></span><span class="sig-name descname"><span class="pre">stripped_ols</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/robustipy/bootstrap_utils.html#stripped_ols"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.bootstrap_utils.stripped_ols" title="Link to this definition"></a></dt>
+<dd><p>Perform Ordinary Least Squares (OLS) regression analysis with stripped output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em>) – Dependent variable values.</p></li>
+<li><p><strong>x</strong> (<em>array-like</em>) – <dl class="simple">
+<dt>Independent variable values. The matrix should be shaped as</dt><dd><p>(number of observations, number of independent variables).</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict</strong> – regression coefficients (‘b’) and corresponding p-values (‘p’) for each independent variable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dictionary</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If inputs <cite>x</cite> or <cite>y</cite> are empty.:</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Missing values in <cite>x</cite> or <cite>y</cite> are not handled, and the function may produce
+unexpected results if there are missing values in the input data.</p></li>
+<li><p>The function internally adds a constant column to the independent variables
+matrix <cite>x</cite> to represent the intercept term in the regression equation.</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="module-robustipy.figures">
+<span id="figures-module"></span><h2>figures module<a class="headerlink" href="#module-robustipy.figures" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_bdist">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_bdist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lines</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_bdist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_bdist" title="Link to this definition"></a></dt>
+<dd><p>Plots the distribution of coefficient estimates for the specified specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>specs</strong> (<em>list</em><em>, </em><em>optional</em>) – List of specification names to be highlighted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>colormap</strong> (<em>str</em><em>, </em><em>optional</em>) – Colormap to use for highlighting specifications.</p></li>
+<li><p><strong>colorset</strong> (<em>list</em><em>, </em><em>optional</em>) – List of colors for specification highlighting.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Axes containing the plotted distribution.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes._subplots.AxesSubplot</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_bma">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_bma</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_left</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_right</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_bma"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_bma" title="Link to this definition"></a></dt>
+<dd><p>Plots the Bayesian Model Averaging (BMA) probabilities and average coefficients.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_curve">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_curve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_curve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_curve" title="Link to this definition"></a></dt>
+<dd><p>Plots the curve of median, confidence intervals, minimum, and maximum
+coefficient estimates for a given results object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>specs</strong> (<em>list</em><em>, </em><em>optional</em>) – List of specification names to be highlighted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>colormap</strong> (<em>str</em><em>, </em><em>optional</em>) – Colormap to use for highlighting specifications.</p></li>
+<li><p><strong>colorset</strong> (<em>list</em><em>, </em><em>optional</em>) – List of colors for specification highlighting.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Axes containing the plotted curve.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes._subplots.AxesSubplot</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_ic">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_ic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_ic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_ic" title="Link to this definition"></a></dt>
+<dd><p>Plots the information criterion (IC) curve for the given results object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>ic</strong> (<em>str</em>) – Information criterion to plot (‘aic’, ‘bic’, etc.).</p></li>
+<li><p><strong>specs</strong> (<em>list</em><em>, </em><em>optional</em>) – List of specification names to be highlighted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>colormap</strong> (<em>str</em><em>, </em><em>optional</em>) – Colormap to use for highlighting specifications.</p></li>
+<li><p><strong>colorset</strong> (<em>list</em><em>, </em><em>optional</em>) – List of colors for specification highlighting.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>IC curve plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.lines.Line2D</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_kfolds">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_kfolds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_kfolds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_kfolds" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.plot_results">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">plot_results</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(26,</span> <span class="pre">8)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#plot_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.plot_results" title="Link to this definition"></a></dt>
+<dd><p>Plots the coefficient estimates, IC curve, and distribution plots for the given results object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>specs</strong> (<em>list</em><em>, </em><em>optional</em>) – List of specification names to be highlighted.</p></li>
+<li><p><strong>ic</strong> (<em>str</em><em>, </em><em>optional</em>) – Information criterion to plot (‘aic’, ‘bic’, etc.).</p></li>
+<li><p><strong>colormap</strong> (<em>str</em><em>, </em><em>optional</em>) – Colormap to use for highlighting specifications.</p></li>
+<li><p><strong>colorset</strong> (<em>list</em><em>, </em><em>optional</em>) – List of colors for specification highlighting.</p></li>
+<li><p><strong>figsize</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Figure size (width, height) in inches.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Figure containing the plotted results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.vars_hist_plot">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">vars_hist_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#vars_hist_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.vars_hist_plot" title="Link to this definition"></a></dt>
+<dd><p>Plots the histogram of the specified covariate in the specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>var_name</strong> (<em>str</em>) – Name of the covariate to be plotted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>bin_size</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of bins for histogram.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Axes containing the histogram plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes._subplots.AxesSubplot</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.vars_line_plot">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">vars_line_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#vars_line_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.vars_line_plot" title="Link to this definition"></a></dt>
+<dd><p>Plots the line plot of the specified covariate in the specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>var_name</strong> (<em>str</em>) – Name of the covariate to be plotted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>bin_size</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of bins for the line plot.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Axes containing the line plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes._subplots.AxesSubplot</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.figures.vars_scatter_plot">
+<span class="sig-prename descclassname"><span class="pre">robustipy.figures.</span></span><span class="sig-name descname"><span class="pre">vars_scatter_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/figures.html#vars_scatter_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.figures.vars_scatter_plot" title="Link to this definition"></a></dt>
+<dd><p>Plots the scatter plot of the specified covariate in the specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_object</strong> (<em>object</em>) – Object containing the results data.</p></li>
+<li><p><strong>var_name</strong> (<em>str</em>) – Name of the covariate to be plotted.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes._subplots.AxesSubplot</em><em>, </em><em>optional</em>) – Axes to plot on.</p></li>
+<li><p><strong>bin_size</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of bins for scatter plot.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Axes containing the scatter plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes._subplots.AxesSubplot</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-robustipy.models">
+<span id="models-module"></span><h2>models module<a class="headerlink" href="#module-robustipy.models" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.models.LRobust">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.models.</span></span><span class="sig-name descname"><span class="pre">LRobust</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'LR_sm'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#LRobust"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.LRobust" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#robustipy.prototypes.Protomodel" title="robustipy.prototypes.Protomodel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Protomodel</span></code></a></p>
+<p>A class to perform logistic regression analysis, underlying lr package = statsmodel</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em>) – Dependent variable values.</p></li>
+<li><p><strong>x</strong> (<em>array-like</em>) – Independent variable values. The matrix should be shaped as
+(number of observations, number of independent variables).</p></li>
+<li><p><strong>data</strong> (<em>DataFrame</em>) – A pandas DataFrame containing the variables in the model.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#robustipy.models.LRobust.y" title="Link to this definition"></a></dt>
+<dd><p>Dependent variable values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>array-like</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="headerlink" href="#robustipy.models.LRobust.x" title="Link to this definition"></a></dt>
+<dd><p>Independent variable values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>array-like</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#robustipy.models.LRobust.data" title="Link to this definition"></a></dt>
+<dd><p>A pandas DataFrame containing the variables in the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.results">
+<span class="sig-name descname"><span class="pre">results</span></span><a class="headerlink" href="#robustipy.models.LRobust.results" title="Link to this definition"></a></dt>
+<dd><p>A dictionary containing regression coefficients (‘b’) and corresponding
+p-values (‘p’) for each independent variable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draws</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">500</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kfold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#LRobust.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.LRobust.fit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.get_results">
+<span class="sig-name descname"><span class="pre">get_results</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#LRobust.get_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.LRobust.get_results" title="Link to this definition"></a></dt>
+<dd><p>Get the results of the OLS regression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>results</strong> – Object containing the regression results.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult">OLSResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.LRobust.multiple_y">
+<span class="sig-name descname"><span class="pre">multiple_y</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#LRobust.multiple_y"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.LRobust.multiple_y" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.models.MergedResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.models.</span></span><span class="sig-name descname"><span class="pre">MergedResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">estimates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#MergedResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.MergedResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#robustipy.prototypes.Protoresult" title="robustipy.prototypes.Protoresult"><code class="xref py py-class docutils literal notranslate"><span class="pre">Protoresult</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.MergedResult.merge">
+<span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">left_prefix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">right_prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#MergedResult.merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.MergedResult.merge" title="Link to this definition"></a></dt>
+<dd><p>Merges two OLSResult objects into one.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>(</strong><strong>OLSResult</strong><strong>)</strong> (<em>result_obj</em>)</p></li>
+<li><p><strong>(</strong><strong>str</strong><strong>)</strong> (<em>right_prefix</em>)</p></li>
+<li><p><strong>(</strong><strong>str</strong><strong>)</strong></p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If the input object is not an instance of OLSResult.:</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.MergedResult.plot">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(12,</span> <span class="pre">6)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#MergedResult.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.MergedResult.plot" title="Link to this definition"></a></dt>
+<dd><p>Plots the regression results using specified options.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Plot showing the regression results.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.MergedResult.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#MergedResult.summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.MergedResult.summary" title="Link to this definition"></a></dt>
+<dd><p>Generates a summary of the regression results (not implemented).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.models.</span></span><span class="sig-name descname"><span class="pre">OLSResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_predictors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draws</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">estimates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ll_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aic_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bic_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hqic_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">av_k_metric_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#robustipy.prototypes.Protoresult" title="robustipy.prototypes.Protoresult"><code class="xref py py-class docutils literal notranslate"><span class="pre">Protoresult</span></code></a></p>
+<p>Result class containing the output of the OLSRobust class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>str</em>) – The name of the dependent variable.</p></li>
+<li><p><strong>specs</strong> (<em>list</em><em> of </em><em>str</em>) – List of specification names.</p></li>
+<li><p><strong>all_predictors</strong> (<em>list</em><em> of </em><em>lists</em><em> of </em><em>str</em>) – List of predictor variable names for each specification.</p></li>
+<li><p><strong>controls</strong> (<em>list</em><em> of </em><em>str</em>) – List of control variable names.</p></li>
+<li><p><strong>draws</strong> (<em>int</em>) – Number of draws in the analysis.</p></li>
+<li><p><strong>estimates</strong> (<em>pd.DataFrame</em>) – DataFrame containing regression coefficient estimates.</p></li>
+<li><p><strong>all_b</strong> (<em>list</em><em> of </em><em>lists</em>) – List of coefficient estimates for each specification and draw.</p></li>
+<li><p><strong>all_p</strong> (<em>list</em><em> of </em><em>lists</em>) – List of p-values for each specification and draw.</p></li>
+<li><p><strong>p_values</strong> (<em>pd.DataFrame</em>) – DataFrame containing p-values for coefficient estimates.</p></li>
+<li><p><strong>ll_array</strong> (<em>list</em>) – List of log-likelihood values for each specification.</p></li>
+<li><p><strong>aic_array</strong> (<em>list</em>) – List of AIC values for each specification.</p></li>
+<li><p><strong>bic_array</strong> (<em>list</em>) – List of BIC values for each specification.</p></li>
+<li><p><strong>hqic_array</strong> (<em>list</em>) – List of HQIC values for each specification.</p></li>
+<li><p><strong>av_k_metric_array</strong> (<em>list</em><em>, </em><em>optional</em>) – List of average Kullback-Leibler divergence metrics.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.save" title="Link to this definition"></a></dt>
+<dd><p>Save the OLSResult object to a file using pickle.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.load">
+<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.load" title="Link to this definition"></a></dt>
+<dd><p>Load an OLSResult object from a file using pickle.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.summary" title="Link to this definition"></a></dt>
+<dd><p>Placeholder for a method to generate a summary of the OLS results.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.plot">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(12,</span> <span class="pre">6)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.plot" title="Link to this definition"></a></dt>
+<dd><p>Generate plots of the OLS results.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.compute_bma">
+<span class="sig-name descname"><span class="pre">compute_bma</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.compute_bma"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.compute_bma" title="Link to this definition"></a></dt>
+<dd><p>Perform Bayesian model averaging using BIC implied priors and return the results.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.merge">
+<span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.merge" title="Link to this definition"></a></dt>
+<dd><p>Merge two OLSResult objects into one.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.y_name">
+<span class="sig-name descname"><span class="pre">y_name</span></span><a class="headerlink" href="#robustipy.models.OLSResult.y_name" title="Link to this definition"></a></dt>
+<dd><p>The name of the dependent variable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.specs_names">
+<span class="sig-name descname"><span class="pre">specs_names</span></span><a class="headerlink" href="#robustipy.models.OLSResult.specs_names" title="Link to this definition"></a></dt>
+<dd><p>Series containing specification names.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.Series</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.all_predictors">
+<span class="sig-name descname"><span class="pre">all_predictors</span></span><a class="headerlink" href="#robustipy.models.OLSResult.all_predictors" title="Link to this definition"></a></dt>
+<dd><p>List of predictor variable names for each specification.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of lists of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.controls">
+<span class="sig-name descname"><span class="pre">controls</span></span><a class="headerlink" href="#robustipy.models.OLSResult.controls" title="Link to this definition"></a></dt>
+<dd><p>List of control variable names.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.draws">
+<span class="sig-name descname"><span class="pre">draws</span></span><a class="headerlink" href="#robustipy.models.OLSResult.draws" title="Link to this definition"></a></dt>
+<dd><p>Number of draws in the analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.estimates">
+<span class="sig-name descname"><span class="pre">estimates</span></span><a class="headerlink" href="#robustipy.models.OLSResult.estimates" title="Link to this definition"></a></dt>
+<dd><p>DataFrame containing regression coefficient estimates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.p_values">
+<span class="sig-name descname"><span class="pre">p_values</span></span><a class="headerlink" href="#robustipy.models.OLSResult.p_values" title="Link to this definition"></a></dt>
+<dd><p>DataFrame containing p-values for coefficient estimates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.all_b">
+<span class="sig-name descname"><span class="pre">all_b</span></span><a class="headerlink" href="#robustipy.models.OLSResult.all_b" title="Link to this definition"></a></dt>
+<dd><p>List of coefficient estimates for each specification and draw.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of lists</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.all_p">
+<span class="sig-name descname"><span class="pre">all_p</span></span><a class="headerlink" href="#robustipy.models.OLSResult.all_p" title="Link to this definition"></a></dt>
+<dd><p>List of p-values for each specification and draw.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of lists</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.summary_df">
+<span class="sig-name descname"><span class="pre">summary_df</span></span><a class="headerlink" href="#robustipy.models.OLSResult.summary_df" title="Link to this definition"></a></dt>
+<dd><p>DataFrame containing summary statistics of coefficient estimates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.summary_bma">
+<span class="sig-name descname"><span class="pre">summary_bma</span></span><a class="headerlink" href="#robustipy.models.OLSResult.summary_bma" title="Link to this definition"></a></dt>
+<dd><p>DataFrame containing Bayesian model averaging results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">compute_bma</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.compute_bma"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd><p>Performs Bayesian Model Averaging (BMA) using BIC implied priors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DataFrame containing BMA results.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id1">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dd><p>Loads an OLSResult object from a binary file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<em>str</em>) – Name of the file from which the object will be loaded.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Loaded OLSResult object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult">OLSResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">left_prefix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">right_prefix</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#robustipy.models.MergedResult" title="robustipy.models.MergedResult"><span class="pre">MergedResult</span></a></span></span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.merge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dd><p>Merges two OLSResult objects into one.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result_obj</strong> (<a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult"><em>OLSResult</em></a>) – OLSResult object to be merged.</p></li>
+<li><p><strong>left_prefix</strong> (<em>str</em>) – Prefix for the orignal result object.</p></li>
+<li><p><strong>right_prefix</strong> (<em>str</em>) – Prefix fort the new result object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If the input object is not an instance of OLSResult.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'aic'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colormap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(12,</span> <span class="pre">6)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dd><p>Plots the regression results using specified options.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>specs</strong> (<em>list</em><em>, </em><em>optional</em>) – List of list of specification names to include in the plot.</p></li>
+<li><p><strong>ic</strong> (<em>str</em><em>, </em><em>optional</em>) – Information criterion to use for model selection (e.g., ‘bic’, ‘aic’).</p></li>
+<li><p><strong>colormap</strong> (<em>str</em><em>, </em><em>optional</em>) – Colormap to use for the plot.</p></li>
+<li><p><strong>colorset</strong> (<em>list</em><em>, </em><em>optional</em>) – List of colors to use for different specifications.</p></li>
+<li><p><strong>figsize</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Size of the figure (width, height) in inches.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Plot showing the regression results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id4" title="Link to this definition"></a></dt>
+<dd><p>Saves the OLSResult object to a binary file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<em>str</em>) – Name of the file to which the object will be saved.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSResult.save_to_csv">
+<span class="sig-name descname"><span class="pre">save_to_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.save_to_csv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSResult.save_to_csv" title="Link to this definition"></a></dt>
+<dd><p>Function to save summary dataframe to a csv</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSResult.summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id5" title="Link to this definition"></a></dt>
+<dd><p>Generates a summary of the regression results (not implemented).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.models.OLSRobust">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.models.</span></span><span class="sig-name descname"><span class="pre">OLSRobust</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSRobust"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSRobust" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#robustipy.prototypes.Protomodel" title="robustipy.prototypes.Protomodel"><code class="xref py py-class docutils literal notranslate"><span class="pre">Protomodel</span></code></a></p>
+<p>Class for multi-variate regression using OLS</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>str</em>) – Name of the dependent variable.</p></li>
+<li><p><strong>x</strong> (<em>str</em><em> or </em><em>list&lt;str&gt;</em>) – List of names of the independent variable(s).</p></li>
+<li><p><strong>data</strong> (<em>DataFrame</em>) – DataFrame contaning all the data to be used in the model.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>self</strong> – An object containing the key metrics.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Object</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSRobust.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draws</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">500</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kfold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSRobust.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSRobust.fit" title="Link to this definition"></a></dt>
+<dd><p>Fit the OLS models into the specification space as well as over the bootstrapped samples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>controls</strong> (<em>list&lt;str&gt;</em>) – List containing all the names of the possible control variables of the model.</p></li>
+<li><p><strong>group</strong> (<em>str</em>) – Grouping variable. If provided, a Fixed Effects model is estimated.</p></li>
+<li><p><strong>draws</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of draws for bootstrapping. Default is 500.</p></li>
+<li><p><strong>kfold</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of folds for k-fold cross-validation. Default is None.</p></li>
+<li><p><strong>shuffle</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to shuffle y variable to estimate joint significance test. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>self</strong> – Object class OLSRobust containing the fitted estimators.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSRobust.get_results">
+<span class="sig-name descname"><span class="pre">get_results</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSRobust.get_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSRobust.get_results" title="Link to this definition"></a></dt>
+<dd><p>Get the results of the OLS regression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>results</strong> – Object containing the regression results.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult">OLSResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.models.OLSRobust.multiple_y">
+<span class="sig-name descname"><span class="pre">multiple_y</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/models.html#OLSRobust.multiple_y"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.models.OLSRobust.multiple_y" title="Link to this definition"></a></dt>
+<dd><p>Cumputes composite y based on multiple indicators provided.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-robustipy.prototypes">
+<span id="prototypes-module"></span><h2>prototypes module<a class="headerlink" href="#module-robustipy.prototypes" title="Link to this heading"></a></h2>
+<dl class="py exception">
+<dt class="sig sig-object py" id="robustipy.prototypes.MissingValueWarning">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.prototypes.</span></span><span class="sig-name descname"><span class="pre">MissingValueWarning</span></span><a class="reference internal" href="_modules/robustipy/prototypes.html#MissingValueWarning"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.MissingValueWarning" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.prototypes.Protomodel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.prototypes.</span></span><span class="sig-name descname"><span class="pre">Protomodel</span></span><a class="reference internal" href="_modules/robustipy/prototypes.html#Protomodel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.Protomodel" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Prototype class, intended to be used in inheritance,
+not to be called.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.prototypes.Protomodel.fit">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/prototypes.html#Protomodel.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.Protomodel.fit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="robustipy.prototypes.Protoresult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">robustipy.prototypes.</span></span><span class="sig-name descname"><span class="pre">Protoresult</span></span><a class="reference internal" href="_modules/robustipy/prototypes.html#Protoresult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.Protoresult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Prototype class for results object, intended to be used in inheritance,
+not to be called.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.prototypes.Protoresult.plot">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/prototypes.html#Protoresult.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.Protoresult.plot" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="robustipy.prototypes.Protoresult.summary">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/prototypes.html#Protoresult.summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.prototypes.Protoresult.summary" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-robustipy.utils">
+<span id="utils-module"></span><h2>utils module<a class="headerlink" href="#module-robustipy.utils" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.all_subsets">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">all_subsets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ss</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#all_subsets"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.all_subsets" title="Link to this definition"></a></dt>
+<dd><p>Generate all subsets of a given iterable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ss</strong> (<em>iterable</em>) – Input iterable.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A chain object containing all subsets of the input iterable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>itertools.chain</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.decorator_timer">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">decorator_timer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">some_function</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#decorator_timer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.decorator_timer" title="Link to this definition"></a></dt>
+<dd><p>Decorator function to measure the execution time of a function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>some_function</strong> (<em>function</em>) – Input function to be timed.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>function</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Wrapped function with timing functionality.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.get_colors">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">get_colors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color_set_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#get_colors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.get_colors" title="Link to this definition"></a></dt>
+<dd><p>Generate colors for visualizing specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>specs</strong> (<em>list</em>) – List of lists containing specifications.</p></li>
+<li><p><strong>(</strong><strong>str</strong> (<em>color_set_name</em>)</p></li>
+<li><p><strong>optional</strong><strong>)</strong> (<em>Name</em><em> of </em><em>the colormap. Default is 'Set1'.</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>list</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of colors based on the specified colormap.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.get_default_colormap">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">get_default_colormap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#get_default_colormap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.get_default_colormap" title="Link to this definition"></a></dt>
+<dd><p>Generate default colormap for visualizing specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>specs</strong> (<em>list</em>) – List of lists containing specifications.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>list</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of colors from the default colormap.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.get_selection_key">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">get_selection_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#get_selection_key"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.get_selection_key" title="Link to this definition"></a></dt>
+<dd><p>Generate selection keys for specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>specs</strong> (<em>list</em>) – List of lists containing specifications.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>list</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of frozen sets representing selection keys.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.group_demean">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">group_demean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#group_demean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.group_demean" title="Link to this definition"></a></dt>
+<dd><p>Demean the input data within groups.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>pd.DataFrame</em>) – Input DataFrame.</p></li>
+<li><p><strong>group</strong> (<em>str</em><em>, </em><em>optional</em>) – Column name for grouping. Default is None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>pd.DataFrame</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Demeaned DataFrame.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.join_sig_test">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">join_sig_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results_target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results_shuffled</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sig_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">positive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#join_sig_test"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.join_sig_test" title="Link to this definition"></a></dt>
+<dd><p>Calculate joint significance test for the entire specification curve.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>results_target</strong> (<a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult"><em>OLSResult</em></a>) – Results object from the original analysis.</p></li>
+<li><p><strong>results_shuffled</strong> (<a class="reference internal" href="#robustipy.models.OLSResult" title="robustipy.models.OLSResult"><em>OLSResult</em></a>) – Results object from shuffled analysis.</p></li>
+<li><p><strong>sig_level</strong> (<em>float</em>) – Significance level threshold for specifications.</p></li>
+<li><p><strong>positive</strong> (<em>bool</em>) – Direction of the joint significance test.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>float</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Estimated p-value for the joint significance test.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.logistic_regression_sm">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">logistic_regression_sm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/robustipy/utils.html#logistic_regression_sm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.logistic_regression_sm" title="Link to this definition"></a></dt>
+<dd><p>Perform logistic regression based on statsmodels.Logit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em>) – Dependent variable values.</p></li>
+<li><p><strong>x</strong> (<em>array-like</em>) – Independent variable values. The matrix should be shaped as (number of observations, number of independent variables).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict</strong> – AIC, BIC, and HQIC.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary containing regression results, including coefficients, p-values, log-likelihood,</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.logistic_regression_sm_stripped">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">logistic_regression_sm_stripped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/robustipy/utils.html#logistic_regression_sm_stripped"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.logistic_regression_sm_stripped" title="Link to this definition"></a></dt>
+<dd><p>Perform logistic regression using statsmodels with stripped output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em>) – Dependent variable values.</p></li>
+<li><p><strong>x</strong> (<em>array-like</em>) – <dl class="simple">
+<dt>Independent variable values. The matrix should be shaped as</dt><dd><p>(number of observations, number of independent variables).</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict</strong> – p-values (‘p’) for each independent variable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary containing regression coefficients (‘b’) and corresponding</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.prepare_asc">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">prepare_asc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">asc_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#prepare_asc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.prepare_asc" title="Link to this definition"></a></dt>
+<dd><p>Prepare data for ASC example.</p>
+<p>Reads a Stata file from the given path, processes the data, creates binary indicators
+for categorical variables, and handles missing values. One-hot encodes the ‘year’ column
+and computes interaction terms for specific columns.</p>
+<p>Parameters:
+asc_path (str): File path to the Stata file containing ASC data.</p>
+<p>Returns:
+tuple: A tuple containing the dependent variable (‘y’), list of continuous variables (‘x’),</p>
+<blockquote>
+<div><p>list of control variables (‘c’), grouping variable (‘group’), and the prepared DataFrame.</p>
+</div></blockquote>
+<p>Raises:
+FileNotFoundError: If the file specified in ‘asc_path’ does not exist.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.prepare_union">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">prepare_union</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_to_union</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#prepare_union"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.prepare_union" title="Link to this definition"></a></dt>
+<dd><p>Prepare data for union example.</p>
+<p>Reads a Stata file from the given path, processes the data, and prepares it for
+regression analysis. The function creates binary indicators for categorical variables,
+augments the input data with a log-transformed wage variable, and handles missing
+values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path_to_union</strong> (<em>str</em>) – File path to the Stata file containing union data.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>tuple</strong> – independent variable (‘x’), and the prepared DataFrame (‘final_data’).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A tuple containing the dependent variable (‘y’), list of control variables (‘c’),</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>FileNotFoundError</strong> – If the file specified in ‘path_to_union’ does not exist.:</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.reservoir_sampling">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">reservoir_sampling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">generator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/robustipy/utils.html#reservoir_sampling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.reservoir_sampling" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.simple_ols">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">simple_ols</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/robustipy/utils.html#simple_ols"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.simple_ols" title="Link to this definition"></a></dt>
+<dd><p>Perform simple ordinary least squares regression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em>) – Dependent variable.</p></li>
+<li><p><strong>x</strong> (<em>array-like</em>) – Independent variables.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict</strong> – AIC, BIC, and HQIC.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary containing regression results, including coefficients, p-values, log-likelihood,</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="robustipy.utils.space_size">
+<span class="sig-prename descclassname"><span class="pre">robustipy.utils.</span></span><span class="sig-name descname"><span class="pre">space_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/robustipy/utils.html#space_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#robustipy.utils.space_size" title="Link to this definition"></a></dt>
+<dd><p>Calculate the size of the power set of the given iterable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>iterable</strong> (<em>iterable</em>) – Input iterable.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Size of the power set of the input iterable.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to RobustiPy’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Daniel Valdenegro Ibarra, Charles Rahal, and Jiani Yan.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

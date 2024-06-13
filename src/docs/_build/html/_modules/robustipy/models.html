@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>robustipy.models &mdash; RobustiPy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            RobustiPy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../robustipy.html">robustipy package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RobustiPy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">robustipy.models</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for robustipy.models</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">robustipy.prototypes</span> <span class="kn">import</span> <span class="n">Protomodel</span>
+<span class="kn">from</span> <span class="nn">robustipy.prototypes</span> <span class="kn">import</span> <span class="n">Protoresult</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">rich.progress</span> <span class="kn">import</span> <span class="n">track</span>
+<span class="kn">from</span> <span class="nn">joblib</span> <span class="kn">import</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">delayed</span>
+<span class="kn">from</span> <span class="nn">robustipy.utils</span> <span class="kn">import</span> <span class="n">simple_ols</span><span class="p">,</span> <span class="n">logistic_regression_sm</span><span class="p">,</span> <span class="n">logistic_regression_sm_stripped</span>
+<span class="kn">from</span> <span class="nn">robustipy.bootstrap_utils</span> <span class="kn">import</span> <span class="n">stripped_ols</span>
+<span class="kn">from</span> <span class="nn">robustipy.utils</span> <span class="kn">import</span> <span class="n">space_size</span>
+<span class="kn">from</span> <span class="nn">robustipy.utils</span> <span class="kn">import</span> <span class="n">all_subsets</span>
+<span class="kn">from</span> <span class="nn">robustipy.figures</span> <span class="kn">import</span> <span class="n">plot_results</span><span class="p">,</span> <span class="n">plot_curve</span>
+<span class="kn">from</span> <span class="nn">robustipy.utils</span> <span class="kn">import</span> <span class="n">group_demean</span>
+<span class="kn">from</span> <span class="nn">robustipy.prototypes</span> <span class="kn">import</span> <span class="n">MissingValueWarning</span>
+<span class="kn">import</span> <span class="nn">_pickle</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">statsmodels.tools.tools</span> <span class="kn">import</span> <span class="n">add_constant</span>
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">KFold</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">root_mean_squared_error</span>
+
+
+<div class="viewcode-block" id="MergedResult">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.MergedResult">[docs]</a>
+<span class="k">class</span> <span class="nc">MergedResult</span><span class="p">(</span><span class="n">Protoresult</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+                 <span class="n">y</span><span class="p">,</span>
+                 <span class="n">specs</span><span class="p">,</span>
+                 <span class="n">estimates</span><span class="p">,</span>
+                 <span class="n">p_values</span><span class="p">,</span> <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">specs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">estimates</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">estimates</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">p_values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">p_values</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_summary</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;spec_name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span>
+
+<div class="viewcode-block" id="MergedResult.summary">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.MergedResult.summary">[docs]</a>
+    <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a summary of the regression results (not implemented).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compute_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes summary statistics based on coefficient estimates.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: DataFrame containing summary statistics.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimates</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;median&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;max&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;min&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ci_up&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="mf">0.975</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                     <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;nearest&#39;</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ci_down&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="mf">0.025</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                       <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;nearest&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span>
+
+<div class="viewcode-block" id="MergedResult.plot">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.MergedResult.plot">[docs]</a>
+    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+             <span class="n">specs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">colorset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">6</span><span class="p">)):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Plots the regression results using specified options.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        matplotlib.figure.Figure:</span>
+<span class="sd">            Plot showing the regression results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">specs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;specs&#39; must be a list of lists.&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span> <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;All specifications in &#39;spec&#39; must be in the valid computed specifications.&quot;</span><span class="p">)</span>
+
+        <span class="n">plot_curve</span><span class="p">(</span><span class="n">results_object</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span>
+                   <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+                   <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+                   <span class="n">colormap</span><span class="o">=</span><span class="n">colormap</span><span class="p">,</span>
+                   <span class="n">colorset</span><span class="o">=</span><span class="n">colorset</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">fig</span></div>
+
+
+<div class="viewcode-block" id="MergedResult.merge">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.MergedResult.merge">[docs]</a>
+    <span class="k">def</span> <span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result_obj</span><span class="p">,</span> <span class="n">left_prefix</span><span class="p">,</span> <span class="n">right_prefix</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Merges two OLSResult objects into one.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        -------</span>
+<span class="sd">            result_obj (OLSResult): OLSResult object to be merged.</span>
+<span class="sd">            left_prefix (str): Prefix for the orignal result object.</span>
+<span class="sd">            right_prefix (str): Prefix fort the new result object.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        -------</span>
+<span class="sd">            TypeError: If the input object is not an instance of OLSResult.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result_obj</span><span class="p">,</span> <span class="n">OLSResult</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;result_obj&#39; must be an instance of OLSResult.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left_prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">right_prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;prefixes&#39; must be of type &#39;str.&#39;&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span> <span class="o">!=</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">y_name</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Dependent variable names must match.&#39;</span><span class="p">)</span>
+
+        <span class="n">specs_original</span> <span class="o">=</span> <span class="p">[</span><span class="nb">frozenset</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">left_prefix</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span><span class="p">]</span>
+        <span class="n">specs_new</span> <span class="o">=</span> <span class="p">[</span><span class="nb">frozenset</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">right_prefix</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">specs_names</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span>
+        <span class="n">specs</span> <span class="o">=</span> <span class="n">specs_original</span> <span class="o">+</span> <span class="n">specs_new</span>
+        <span class="n">estimates</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">estimates</span><span class="p">,</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">estimates</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">p_values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">p_values</span><span class="p">,</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">p_values</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">MergedResult</span><span class="p">(</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+            <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+            <span class="n">estimates</span><span class="o">=</span><span class="n">estimates</span><span class="p">,</span>
+            <span class="n">p_values</span><span class="o">=</span><span class="n">p_values</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OLSResult">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult">[docs]</a>
+<span class="k">class</span> <span class="nc">OLSResult</span><span class="p">(</span><span class="n">Protoresult</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Result class containing the output of the OLSRobust class.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        y (str): The name of the dependent variable.</span>
+<span class="sd">        specs (list of str): List of specification names.</span>
+<span class="sd">        all_predictors (list of lists of str): List of predictor variable names for each specification.</span>
+<span class="sd">        controls (list of str): List of control variable names.</span>
+<span class="sd">        draws (int): Number of draws in the analysis.</span>
+<span class="sd">        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.</span>
+<span class="sd">        all_b (list of lists): List of coefficient estimates for each specification and draw.</span>
+<span class="sd">        all_p (list of lists): List of p-values for each specification and draw.</span>
+<span class="sd">        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.</span>
+<span class="sd">        ll_array (list): List of log-likelihood values for each specification.</span>
+<span class="sd">        aic_array (list): List of AIC values for each specification.</span>
+<span class="sd">        bic_array (list): List of BIC values for each specification.</span>
+<span class="sd">        hqic_array (list): List of HQIC values for each specification.</span>
+<span class="sd">        av_k_metric_array (list, optional): List of average Kullback-Leibler divergence metrics.</span>
+
+<span class="sd">    Methods:</span>
+<span class="sd">        save(filename):</span>
+<span class="sd">            Save the OLSResult object to a file using pickle.</span>
+
+<span class="sd">        load(filename):</span>
+<span class="sd">            Load an OLSResult object from a file using pickle.</span>
+
+<span class="sd">        summary():</span>
+<span class="sd">            Placeholder for a method to generate a summary of the OLS results.</span>
+
+<span class="sd">        plot(specs=None, ic=None, colormap=None, colorset=None, figsize=(12, 6)):</span>
+<span class="sd">            Generate plots of the OLS results.</span>
+
+<span class="sd">        compute_bma():</span>
+<span class="sd">            Perform Bayesian model averaging using BIC implied priors and return the results.</span>
+
+<span class="sd">        merge(result_obj, prefix):</span>
+<span class="sd">            Merge two OLSResult objects into one.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        y_name (str): The name of the dependent variable.</span>
+<span class="sd">        specs_names (pd.Series): Series containing specification names.</span>
+<span class="sd">        all_predictors (list of lists of str): List of predictor variable names for each specification.</span>
+<span class="sd">        controls (list of str): List of control variable names.</span>
+<span class="sd">        draws (int): Number of draws in the analysis.</span>
+<span class="sd">        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.</span>
+<span class="sd">        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.</span>
+<span class="sd">        all_b (list of lists): List of coefficient estimates for each specification and draw.</span>
+<span class="sd">        all_p (list of lists): List of p-values for each specification and draw.</span>
+<span class="sd">        summary_df (pd.DataFrame): DataFrame containing summary statistics of coefficient estimates.</span>
+<span class="sd">        summary_bma (pd.DataFrame, optional): DataFrame containing Bayesian model averaging results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+                 <span class="n">y</span><span class="p">,</span>
+                 <span class="n">specs</span><span class="p">,</span>
+                 <span class="n">all_predictors</span><span class="p">,</span>
+                 <span class="n">controls</span><span class="p">,</span>
+                 <span class="n">draws</span><span class="p">,</span>
+                 <span class="n">estimates</span><span class="p">,</span>
+                 <span class="n">all_b</span><span class="p">,</span>
+                 <span class="n">all_p</span><span class="p">,</span>
+                 <span class="n">p_values</span><span class="p">,</span>
+                 <span class="n">ll_array</span><span class="p">,</span>
+                 <span class="n">aic_array</span><span class="p">,</span>
+                 <span class="n">bic_array</span><span class="p">,</span>
+                 <span class="n">hqic_array</span><span class="p">,</span>
+                 <span class="n">av_k_metric_array</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">specs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_predictors</span> <span class="o">=</span> <span class="n">all_predictors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controls</span> <span class="o">=</span> <span class="n">controls</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">draws</span> <span class="o">=</span> <span class="n">draws</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">estimates</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">estimates</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">p_values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">p_values</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_b</span> <span class="o">=</span> <span class="n">all_b</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_p</span> <span class="o">=</span> <span class="n">all_p</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_summary</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;ll&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">ll_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;aic&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">aic_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;bic&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">bic_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;hqic&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">hqic_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;av_k_metric&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">av_k_metric_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;spec_name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span>
+
+<div class="viewcode-block" id="OLSResult.save">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.save">[docs]</a>
+    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the OLSResult object to a binary file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str): Name of the file to which the object will be saved.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">_pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OLSResult.load">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.load">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads an OLSResult object from a binary file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str): Name of the file from which the object will be loaded.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            OLSResult: Loaded OLSResult object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OLSResult.summary">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.summary">[docs]</a>
+    <span class="k">def</span> <span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a summary of the regression results (not implemented).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="OLSResult.plot">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.plot">[docs]</a>
+    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+             <span class="n">specs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">ic</span><span class="o">=</span><span class="s1">&#39;aic&#39;</span><span class="p">,</span>
+             <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">colorset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">6</span><span class="p">)):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Plots the regression results using specified options.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            specs (list, optional): List of list of specification names to include in the plot.</span>
+<span class="sd">            ic (str, optional): Information criterion to use for model selection (e.g., &#39;bic&#39;, &#39;aic&#39;).</span>
+<span class="sd">            colormap (str, optional): Colormap to use for the plot.</span>
+<span class="sd">            colorset (list, optional): List of colors to use for different specifications.</span>
+<span class="sd">            figsize (tuple, optional): Size of the figure (width, height) in inches.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            matplotlib.figure.Figure: Plot showing the regression results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">valid_ic</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;bic&#39;</span><span class="p">,</span> <span class="s1">&#39;aic&#39;</span><span class="p">,</span> <span class="s1">&#39;hqic&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">specs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;specs&#39; must be a list of lists.&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span> <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;All specifications in &#39;spec&#39; must be in the valid computed specifications.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">ic</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_ic</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;ic&#39; must be one of the following: </span><span class="si">{</span><span class="n">valid_ic</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">plot_results</span><span class="p">(</span><span class="n">results_object</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span>
+                            <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+                            <span class="n">ic</span><span class="o">=</span><span class="n">ic</span><span class="p">,</span>
+                            <span class="n">colormap</span><span class="o">=</span><span class="n">colormap</span><span class="p">,</span>
+                            <span class="n">colorset</span><span class="o">=</span><span class="n">colorset</span><span class="p">,</span>
+                            <span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compute_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes summary statistics based on coefficient estimates.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: DataFrame containing summary statistics.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimates</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;median&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;max&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;min&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ci_up&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="mf">0.975</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                     <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;nearest&#39;</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ci_down&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="mf">0.025</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                       <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;nearest&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span>
+
+<div class="viewcode-block" id="OLSResult.compute_bma">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.compute_bma">[docs]</a>
+    <span class="k">def</span> <span class="nf">compute_bma</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs Bayesian Model Averaging (BMA) using BIC implied priors.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: DataFrame containing BMA results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">likelihood_per_var</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">weigthed_coefs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">max_ll</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="o">.</span><span class="n">bic</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">shifted_ll</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="o">.</span><span class="n">bic</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="n">max_ll</span>
+        <span class="n">models_likelihood</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">shifted_ll</span><span class="p">)</span>
+        <span class="n">sum_likelihoods</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span><span class="n">models_likelihood</span><span class="p">)</span>
+        <span class="n">coefs</span> <span class="o">=</span> <span class="p">[[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_b</span><span class="p">]</span>
+        <span class="n">coefs</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">sl</span> <span class="ow">in</span> <span class="n">coefs</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sl</span><span class="p">]</span>
+        <span class="n">var_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">sl</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_predictors</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sl</span><span class="p">]</span>
+        <span class="n">coefs_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;coef&#39;</span><span class="p">:</span> <span class="n">coefs</span><span class="p">,</span> <span class="s1">&#39;var_name&#39;</span><span class="p">:</span> <span class="n">var_names</span><span class="p">})</span>
+        <span class="k">for</span> <span class="n">ele</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span><span class="p">:</span>
+                <span class="n">idx</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ele</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">)</span>
+            <span class="n">likelihood_per_var</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span><span class="n">models_likelihood</span><span class="p">[</span><span class="n">idx</span><span class="p">]))</span>
+            <span class="n">coefs</span> <span class="o">=</span> <span class="n">coefs_df</span><span class="p">[</span><span class="n">coefs_df</span><span class="o">.</span><span class="n">var_name</span> <span class="o">==</span> <span class="n">ele</span><span class="p">]</span><span class="o">.</span><span class="n">coef</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+            <span class="n">likelihood</span> <span class="o">=</span> <span class="n">models_likelihood</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">weigthed_coef</span> <span class="o">=</span> <span class="n">coefs</span> <span class="o">*</span> <span class="n">likelihood</span>
+            <span class="n">weigthed_coefs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span><span class="n">weigthed_coef</span><span class="p">))</span>
+        <span class="n">probs</span> <span class="o">=</span> <span class="n">likelihood_per_var</span> <span class="o">/</span> <span class="n">sum_likelihoods</span>
+        <span class="n">final_coefs</span> <span class="o">=</span> <span class="n">weigthed_coefs</span> <span class="o">/</span> <span class="n">sum_likelihoods</span>
+        <span class="n">summary_bma</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s1">&#39;control_var&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">,</span>
+            <span class="s1">&#39;probs&#39;</span><span class="p">:</span> <span class="n">probs</span><span class="p">,</span>
+            <span class="s1">&#39;average_coefs&#39;</span><span class="p">:</span> <span class="n">final_coefs</span>
+        <span class="p">})</span>
+        <span class="k">return</span> <span class="n">summary_bma</span></div>
+
+
+<div class="viewcode-block" id="OLSResult.merge">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.merge">[docs]</a>
+    <span class="k">def</span> <span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result_obj</span><span class="p">,</span> <span class="n">left_prefix</span><span class="p">,</span> <span class="n">right_prefix</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MergedResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Merges two OLSResult objects into one.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            result_obj (OLSResult): OLSResult object to be merged.</span>
+<span class="sd">            left_prefix (str): Prefix for the orignal result object.</span>
+<span class="sd">            right_prefix (str): Prefix fort the new result object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If the input object is not an instance of OLSResult.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result_obj</span><span class="p">,</span> <span class="n">OLSResult</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;result_obj&#39; must be an instance of OLSResult.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">left_prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">right_prefix</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;prefixes&#39; must be of type &#39;str.&#39;&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span> <span class="o">!=</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">y_name</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Dependent variable names must match.&#39;</span><span class="p">)</span>
+
+        <span class="n">specs_original</span> <span class="o">=</span> <span class="p">[</span><span class="nb">frozenset</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">left_prefix</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">specs_names</span><span class="p">]</span>
+        <span class="n">specs_new</span> <span class="o">=</span> <span class="p">[</span><span class="nb">frozenset</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">right_prefix</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">specs_names</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_name</span>
+        <span class="n">specs</span> <span class="o">=</span> <span class="n">specs_original</span> <span class="o">+</span> <span class="n">specs_new</span>
+        <span class="n">estimates</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">estimates</span><span class="p">,</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">estimates</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">p_values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">p_values</span><span class="p">,</span> <span class="n">result_obj</span><span class="o">.</span><span class="n">p_values</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">MergedResult</span><span class="p">(</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+            <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+            <span class="n">estimates</span><span class="o">=</span><span class="n">estimates</span><span class="p">,</span>
+            <span class="n">p_values</span><span class="o">=</span><span class="n">p_values</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OLSResult.save_to_csv">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSResult.save_to_csv">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_to_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function to save summary dataframe to a csv</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OLSRobust">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSRobust">[docs]</a>
+<span class="k">class</span> <span class="nc">OLSRobust</span><span class="p">(</span><span class="n">Protomodel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class for multi-variate regression using OLS</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : str</span>
+<span class="sd">     Name of the dependent variable.</span>
+<span class="sd">    x : str or list&lt;str&gt;</span>
+<span class="sd">     List of names of the independent variable(s).</span>
+<span class="sd">    data : DataFrame</span>
+<span class="sd">     DataFrame contaning all the data to be used in the model.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    self : Object</span>
+<span class="sd">        An object containing the key metrics.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the OLSRobust object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y : list&lt;str&gt;</span>
+<span class="sd">            Name of the dependent variable.</span>
+<span class="sd">        x : list&lt;str&gt;</span>
+<span class="sd">            List of names of the independent variable(s).</span>
+<span class="sd">        data : DataFrame</span>
+<span class="sd">            DataFrame containing all the data to be used in the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;y&#39; and &#39;x&#39; must be lists.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;data&#39; must be a pandas DataFrame.&quot;</span><span class="p">)</span>
+
+        <span class="n">all_vars</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">y</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">x</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Variable names in &#39;y&#39; and &#39;x&#39; must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Missing values found in data. Listwise deletion will be applied&#39;</span><span class="p">,</span>
+                          <span class="n">MissingValueWarning</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="OLSRobust.get_results">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSRobust.get_results">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_results</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the results of the OLS regression.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        results : OLSResult</span>
+<span class="sd">            Object containing the regression results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="OLSRobust.multiple_y">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSRobust.multiple_y">[docs]</a>
+    <span class="k">def</span> <span class="nf">multiple_y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Cumputes composite y based on multiple indicators provided.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_specs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y_composites</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Calculating Composite Ys&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">spec</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">track</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">all_subsets</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">),</span>
+                                     <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">space_size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">))),</span> <span class="n">total</span><span class="o">=</span><span class="n">space_size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">subset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+                <span class="n">subset</span> <span class="o">=</span> <span class="p">(</span><span class="n">subset</span> <span class="o">-</span> <span class="n">subset</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">/</span> <span class="n">subset</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">y_composites</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subset</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">y_specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OLSRobust.fit">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.OLSRobust.fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+            <span class="o">*</span><span class="p">,</span>
+            <span class="n">controls</span><span class="p">,</span>
+            <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+            <span class="n">kfold</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fit the OLS models into the specification space as well as over the bootstrapped samples.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        controls : list&lt;str&gt;</span>
+<span class="sd">            List containing all the names of the possible control variables of the model.</span>
+<span class="sd">        group : str</span>
+<span class="sd">            Grouping variable. If provided, a Fixed Effects model is estimated.</span>
+<span class="sd">        draws : int, optional</span>
+<span class="sd">            Number of draws for bootstrapping. Default is 500.</span>
+<span class="sd">        kfold : int, optional</span>
+<span class="sd">            Number of folds for k-fold cross-validation. Default is None.</span>
+<span class="sd">        shuffle : bool, optional</span>
+<span class="sd">            Whether to shuffle y variable to estimate joint significance test. Default is False.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self : Object</span>
+<span class="sd">            Object class OLSRobust containing the fitted estimators.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">controls</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;controls&#39; must be a list.&quot;</span><span class="p">)</span>
+
+        <span class="n">all_vars</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Variable names in &#39;controls&#39; must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">group</span><span class="p">,</span><span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">all_vars</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;group&#39; variable must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="n">sample_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">multiple_y</span><span class="p">()</span>
+            <span class="n">list_all_predictors</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_b_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_p_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_ll_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_aic_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_bic_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_hqic_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">list_av_k_metric_array</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">y_names</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">specs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">y</span><span class="p">,</span> <span class="n">y_name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_composites</span><span class="p">,</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">y_specs</span><span class="p">):</span>
+                <span class="n">space_n</span> <span class="o">=</span> <span class="n">space_size</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+                <span class="n">b_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+                <span class="n">p_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+                <span class="n">ll_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+                <span class="n">aic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+                <span class="n">bic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+                <span class="n">hqic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+                <span class="n">all_predictors</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">av_k_metric_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+
+                <span class="k">for</span> <span class="n">spec</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">track</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">all_subsets</span><span class="p">(</span><span class="n">controls</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">space_n</span><span class="p">)),</span> <span class="n">total</span><span class="o">=</span><span class="n">space_n</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+                    <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                        <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+
+                    <span class="n">comb</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">y</span><span class="p">,</span> <span class="n">comb</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="n">comb</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+
+                    <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                        <span class="n">comb</span> <span class="o">=</span> <span class="n">group_demean</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+                    <span class="p">(</span><span class="n">b_all</span><span class="p">,</span> <span class="n">p_all</span><span class="p">,</span> <span class="n">ll_i</span><span class="p">,</span>
+                     <span class="n">aic_i</span><span class="p">,</span> <span class="n">bic_i</span><span class="p">,</span> <span class="n">hqic_i</span><span class="p">,</span>
+                     <span class="n">av_k_metric_i</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_sample_OLS</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span>
+                                                            <span class="n">kfold</span><span class="o">=</span><span class="n">kfold</span><span class="p">)</span>
+                    <span class="n">b_list</span><span class="p">,</span> <span class="n">p_list</span> <span class="o">=</span> <span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">Parallel</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="p">(</span><span class="n">delayed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strap_OLS</span><span class="p">)</span>
+                     <span class="p">(</span><span class="n">comb</span><span class="p">,</span>
+                      <span class="n">group</span><span class="p">,</span>
+                      <span class="n">sample_size</span><span class="p">,</span>
+                      <span class="n">shuffle</span><span class="p">)</span>
+                     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>
+                                    <span class="n">draws</span><span class="p">))))</span>
+                    <span class="n">y_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y_name</span><span class="p">)</span>
+                    <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">y_name</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)))</span>
+                    <span class="n">all_predictors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;const&#39;</span><span class="p">])</span>
+                    <span class="n">b_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">b_list</span>
+                    <span class="n">p_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">p_list</span>
+                    <span class="n">ll_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ll_i</span>
+                    <span class="n">aic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">aic_i</span>
+                    <span class="n">bic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">bic_i</span>
+                    <span class="n">hqic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">hqic_i</span>
+                    <span class="n">av_k_metric_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">av_k_metric_i</span>
+
+                <span class="n">list_all_predictors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">all_predictors</span><span class="p">)</span>
+                <span class="n">list_b_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">b_array</span><span class="p">)</span>
+                <span class="n">list_p_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p_array</span><span class="p">)</span>
+                <span class="n">list_ll_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ll_array</span><span class="p">)</span>
+                <span class="n">list_aic_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aic_array</span><span class="p">)</span>
+                <span class="n">list_bic_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bic_array</span><span class="p">)</span>
+                <span class="n">list_hqic_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hqic_array</span><span class="p">)</span>
+                <span class="n">list_av_k_metric_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">av_k_metric_array</span><span class="p">)</span>
+
+            <span class="n">results</span> <span class="o">=</span> <span class="n">OLSResult</span><span class="p">(</span>
+                <span class="n">y</span><span class="o">=</span><span class="n">y_names</span><span class="p">,</span>
+                <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+                <span class="n">all_predictors</span><span class="o">=</span><span class="n">list_all_predictors</span><span class="p">,</span>
+                <span class="n">controls</span><span class="o">=</span><span class="n">controls</span><span class="p">,</span>
+                <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span>
+                <span class="n">all_b</span><span class="o">=</span><span class="n">b_all</span><span class="p">,</span>
+                <span class="n">all_p</span><span class="o">=</span><span class="n">p_all</span><span class="p">,</span>
+                <span class="n">estimates</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">list_b_array</span><span class="p">),</span>
+                <span class="n">p_values</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">list_p_array</span><span class="p">),</span>
+                <span class="n">ll_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span><span class="n">list_ll_array</span><span class="p">),</span>
+                <span class="n">aic_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span><span class="n">list_aic_array</span><span class="p">),</span>
+                <span class="n">bic_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span><span class="n">list_bic_array</span><span class="p">),</span>
+                <span class="n">hqic_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span><span class="n">list_hqic_array</span><span class="p">),</span>
+                <span class="n">av_k_metric_array</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span><span class="n">list_av_k_metric_array</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="n">results</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">space_n</span> <span class="o">=</span> <span class="n">space_size</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+            <span class="n">specs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">all_predictors</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">b_all_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">p_all_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">b_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+            <span class="n">p_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+            <span class="n">ll_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">aic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">bic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">hqic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">av_k_metric_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">spec</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">track</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">all_subsets</span><span class="p">(</span><span class="n">controls</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">space_n</span><span class="p">)),</span> <span class="n">total</span><span class="o">=</span><span class="n">space_n</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+                <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+
+                <span class="n">comb</span> <span class="o">=</span> <span class="n">comb</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="n">group_demean</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">b_all</span><span class="p">,</span> <span class="n">p_all</span><span class="p">,</span> <span class="n">ll_i</span><span class="p">,</span>
+                 <span class="n">aic_i</span><span class="p">,</span> <span class="n">bic_i</span><span class="p">,</span> <span class="n">hqic_i</span><span class="p">,</span>
+                 <span class="n">av_k_metric_i</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_sample_OLS</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span>
+                                                        <span class="n">kfold</span><span class="o">=</span><span class="n">kfold</span><span class="p">)</span>
+                <span class="n">b_list</span><span class="p">,</span> <span class="n">p_list</span> <span class="o">=</span> <span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">Parallel</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">delayed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strap_OLS</span><span class="p">)</span>
+                 <span class="p">(</span><span class="n">comb</span><span class="p">,</span>
+                  <span class="n">group</span><span class="p">,</span>
+                  <span class="n">sample_size</span><span class="p">,</span>
+                  <span class="n">shuffle</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>
+                                <span class="n">draws</span><span class="p">))))</span>
+
+                <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">spec</span><span class="p">))</span>
+                <span class="n">all_predictors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;const&#39;</span><span class="p">])</span>
+                <span class="n">b_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">b_list</span>
+                <span class="n">p_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">p_list</span>
+                <span class="n">ll_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ll_i</span>
+                <span class="n">aic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">aic_i</span>
+                <span class="n">bic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">bic_i</span>
+                <span class="n">hqic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">hqic_i</span>
+                <span class="n">av_k_metric_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">av_k_metric_i</span>
+                <span class="n">b_all_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">b_all</span><span class="p">)</span>
+                <span class="n">p_all_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p_all</span><span class="p">)</span>
+
+            <span class="n">results</span> <span class="o">=</span> <span class="n">OLSResult</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+                                <span class="n">all_predictors</span><span class="o">=</span><span class="n">all_predictors</span><span class="p">,</span>
+                                <span class="n">controls</span><span class="o">=</span><span class="n">controls</span><span class="p">,</span>
+                                <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span>
+                                <span class="n">all_b</span><span class="o">=</span><span class="n">b_all_list</span><span class="p">,</span>
+                                <span class="n">all_p</span><span class="o">=</span><span class="n">p_all_list</span><span class="p">,</span>
+                                <span class="n">estimates</span><span class="o">=</span><span class="n">b_array</span><span class="p">,</span>
+                                <span class="n">p_values</span><span class="o">=</span><span class="n">p_array</span><span class="p">,</span>
+                                <span class="n">ll_array</span><span class="o">=</span><span class="n">ll_array</span><span class="p">,</span>
+                                <span class="n">aic_array</span><span class="o">=</span><span class="n">aic_array</span><span class="p">,</span>
+                                <span class="n">bic_array</span><span class="o">=</span><span class="n">bic_array</span><span class="p">,</span>
+                                <span class="n">hqic_array</span><span class="o">=</span><span class="n">hqic_array</span><span class="p">,</span>
+                                <span class="n">av_k_metric_array</span><span class="o">=</span><span class="n">av_k_metric_array</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="n">results</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_test</span><span class="p">,</span> <span class="n">betas</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Predict the dependent variable based on the test data and coefficients.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        x_test : array-like</span>
+<span class="sd">            Test data for independent variables.</span>
+<span class="sd">        betas : array-like</span>
+<span class="sd">            Coefficients obtained from the regression.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        y_pred : array</span>
+<span class="sd">            Predicted values for the dependent variable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x_test</span><span class="p">,</span> <span class="n">betas</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_full_sample_OLS</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                         <span class="n">comb_var</span><span class="p">,</span>
+                         <span class="n">kfold</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Call stripped_ols() over the full data containing y, x, and controls.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        comb_var : Array</span>
+<span class="sd">            ND array-like object containing the data for y, x, and controls.</span>
+<span class="sd">        kfold : Boolean</span>
+<span class="sd">            Whether or not to calculate k-fold cross-validation.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        beta : float</span>
+<span class="sd">            Estimate for x.</span>
+<span class="sd">        p : float</span>
+<span class="sd">            P value for x.</span>
+<span class="sd">        AIC : float</span>
+<span class="sd">            Akaike information criteria value for the model.</span>
+<span class="sd">        BIC : float</span>
+<span class="sd">            Bayesian information criteria value for the model.</span>
+<span class="sd">        HQIC : float</span>
+<span class="sd">            Hannan-Quinn information criteria value for the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">comb_var</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">simple_ols</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+                         <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">av_k_metric</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">kfold</span><span class="p">:</span>
+            <span class="n">k_fold</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span><span class="n">kfold</span><span class="p">)</span>
+            <span class="n">metrics</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">test</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">k_fold</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)):</span>
+                <span class="n">out_k</span> <span class="o">=</span> <span class="n">simple_ols</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train</span><span class="p">],</span>
+                                   <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train</span><span class="p">])</span>
+                <span class="n">y_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">],</span> <span class="n">out_k</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">])</span>
+                <span class="n">y_true</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">]</span>
+                <span class="n">k_rmse</span> <span class="o">=</span> <span class="n">root_mean_squared_error</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+                <span class="n">metrics</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k_rmse</span><span class="p">)</span>
+            <span class="n">av_k_metric</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ll&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;aic&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;bic&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;hqic&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">av_k_metric</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_strap_OLS</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                   <span class="n">comb_var</span><span class="p">,</span>
+                   <span class="n">group</span><span class="p">,</span>
+                   <span class="n">sample_size</span><span class="p">,</span>
+                   <span class="n">shuffle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Call stripped_ols() over a random sample of the data containing y, x, and controls.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        comb_var : Array</span>
+<span class="sd">            ND array-like object containing the data for y, x, and controls.</span>
+<span class="sd">        group : str</span>
+<span class="sd">            Grouping variable. If provided, sampling is performed over the group variable.</span>
+<span class="sd">        sample_size : int</span>
+<span class="sd">            Sample size to use in the bootstrap.</span>
+<span class="sd">        shuffle : bool</span>
+<span class="sd">            Whether to shuffle y var to estimate joint significant test.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        beta : float</span>
+<span class="sd">            Estimate for x.</span>
+<span class="sd">        p : float</span>
+<span class="sd">            P value for x.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">temp_data</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">shuffle</span><span class="p">:</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">idx_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx_y</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">temp_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">temp_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">samp_df</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">sample_size</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="c1"># @TODO generalize the frac to the function call</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">samp_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">samp_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">samp_df</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">stripped_ols</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">]</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">temp_data</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">(),</span> <span class="n">sample_size</span><span class="p">)</span>
+            <span class="n">select</span> <span class="o">=</span> <span class="n">temp_data</span><span class="p">[</span><span class="n">temp_data</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">idx</span><span class="p">)]</span>
+            <span class="n">no_singleton</span> <span class="o">=</span> <span class="n">select</span><span class="p">[</span><span class="n">select</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">group</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s1">&#39;size&#39;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">no_singleton</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">group</span><span class="p">])</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">no_singleton</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">stripped_ols</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">]</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="LRobust">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.LRobust">[docs]</a>
+<span class="k">class</span> <span class="nc">LRobust</span><span class="p">(</span><span class="n">Protomodel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A class to perform logistic regression analysis, underlying lr package = statsmodel</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : array-like</span>
+<span class="sd">        Dependent variable values.</span>
+<span class="sd">    x : array-like</span>
+<span class="sd">        Independent variable values. The matrix should be shaped as</span>
+<span class="sd">        (number of observations, number of independent variables).</span>
+<span class="sd">    data : DataFrame</span>
+<span class="sd">        A pandas DataFrame containing the variables in the model.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y : array-like</span>
+<span class="sd">        Dependent variable values.</span>
+<span class="sd">    x : array-like</span>
+<span class="sd">        Independent variable values.</span>
+<span class="sd">    data : DataFrame</span>
+<span class="sd">        A pandas DataFrame containing the variables in the model.</span>
+<span class="sd">    results : dict</span>
+<span class="sd">        A dictionary containing regression coefficients (&#39;b&#39;) and corresponding</span>
+<span class="sd">        p-values (&#39;p&#39;) for each independent variable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="s1">&#39;LR_sm&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the LRobust object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y : str</span>
+<span class="sd">            Name of the dependent variable.</span>
+<span class="sd">        x : str or list&lt;str&gt;</span>
+<span class="sd">            List of names of the independent variable(s).</span>
+<span class="sd">        data : DataFrame</span>
+<span class="sd">            DataFrame containing all the data to be used in the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;y&#39; and &#39;x&#39; must be lists.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;data&#39; must be a pandas DataFrame.&quot;</span><span class="p">)</span>
+
+        <span class="n">all_vars</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">y</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">x</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Variable names in &#39;y&#39; and &#39;x&#39; must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Missing values found in data. Listwise deletion will be applied&#39;</span><span class="p">,</span>
+                          <span class="n">MissingValueWarning</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span> <span class="o">=</span> <span class="n">model_name</span>
+
+<div class="viewcode-block" id="LRobust.get_results">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.LRobust.get_results">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_results</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the results of the OLS regression.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        results : OLSResult</span>
+<span class="sd">            Object containing the regression results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="LRobust.multiple_y">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.LRobust.multiple_y">[docs]</a>
+    <span class="k">def</span> <span class="nf">multiple_y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Not implemented yet&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_full_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">comb_var</span><span class="p">,</span> <span class="n">kfold</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Call logistic_regression_sm_stripped() over the full data containing y, x, and controls.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        comb_var : Array</span>
+<span class="sd">            ND array-like object containing the data for y, x, and controls.</span>
+<span class="sd">        kfold : Boolean</span>
+<span class="sd">            Whether or not to calculate k-fold cross-validation.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        beta : float</span>
+<span class="sd">            Estimate for x.</span>
+<span class="sd">        p : float</span>
+<span class="sd">            P value for x.</span>
+<span class="sd">        AIC : float</span>
+<span class="sd">            Akaike information criteria value for the model.</span>
+<span class="sd">        BIC : float</span>
+<span class="sd">            Bayesian information criteria value for the model.</span>
+<span class="sd">        HQIC : float</span>
+<span class="sd">            Hannan-Quinn information criteria value for the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">comb_var</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="n">logistic_regression_sm</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">av_k_metric</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">kfold</span><span class="p">:</span>
+            <span class="n">k_fold</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span><span class="n">kfold</span><span class="p">)</span>
+            <span class="n">metrics</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">test</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">k_fold</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)):</span>
+
+                <span class="n">out_k</span> <span class="o">=</span> <span class="n">logistic_regression_sm</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train</span><span class="p">])</span>
+                <span class="n">y_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict_LR</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">],</span> <span class="n">out_k</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">])</span>
+                <span class="n">y_true</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test</span><span class="p">]</span>
+                <span class="n">k_rmse</span> <span class="o">=</span> <span class="n">root_mean_squared_error</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+                <span class="n">metrics</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k_rmse</span><span class="p">)</span>
+            <span class="n">av_k_metric</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;ll&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;aic&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;bic&#39;</span><span class="p">],</span>
+                <span class="n">out</span><span class="p">[</span><span class="s1">&#39;hqic&#39;</span><span class="p">],</span>
+                <span class="n">av_k_metric</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_predict_LR</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_test</span><span class="p">,</span> <span class="n">betas</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Predict the dependent variable using the estimated coefficients.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x_test</span> <span class="o">=</span> <span class="n">add_constant</span><span class="p">(</span><span class="n">x_test</span><span class="p">,</span> <span class="n">prepend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x_test</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">betas</span><span class="p">)))</span>
+<div class="viewcode-block" id="LRobust.fit">
+<a class="viewcode-back" href="../../robustipy.html#robustipy.models.LRobust.fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+            <span class="o">*</span><span class="p">,</span>
+            <span class="n">controls</span><span class="p">,</span>
+            <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+            <span class="n">sample_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">kfold</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">controls</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;&#39;controls&#39; must be a list.&quot;</span><span class="p">)</span>
+
+        <span class="n">all_vars</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">var</span> <span class="ow">in</span> <span class="n">all_vars</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Variable names in &#39;controls&#39; must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">all_vars</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;group&#39; variable must exist in the provided DataFrame &#39;data&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sample_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sample_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Not implemented yet for logistic regression&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">space_n</span> <span class="o">=</span> <span class="n">space_size</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+            <span class="n">specs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">all_predictors</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">b_all_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">p_all_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">b_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+            <span class="n">p_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">,</span> <span class="n">draws</span><span class="p">])</span>
+            <span class="n">ll_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">aic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">bic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">hqic_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+            <span class="n">av_k_metric_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">space_n</span><span class="p">])</span>
+
+            <span class="k">for</span> <span class="n">spec</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">track</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">all_subsets</span><span class="p">(</span><span class="n">controls</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">space_n</span><span class="p">)),</span> <span class="n">total</span><span class="o">=</span><span class="n">space_n</span><span class="p">):</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+
+                <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="p">[</span><span class="n">group</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)]</span>
+
+                <span class="n">comb</span> <span class="o">=</span> <span class="n">comb</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="n">group</span><span class="p">:</span>
+                    <span class="n">comb</span> <span class="o">=</span> <span class="n">group_demean</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">b_all</span><span class="p">,</span> <span class="n">p_all</span><span class="p">,</span> <span class="n">ll_i</span><span class="p">,</span>
+                 <span class="n">aic_i</span><span class="p">,</span> <span class="n">bic_i</span><span class="p">,</span> <span class="n">hqic_i</span><span class="p">,</span>
+                 <span class="n">av_k_metric_i</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_sample</span><span class="p">(</span><span class="n">comb</span><span class="p">,</span> <span class="n">kfold</span><span class="o">=</span><span class="n">kfold</span><span class="p">)</span>
+
+                <span class="n">b_list</span><span class="p">,</span> <span class="n">p_list</span> <span class="o">=</span> <span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">Parallel</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">delayed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_strap_regression</span><span class="p">)</span>
+                 <span class="p">(</span><span class="n">comb</span><span class="p">,</span>
+                  <span class="n">group</span><span class="p">,</span>
+                  <span class="n">sample_size</span><span class="p">,</span>
+                  <span class="n">shuffle</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">draws</span><span class="p">))))</span>
+
+                <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">spec</span><span class="p">))</span>
+                <span class="n">all_predictors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;const&#39;</span><span class="p">])</span>
+                <span class="n">b_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">b_list</span>
+                <span class="n">p_array</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">p_list</span>
+                <span class="n">ll_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ll_i</span>
+                <span class="n">aic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">aic_i</span>
+                <span class="n">bic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">bic_i</span>
+                <span class="n">hqic_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">hqic_i</span>
+                <span class="n">av_k_metric_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">av_k_metric_i</span>
+                <span class="n">b_all_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">b_all</span><span class="p">)</span>
+                <span class="n">p_all_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p_all</span><span class="p">)</span>
+
+            <span class="n">results</span> <span class="o">=</span> <span class="n">OLSResult</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                       <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+                                       <span class="n">all_predictors</span><span class="o">=</span><span class="n">all_predictors</span><span class="p">,</span>
+                                       <span class="n">controls</span><span class="o">=</span><span class="n">controls</span><span class="p">,</span>
+                                       <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span>
+                                       <span class="n">all_b</span><span class="o">=</span><span class="n">b_all_list</span><span class="p">,</span>
+                                       <span class="n">all_p</span><span class="o">=</span><span class="n">p_all_list</span><span class="p">,</span>
+                                       <span class="n">estimates</span><span class="o">=</span><span class="n">b_array</span><span class="p">,</span>
+                                       <span class="n">p_values</span><span class="o">=</span><span class="n">p_array</span><span class="p">,</span>
+                                       <span class="n">ll_array</span><span class="o">=</span><span class="n">ll_array</span><span class="p">,</span>
+                                       <span class="n">aic_array</span><span class="o">=</span><span class="n">aic_array</span><span class="p">,</span>
+                                       <span class="n">bic_array</span><span class="o">=</span><span class="n">bic_array</span><span class="p">,</span>
+                                       <span class="n">hqic_array</span><span class="o">=</span><span class="n">hqic_array</span><span class="p">,</span>
+                                       <span class="n">av_k_metric_array</span><span class="o">=</span><span class="n">av_k_metric_array</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="n">results</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_strap_regression</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                          <span class="n">comb_var</span><span class="p">,</span>
+                          <span class="n">group</span><span class="p">,</span>
+                          <span class="n">sample_size</span><span class="p">,</span>
+                          <span class="n">shuffle</span><span class="p">):</span>
+        <span class="n">temp_data</span> <span class="o">=</span> <span class="n">comb_var</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">shuffle</span><span class="p">:</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">idx_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx_y</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">temp_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">temp_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">samp_df</span> <span class="o">=</span> <span class="n">temp_data</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">sample_size</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">samp_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">samp_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">samp_df</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">logistic_regression_sm_stripped</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">temp_data</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">(),</span> <span class="n">sample_size</span><span class="p">)</span>
+            <span class="n">select</span> <span class="o">=</span> <span class="n">temp_data</span><span class="p">[</span><span class="n">temp_data</span><span class="p">[</span><span class="n">group</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">idx</span><span class="p">)]</span>
+            <span class="n">no_singleton</span> <span class="o">=</span> <span class="n">select</span><span class="p">[</span><span class="n">select</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">group</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s1">&#39;size&#39;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">no_singleton</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">group</span><span class="p">])</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">no_singleton</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">no_singleton</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">logistic_regression_sm</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Daniel Valdenegro Ibarra, Charles Rahal, and Jiani Yan.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
