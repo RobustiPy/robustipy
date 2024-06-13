@@ -41,6 +41,10 @@ A working usage example script -- `replication_example.py` -- is provided at the
 
 We have a shiny website made with `jekkyl-theme-minimal` that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon!
 
+## Docs
+
+You can find documentation of the library at ./src/docs or online [here](https://robustipy.readthedocs.io/en/latest/).
+
 ## Contributing and Code of Conduct
 
 Please kindly see our [guide for contributors](https://github.com/RobustiPy/robustipy/blob/main/contributing.md) file as well as our [code of conduct](https://github.com/RobustiPy/robustipy/blob/main/CODE-OF-CONDUCT.md). If you would like to become a formal project maintainer, please simply contact the team to discuss!
