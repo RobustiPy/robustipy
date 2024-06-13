@@ -150,3 +150,6 @@ etc/
 
 /data/input/CleanData_LASpending.dta
 /full_replications/
+
+
+/src/docs/_build/
