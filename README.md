@@ -5,7 +5,7 @@
 [![Generic badge](https://img.shields.io/badge/R-brightgreen.svg)](https://shields.io/)
 [![Generic badge](https://img.shields.io/badge/License-GNU3.0-purple.svg)](https://shields.io/)
 
-Welcome to the home of RobustiPy, a library for the creation of a more robust and stable model space. Kindly note: **this project is in early stages of development and its functionally and API might change without notice**!
+Welcome to the home of RobustiPy, a library for the creation of a more robust and stable model space. RobustiPy is an efficient multiversal library with model selection, averaging, joint-inference, resampling and out-of-sample analysis. It analyses various output spaces, in addition to the control variable space (e.g. multiple dependent variables, estimands of interest, etc). Kindly note: **this project is in early stages of development and its functionally and API might change without notice**!
 
 ## Installation
 
@@ -33,7 +33,7 @@ Where `y` is a list of variables names used to create your dependent variable, a
 
 ## Example
 
-A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
+A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples). Those examples show how RobustiPy goes beyond the simple variation of `controls'.
 
 ![Union dataset example](./figures/union_example/union_curve.svg)
 
