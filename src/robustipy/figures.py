@@ -337,6 +337,11 @@ def plot_kfolds(results_object,
                  color=colors[0],
                  bins=30, stat='density',
                  discrete=True)
+    
+    min_lim = min(results_object.summary_df['av_k_metric']) - min(results_object.summary_df['av_k_metric']) *.05
+    max_lim = max(results_object.summary_df['av_k_metric']) + max(results_object.summary_df['av_k_metric']) *.05
+    ax.set_xlim(min_lim, max_lim)
+    
     ax.yaxis.set_label_position("right")
     ax.grid(linestyle='--',
             color='k',
