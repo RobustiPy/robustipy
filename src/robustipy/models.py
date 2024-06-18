@@ -463,7 +463,7 @@ class OLSRobust(Protomodel):
             controls,
             group=None,
             draws=500,
-            kfold=None,
+            kfold=5,
             shuffle=False):
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
@@ -497,7 +497,7 @@ class OLSRobust(Protomodel):
             if not isinstance(group,str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
             
-        if kfold is not None and kfold < 2:
+        if kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
 
         sample_size = self.data.shape[0]
