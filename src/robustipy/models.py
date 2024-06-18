@@ -426,6 +426,9 @@ class OLSRobust(Protomodel):
         self.x = x
         self.data = data
         self.results = None
+        self.parameters = {}
+        self.parameters['y'] = self.y
+        self.parameters['x'] = self.x 
 
     def get_results(self):
         """
@@ -452,6 +455,8 @@ class OLSRobust(Protomodel):
                 subset = (subset - subset.mean()) / subset.std()
                 self.y_composites.append(subset.mean(axis=1))
                 self.y_specs.append(spec)
+                self.parameters['y_specs'] = self.y_specs
+                self.parameters['y_composites'] = self.y_composites
 
     def fit(self,
             *,
