@@ -246,20 +246,23 @@ class OLSResult(Protoresult):
         """
         # Helper function to print section headers
         def print_separator(title=None):
-            print('------------------------------------------------------')
+
             if title:
+                print('======================================================')
                 print(title)
+                print('======================================================')
+
+            else:
                 print('------------------------------------------------------')
 
         # Display basic model information
-        print_separator("Model Summary")
+        print_separator("1. Model Summary")
         print(f"Model: {self.model_name}")
         print(f"Dependent variable: {self.y_name}")
         print(f"Independent variable: {self.x_name}")
         print(f"Number of possible controls: {len(self.controls)}")
         print(f"Number of draws: {self.draws}")
         print(f"Number of specifications: {len(self.specs_names)}")
-        print_separator()
 
         # Prepare the DataFrame for model metrics
         df_model_result = pd.DataFrame({
@@ -270,13 +273,30 @@ class OLSResult(Protoresult):
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
 
         # Print model robustness metrics
-        print_separator("Model Robustness Metrics")
+        print_separator("2.Model Robustness Metrics")
+        print('2.1 Inference Metrics')
+        print_separator()
+
         print(f"Mean beta: {df_model_result['betas'].mean():.2f}")
         print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
         print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
         print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
-        print(f"Negative portion of beta: {(1 - df_model_result['positive_beta']).mean():.2f}")
+
+        print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
+        print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
+        print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print_separator()
+        print('2.2 Out-Of-Sample Metrics')
+        print_separator()
+        oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
+        print(f'Max: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
+        oos_min_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmin(),]
+        print(f'Min: {oos_min_row["av_k_metric"]}, Specs: {list(oos_min_row["spec_name"])} ')
+        print(f"Mean: {self.summary_df['av_k_metric'].mean():.2f}")
+        print(f"Median: {self.summary_df['av_k_metric'].median():.2f}")
+
+
+
 
 
     def plot(self,
