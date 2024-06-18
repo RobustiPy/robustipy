@@ -499,6 +499,9 @@ class OLSRobust(Protomodel):
             
         if kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
+        
+        if draws < 1:
+            raise ValueError(f"Draws value mustbe 1 or above, current value is {draws}.")
 
         sample_size = self.data.shape[0]
 
