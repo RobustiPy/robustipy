@@ -286,7 +286,7 @@ class OLSResult(Protoresult):
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print_separator()
-        print('2.2 Out-Of-Sample Metrics')
+        print('2.2 Averaged Out-Of-Sample Metrics (Kullback-Leibler Divergence)')
         print_separator()
         oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
         print(f'Max: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
