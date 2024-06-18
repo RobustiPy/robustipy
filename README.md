@@ -17,17 +17,17 @@ $$
 
 In which we attempt to model a dependent variable $y$ using some kind of function $f()$, some predictor/s $x$ and some covariates $z$, plus some random error $\epsilon$. For all of these elements it is possible to have different versions. Lets assume $y$, $x$ and $z$ are imperfect latent variables or collection of latent variables. Researchers can come up with reasonable operationalisations of $y$, $x$ and $z$, running the analysis ussually in just a few or a single combination of them. Ideally, we should take all those operationalisations and store them in sets:
 
-$$
+```math
 Y = \{y_{1}, y_{2}, \dots, y_{n}\} \\
 X = \{x_{1}, x_{2}, \dots, x_{n}\} \\
 Z = \{z_{1}, z_{2}, \dots, z_{n}\}
-$$
+```
 
 `RobustiPy` will then:
 
-$$
+```math
 \Pi = \left\{ \overline{S_i} \mid S_i \in \mathcal{P}(Y) \text{ and } S_i \neq \emptyset \right\} \times X \times \mathcal{P}(Z)
-$$
+```
 
 In other words, it will create a set contaning the aritmentic mean of the elements of the powerset $\mathcal{P}$ (all possible combination of any lenght) of $Y$, the set $X$ and the powerset of $Z$, to then produce the cartesian product of these sets, creating the full set of possible model specifications $\Pi$. `RobustiPy` will then take this specifications, fit them in the provided data, and deliver the coeficients for each version of the predictor $x$ in the set $X$.
 
