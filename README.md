@@ -5,17 +5,7 @@
 [![Generic badge](https://img.shields.io/badge/R-brightgreen.svg)](https://shields.io/)
 [![Generic badge](https://img.shields.io/badge/License-GNU3.0-purple.svg)](https://shields.io/)
 
-Welcome to the home of `RobustiPy`, a library for the creation of a more robust and stable model space. Kindly note: **this project is in early stages of development and its functionally and API might change without notice**!
-
-`RobustiPy` performs Multiversal/Specification Curve Analysis. Multiversal/Specification Curve Analysis attempts to compute most or all reasonable specification of a statistical model, understanding a specification as a single version of a model, with is particular choice of covariates, hyperparamters, data cleaning decisions, etc.
-
-More formally, lets assume we have model of the form:
-
-$$
-Y = F(X, \textbf{Z}) + \epsilon .
-$$
-
-In which we attempt to model a dependent variable $Y$ using some kind of function $F()$, some predictor/s $X$ and some covariates $Z$, plus some random error $\epsilon$. For all of this elements it is possible to have different versions. Lets assume $Y$, $X$ and $Z$ are imperfect latent variable/s of an 
+Welcome to the home of RobustiPy, a library for the creation of a more robust and stable model space. Kindly note: **this project is in early stages of development and its functionally and API might change without notice**!
 
 ## Installation
 
@@ -43,13 +33,17 @@ Where `y` is a list of variables names used to create your dependent variable, a
 
 ## Example
 
-A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
+A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples). Those examples show how RobustiPy goes beyond the simple variation of `controls'.
 
 ![Union dataset example](./figures/union_example/union_curve.svg)
 
 ## Website
 
 We have a shiny website made with `jekkyl-theme-minimal` that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon!
+
+## Docs
+
+You can find documentation of the library at ./src/docs or online [here](https://robustipy.readthedocs.io/en/latest/).
 
 ## Contributing and Code of Conduct
 
