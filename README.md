@@ -5,17 +5,17 @@
 [![Generic badge](https://img.shields.io/badge/R-brightgreen.svg)](https://shields.io/)
 [![Generic badge](https://img.shields.io/badge/License-GNU3.0-purple.svg)](https://shields.io/)
 
-Welcome to the home of `RobustiPy`, a library for the creation of a more robust and stable model space. Kindly note: **this project is in early stages of development and its functionally and API might change without notice**!
+Welcome to the home of `RobustiPy`, a library for the creation of a more robust and stable model space. Kindly note: **this project is in the early stages of development. Its functionally and API might change without notice**!
 
-`RobustiPy` performs Multiversal/Specification Curve Analysis. Multiversal/Specification Curve Analysis attempts to compute most or all reasonable specifications of a statistical model, understanding a specification as a single version of a model, with is particular choice of covariates, hyperparameters, data cleaning decisions, etc.
+`RobustiPy` performs Multiversal/Specification Curve Analysis. Multiversal/Specification Curve Analysis attempts to compute most or all reasonable specifications of a statistical model, understanding a specification as a single attempt to estimate an estimand of interest, whether through a particular choice of covariates, hyperparameters, data cleaning decisions, and so forth.
 
-More formally, lets assume we have model of the form:
+More formally, lets assume we have a general model of the form:
 
 $$
 y = f(x, \textbf{z}) + \epsilon .
 $$
 
-In which we attempt to model a dependent variable $y$ using some kind of function $f()$, some predictor/s $x$ and some covariates $z$, plus some random error $\epsilon$. For all of these elements it is possible to have different versions. Lets assume $y$, $x$ and $z$ are imperfect latent variables or collection of latent variables. Researchers can come up with reasonable operationalisations of $y$, $x$ and $z$, running the analysis usually in just a few or a single combination of them. Ideally, we should take all those operationalisations and store them in sets:
+We are essentially attempting to model a dependent variable $y$ using some kind of function $f()$, some predictor(s) $x$, some covariates $z$, and random error $\epsilon$. For all of these elements, different estimates of the coefficient of interest are produced. Lets assume $y$, $x$ and $z$ are imperfect latent variables or a collection of latent variables. Researchers can come up with _reasonable_ operationalisations of $y$, $x$ and $z$, running the analysis most usually with one or a small number of combinations of them. Ideally -- in an age of vast computational resources -- we should take all such _reasonable_ operationalisations, and store them in sets:
 
 ```math
 Y = \{y_{1}, y_{2}, \dots, y_{n}\}
@@ -33,12 +33,11 @@ Z = \{z_{1}, z_{2}, \dots, z_{n}\}
 \Pi = \left\{ \overline{S_i} \mid S_i \in \mathcal{P}(Y) \text{ and } S_i \neq \emptyset \right\} \times X \times \mathcal{P}(Z)
 ```
 
-In other words, it will create a set contaning the aritmentic mean of the elements of the powerset $\mathcal{P}$ (all possible combination of any lenght) of $Y$, the set $X$ and the powerset of $Z$, to then produce the cartesian product of these sets, creating the full set of possible model specifications $\Pi$. `RobustiPy` will then take these specifications, fit them in the provided data, and deliver the coeficients for each version of the predictor $x$ in the set $X$.
-
+In words, it creates a set contaning the aritmentic mean of the elements of the powerset $\mathcal{P}$ (all possible combination of any length) of $Y$, the set $X$ and the powerset of $Z$ to then produce the Cartesian product of these sets, creating the full set of possible model specifications $\Pi$. `RobustiPy` then takes these specifications, fits them against observable (tabular) data, and produces coefficients and relevant metrics for each version of the predictor $x$ in the set $X$.
 
 ## Installation
 
-To install directly (in `Python`) from GitHub run:
+To install directly (in `Python`) from GitHub, run:
 
 ```
 git clone https://github.com/RobustiPy/robustipy.git
@@ -48,7 +47,7 @@ pip install .
 
 ## Usage
 
-In a Python script (or Jupyter Notebook), import the OLSRobust class running:
+In a Python script (or Jupyter Notebook), import the `OLSRobust` class by running:
 
 ```python
 from robustipy.models import OLSRobust
@@ -58,7 +57,8 @@ model_robust.fit(controls=c,
                  sample_size=100)
 model_results = model_robust.get_results()
 ```
-Where `y` is a list of variables names used to create your dependent variable, and `x` is a list of variables names used as predictors.
+
+Where `y` is a list of variable names used to create your dependent variable, and `x` is a list of variable names used as predictors.
 
 ## Example
 
@@ -68,7 +68,7 @@ A working usage example script -- `replication_example.py` -- is provided at the
 
 ## Website
 
-We have a shiny website made with `jekkyl-theme-minimal` that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon!
+We have a website made with [jekkyl-theme-minimal](https://github.com/pages-themes/minimal) that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon!
 
 ## Contributing and Code of Conduct
 
@@ -76,7 +76,7 @@ Please kindly see our [guide for contributors](https://github.com/RobustiPy/robu
 
 ## License
 
-This work is free. You can redistribute it and/or modify it under the terms of the GNU 3.0 license. The two datasets listed above come with their own licensing conditions, and should be treatedly accordingly.
+This work is free. You can redistribute it and/or modify it under the terms of the GNU GPL 3.0 license. The two dataset which is bundled with the library comes with it's own licensing conditions, and should be treatedly accordingly.
 
 ## Acknowledgements
 We are grateful to the extensive comments made by various academic communities over the course of our thinking about this work, not least the members of the [ESRC Centre for Care](https://centreforcare.ac.uk/) and the [Leverhulme Centre for Demographic Science](https://demography.ox.ac.uk/).
