@@ -46,6 +46,18 @@ def all_subsets(ss):
                       range(0, len(ss) + 1)))
 
 
+def make_aic(ll, n):
+    return (-2.0 * ll) + (2 * n)
+
+
+def make_bic(ll, n, k):
+    return (-2.0 * ll) + (k * np.log(n))
+
+
+def make_hqic(ll, n, k):
+    return -2 * ll + 2 * k * np.log(np.log(n))
+
+
 def logistic_regression_sm(y, x) -> dict:
     """
     Perform logistic regression based on statsmodels.Logit.
@@ -68,13 +80,14 @@ def logistic_regression_sm(y, x) -> dict:
     n = result.nobs
     k = result.df_model + 1
     ll = result.llf
-    hqic = -2 * ll + 2 * k * np.log(np.log(n))
     return {'b': [[x] for x in result.params.values],
             'p': [[x] for x in result.pvalues.values],
             'll': ll,
-            'aic': result.aic,
-            'bic': result.bic,
-            'hqic': hqic}
+            'aic': make_aic(ll, n),
+            'bic': make_aic(ll, n, k),
+            'hqic': make_hqic(ll, n, k)
+            }
+
 
 def logistic_regression_sm_stripped(y, x) -> dict:
     """
@@ -116,7 +129,7 @@ def simple_ols(y, x) -> dict:
     dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
           AIC, BIC, and HQIC.
     """
-    x['const'] = 1  # constant
+    x['const'] = 1
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
@@ -130,7 +143,7 @@ def simple_ols(y, x) -> dict:
     nobs = y.shape[0]  # number of observations
     ncoef = x.shape[1]  # number of coef.
     df_e = nobs - ncoef  # degrees of freedom, error
-    #df_r = ncoef - 1  # degrees of freedom, regression
+    # df_r = ncoef - 1  # degrees of freedom, regression
     e = y - np.dot(x, b)  # residuals
     sse = np.dot(e.T, e) / df_e  # SSE
     se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
@@ -140,15 +153,13 @@ def simple_ols(y, x) -> dict:
     #R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
           * np.log(abs(np.dot(e.T, e) / nobs)))
-    aic = (-2.0 * ll) + (2 * ncoef)
-    bic = (-2.0 * ll) + (ncoef * np.log(nobs))
-    hqic = (-2.0 * ll) + 2 * np.log(np.log(nobs)) * ncoef
     return {'b': b,
             'p': p,
             'll': ll,
-            'aic': aic,
-            'bic': bic,
-            'hqic': hqic}
+            'aic': make_aic(ll, nobs),
+            'bic': make_bic(ll, nobs, ncoef),
+            'hqic': make_hqic(ll, nobs, ncoef)
+            }
 
 
 def group_demean(x, group=None):
