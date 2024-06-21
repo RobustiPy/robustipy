@@ -199,7 +199,8 @@ class OLSResult(Protoresult):
                  hqic_array,
                  av_k_rmse_array=None,
                  av_k_r2_array=None,
-                 av_k_ce_array=None):
+                 av_k_ce_array=None,
+                 model_name):
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -667,7 +668,8 @@ class OLSRobust(Protomodel):
                 hqic_array=np.hstack(list_hqic_array),
                 av_k_rmse_array=np.hstack(list_av_k_rmse_array),
                 av_k_r2_array=np.hstack(list_av_k_r2_array),
-                av_k_ce_array=np.hstack(list_av_k_ce_array)
+                av_k_ce_array=np.hstack(list_av_k_ce_array),
+                model_name=self.model_name
             )
 
             self.results = results
@@ -743,7 +745,8 @@ class OLSRobust(Protomodel):
                                 hqic_array=hqic_array,
                                 av_k_rmse_array=av_k_rmse_array,
                                 av_k_r2_array=av_k_r2_array,
-                                av_k_ce_array=av_k_ce_array)
+                                av_k_ce_array=av_k_ce_array,
+                                model_name=self.model_name)
 
             self.results = results
 
@@ -1122,7 +1125,8 @@ class LRobust(Protomodel):
                                        hqic_array=hqic_array,
                                        av_k_rmse_array=av_k_rmse_array,
                                        av_k_r2_array=av_k_r2_array,
-                                       av_k_ce_array=av_k_ce_array
+                                       av_k_ce_array=av_k_ce_array,
+                                       model_name=self.model_name
                                        )
             self.results = results
 
