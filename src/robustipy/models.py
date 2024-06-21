@@ -197,10 +197,9 @@ class OLSResult(Protoresult):
                  aic_array,
                  bic_array,
                  hqic_array,
-                 av_k_rmse_array=None,
-                 av_k_r2_array=None,
-                 av_k_ce_array=None,
-                 model_name):
+                 av_k_metric_array=None,
+                 model_name,
+                 name_av_k_metric=None):
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -218,12 +217,11 @@ class OLSResult(Protoresult):
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
-        self.summary_df['av_k_rmse'] = pd.Series(av_k_rmse_array)
-        self.summary_df['av_k_r2'] = pd.Series(av_k_r2_array)
-        self.summary_df['av_k_cross_entropy'] = pd.Series(av_k_ce_array)
+        self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
         self.model_name = model_name
+        self.name_av_k_metric = name_av_k_metric
 
     def save(self, filename):
         """
@@ -532,7 +530,8 @@ class OLSRobust(Protomodel):
             group=None,
             draws=500,
             kfold=5,
-            shuffle=False):
+            shuffle=False,
+            oos_metric='r-squared'):
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
@@ -566,12 +565,18 @@ class OLSRobust(Protomodel):
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
             
         if kfold < 2:
-            raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
+            raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
         
         if draws < 1:
-            raise ValueError(f"Draws value mustbe 1 or above, current value is {draws}.")
+            raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
+        
+        valid_oos_metric = ['r-squared', 'rmse']
+
+        if oos_metric not in valid_oos_metric:
+            raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
 
         sample_size = self.data.shape[0]
+        self.oos_metric_name = oos_metric
 
         if len(self.y) > 1:
             self.multiple_y()
@@ -582,9 +587,7 @@ class OLSRobust(Protomodel):
             list_aic_array = []
             list_bic_array = []
             list_hqic_array = []
-            list_av_k_rmse_array = []
-            list_av_k_r2_array = []
-            list_av_k_ce_array = []
+            list_av_k_metric_array = []
             y_names = []
             specs = []
             for y, y_name in zip(self.y_composites,
@@ -597,9 +600,7 @@ class OLSRobust(Protomodel):
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
                 all_predictors = []
-                av_k_rmse_array = np.empty([space_n])
-                av_k_r2_array = np.empty([space_n])
-                av_k_ce_array = np.empty([space_n])
+                av_k_metric_array = np.empty([space_n])
 
                 for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                     if len(spec) == 0:
@@ -616,8 +617,9 @@ class OLSRobust(Protomodel):
                         comb = group_demean(comb, group=group)
                     (b_all, p_all, ll_i,
                      aic_i, bic_i, hqic_i,
-                     av_k_rmse_i, av_k_r2_i, av_k_cross_entropy_i) = self._full_sample_OLS(comb,
-                                                            kfold=kfold)
+                     av_k_metric_i) = self._full_sample_OLS(comb,
+                                                            kfold=kfold,
+                                                            oos_metric_name=self.oos_metric_name)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
                     (delayed(self._strap_OLS)
                      (comb,
@@ -635,9 +637,7 @@ class OLSRobust(Protomodel):
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
                     hqic_array[index] = hqic_i
-                    av_k_rmse_array[index] = av_k_rmse_i
-                    av_k_r2_array[index] = av_k_r2_i
-                    av_k_ce_array[index] = av_k_cross_entropy_i
+                    av_k_metric_array[index] = av_k_metric_i
 
                 list_all_predictors.append(all_predictors)
                 list_b_array.append(b_array)
@@ -646,9 +646,7 @@ class OLSRobust(Protomodel):
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
                 list_hqic_array.append(hqic_array)
-                list_av_k_rmse_array.append(av_k_rmse_array)
-                list_av_k_r2_array.append(av_k_r2_array)
-                list_av_k_ce_array.append(av_k_ce_array)
+                list_av_k_metric_array.append(av_k_metric_array)
 
             results = OLSResult(
                 y=y_names,
@@ -666,10 +664,9 @@ class OLSRobust(Protomodel):
                 aic_array=np.hstack(list_aic_array),
                 bic_array=np.hstack(list_bic_array),
                 hqic_array=np.hstack(list_hqic_array),
-                av_k_rmse_array=np.hstack(list_av_k_rmse_array),
-                av_k_r2_array=np.hstack(list_av_k_r2_array),
-                av_k_ce_array=np.hstack(list_av_k_ce_array),
-                model_name=self.model_name
+                av_k_metric_array=np.hstack(list_av_k_metric_array),
+                model_name=self.model_name,
+                name_av_k_metric=self.oos_metric
             )
 
             self.results = results
@@ -686,9 +683,7 @@ class OLSRobust(Protomodel):
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
-            av_k_rmse_array = np.empty([space_n])
-            av_k_r2_array = np.empty([space_n])
-            av_k_ce_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
@@ -703,8 +698,9 @@ class OLSRobust(Protomodel):
                     comb = group_demean(comb, group=group)
                 (b_all, p_all, ll_i,
                  aic_i, bic_i, hqic_i,
-                 av_k_rmse_i, av_k_r2_i, av_k_cross_entropy_i) = self._full_sample_OLS(comb,
-                                                        kfold=kfold)
+                 av_k_metric_i) = self._full_sample_OLS(comb,
+                                                        kfold=kfold,
+                                                        oos_metric_name=self.oos_metric_name)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_OLS)
                  (comb,
@@ -722,9 +718,7 @@ class OLSRobust(Protomodel):
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
-                av_k_rmse_array[index] = av_k_rmse_i
-                av_k_r2_array[index] = av_k_r2_i
-                av_k_ce_array[index] = av_k_cross_entropy_i
+                av_k_metric_array[index] = av_k_metric_i
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
 
@@ -743,9 +737,7 @@ class OLSRobust(Protomodel):
                                 aic_array=aic_array,
                                 bic_array=bic_array,
                                 hqic_array=hqic_array,
-                                av_k_rmse_array=av_k_rmse_array,
-                                av_k_r2_array=av_k_r2_array,
-                                av_k_ce_array=av_k_ce_array,
+                                av_k_metric_array=av_k_metric_array,
                                 model_name=self.model_name)
 
             self.results = results
@@ -770,7 +762,8 @@ class OLSRobust(Protomodel):
     
     def _full_sample_OLS(self,
                          comb_var,
-                         kfold):
+                         kfold,
+                         oos_metric_name):
         """
         Call stripped_ols() over the full data containing y, x, and controls.
 
@@ -798,37 +791,31 @@ class OLSRobust(Protomodel):
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = simple_ols(y=y,
                          x=x)
-        av_k_rmse = None
-        av_k_r2 = None
-        av_k_cross_entropy = None
+        av_k_metric = None
         if kfold:
             k_fold = KFold(kfold)
-            rmse = []
-            r2 = []
-            cross_entropy = []
+            metric = []
             for k, (train, test) in enumerate(k_fold.split(x, y)):
                 out_k = simple_ols(y=y.loc[train],
                                    x=x.loc[train])
                 y_pred = self._predict(x.loc[test], out_k['b'])
                 y_true = y.loc[test]
-                k_rmse = root_mean_squared_error(y_true, y_pred)
-                k_r2 = r2_score(y_true, y_pred)
-                k_cross_entropy = log_loss(y_true, y_pred)
-                rmse.append(k_rmse)
-                r2.append(k_r2)
-                cross_entropy.append(k_cross_entropy)
-            av_k_rmse = np.mean(rmse)
-            av_k_r2 = np.mean(r2)
-            av_k_cross_entropy = np.mean(cross_entropy)
+                if oos_metric_name == 'r-squared':
+                    k_rmse = root_mean_squared_error(y_true, y_pred)
+                    metric.append(k_rmse)
+                elif oos_metric_name == 'rmse':
+                    k_r2 = r2_score(y_true, y_pred)
+                    metric.append(k_r2)
+                else:
+                    raise ValueError('No valid OOS metric provided.')
+            av_k_metric = np.mean(metric)
         return (out['b'],
                 out['p'],
                 out['ll'][0][0],
                 out['aic'][0][0],
                 out['bic'][0][0],
                 out['hqic'][0][0],
-                av_k_rmse,
-                av_k_r2,
-                av_k_cross_entropy)
+                av_k_metric)
 
     def _strap_OLS(self,
                    comb_var,
@@ -961,7 +948,7 @@ class LRobust(Protomodel):
     def multiple_y(self):
         raise NotImplementedError("Not implemented yet")
 
-    def _full_sample(self, comb_var, kfold):
+    def _full_sample(self, comb_var, kfold, oos_metric_name):
         """
         Call logistic_regression_sm_stripped() over the full data containing y, x, and controls.
 
@@ -989,37 +976,34 @@ class LRobust(Protomodel):
         x = comb_var.drop(comb_var.columns[0], axis=1)
 
         out = logistic_regression_sm(y=y, x=x)
-        av_k_rmse = None
-        av_k_r2 = None
-        av_k_cross_entropy = None
+        av_k_metric = None
 
         if kfold:
             k_fold = KFold(kfold)
-            rmse = []
-            r2 = []
-            cross_entropy = []
+            metric = []
             for k, (train, test) in enumerate(k_fold.split(x, y)):
                 out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
                 y_pred = self._predict_LR(x.loc[test], out_k['b'])
                 y_true = y.loc[test]
-                k_rmse = root_mean_squared_error(y_true, y_pred)
-                k_r2 = r2_score(y_true, y_pred)
-                k_cross_entropy = log_loss(y_true, y_pred)
-                rmse.append(k_rmse)
-                r2.append(k_r2)
-                cross_entropy.append(k_cross_entropy)
-            av_k_rmse = np.mean(rmse)
-            av_k_r2 = np.mean(r2)
-            av_k_cross_entropy = np.mean(cross_entropy)
+                if oos_metric_name == 'rmse':
+                    k_rmse = root_mean_squared_error(y_true, y_pred)
+                    metric.append(k_rmse)
+                elif oos_metric_name == 'r-squared':
+                    k_r2 = r2_score(y_true, y_pred)
+                    metric.append(k_r2)
+                elif oos_metric_name == 'cross-entropy':
+                    k_cross_entropy = log_loss(y_true, y_pred)
+                    metric.append(k_cross_entropy)
+                else:
+                    raise ValueError('No valid OOS metric provided.')
+            av_k_metric = np.mean(metric)
         return (out['b'],
                 out['p'],
                 out['ll'],
                 out['aic'],
                 out['bic'],
                 out['hqic'],
-                av_k_rmse,
-                av_k_r2,
-                av_k_cross_entropy)
+                av_k_metric)
 
     def _predict_LR(self, x_test, betas):
         """
@@ -1035,7 +1019,8 @@ class LRobust(Protomodel):
             draws=500,
             sample_size=None,
             kfold=None,
-            shuffle=False):
+            shuffle=False,
+            oos_metric='r-squared'):
         if not isinstance(controls, list):
             raise TypeError("'controls' must be a list.")
 
@@ -1049,6 +1034,13 @@ class LRobust(Protomodel):
             
         if kfold is not None and kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
+        
+        valid_oos_metric = ['r-squared', 'rmse', 'cross-entropy']
+        
+        if oos_metric not in valid_oos_metric:
+            raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
+
+        self.oos_metric_name = oos_metric
 
         if sample_size is None:
             sample_size = self.data.shape[0]
@@ -1066,9 +1058,7 @@ class LRobust(Protomodel):
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
-            av_k_rmse_array = np.empty([space_n])
-            av_k_r2_array = np.empty([space_n])
-            av_k_ce_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
 
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
 
@@ -1086,7 +1076,7 @@ class LRobust(Protomodel):
                     comb = group_demean(comb, group=group)
                 (b_all, p_all, ll_i,
                  aic_i, bic_i, hqic_i,
-                 av_k_rmse_i, av_k_r2_i, av_k_cross_entropy_i) = self._full_sample(comb, kfold=kfold)
+                 av_k_metric_i) = self._full_sample(comb, kfold=kfold, oos_metric_name=self.oos_metric_name)
 
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_regression)
@@ -1104,13 +1094,13 @@ class LRobust(Protomodel):
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
-                av_k_rmse_array[index] = av_k_rmse_i
-                av_k_r2_array[index] = av_k_r2_i
-                av_k_ce_array[index] = av_k_cross_entropy_i
+                av_k_metric_array[index] = av_k_metric_i
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
 
             results = OLSResult(y=self.y[0],
+                                x=self.x,
+                                data=self.data,
                                        specs=specs,
                                        all_predictors=all_predictors,
                                        controls=controls,
@@ -1123,10 +1113,9 @@ class LRobust(Protomodel):
                                        aic_array=aic_array,
                                        bic_array=bic_array,
                                        hqic_array=hqic_array,
-                                       av_k_rmse_array=av_k_rmse_array,
-                                       av_k_r2_array=av_k_r2_array,
-                                       av_k_ce_array=av_k_ce_array,
-                                       model_name=self.model_name
+                                       av_k_metric_array=av_k_metric_array,
+                                       model_name=self.model_name,
+                                       name_av_k_metric=self.oos_metric_name
                                        )
             self.results = results
 
