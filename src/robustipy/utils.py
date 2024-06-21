@@ -84,7 +84,7 @@ def logistic_regression_sm(y, x) -> dict:
             'p': [[x] for x in result.pvalues.values],
             'll': ll,
             'aic': make_aic(ll, n),
-            'bic': make_aic(ll, n, k),
+            'bic': make_bic(ll, n, k),
             'hqic': make_hqic(ll, n, k)
             }
 
