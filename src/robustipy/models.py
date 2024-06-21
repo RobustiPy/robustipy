@@ -156,7 +156,7 @@ class OLSResult(Protoresult):
             Load an OLSResult object from a file using pickle.
 
         summary():
-            Placeholder for a method to generate a summary of the OLS results.
+            Placeholder for a method to generate a summary of the results.
 
         plot(specs=None, ic=None, colormap=None, colorset=None, figsize=(12, 6)):
             Generate plots of the OLS results.
@@ -222,6 +222,7 @@ class OLSResult(Protoresult):
         self.summary_df['av_k_cross_entropy'] = pd.Series(av_k_ce_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
+        self.model_name = model_name
 
     def save(self, filename):
         """
@@ -249,9 +250,62 @@ class OLSResult(Protoresult):
 
     def summary(self):
         """
-        Generates a summary of the regression results (not implemented).
+        Prints a summary of the model including basic configuration and robustness metrics.
         """
-        pass
+        # Helper function to print section headers
+        def print_separator(title=None):
+
+            if title:
+                print('============================================================================================================')
+                print(title)
+                print('============================================================================================================')
+
+            else:
+                print('------------------------------------------------------------------------------------------------------------')
+
+        # Display basic model information
+        print_separator("1. Model Summary")
+        print(f"Model: {self.model_name}")
+        print(f"Dependent variable: {self.y_name}")
+        print(f"Independent variable: {self.x_name}")
+        print(f"Number of possible controls: {len(self.controls)}")
+        print(f"Number of draws: {self.draws}")
+        print(f"Number of specifications: {len(self.specs_names)}")
+
+        # Prepare the DataFrame for model metrics
+        df_model_result = pd.DataFrame({
+            'betas': [b[0][0] for b in self.all_b],
+            'p_values': [p[0][0] for p in self.all_p]
+        })
+        df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
+        df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
+
+        # Print model robustness metrics
+        print_separator("2.Model Robustness Metrics")
+        print('2.1 Inference Metrics')
+        print_separator()
+
+        print(f"Mean beta: {df_model_result['betas'].mean():.2f}")
+        print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
+        print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
+        print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
+
+        print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
+        print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
+        print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
+        print_separator()
+        print('2.2 Averaged Out-Of-Sample Metrics (Kullback-Leibler Divergence)')
+        print_separator()
+        oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
+        print(f'Max: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
+        oos_min_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmin(),]
+        print(f'Min: {oos_min_row["av_k_metric"]}, Specs: {list(oos_min_row["spec_name"])} ')
+        print(f"Mean: {self.summary_df['av_k_metric'].mean():.2f}")
+        print(f"Median: {self.summary_df['av_k_metric'].median():.2f}")
+
+
+
+
 
     def plot(self,
              specs=None,
@@ -406,7 +460,7 @@ class OLSRobust(Protomodel):
         An object containing the key metrics.
     """
 
-    def __init__(self, *, y, x, data):
+    def __init__(self, *, y, x, data, model_name='OLS Robust'):
         """
         Initialize the OLSRobust object.
 
@@ -437,9 +491,11 @@ class OLSRobust(Protomodel):
         self.x = x
         self.data = data
         self.results = None
+        self.model_name = model_name
         self.parameters = {}
         self.parameters['y'] = self.y
         self.parameters['x'] = self.x 
+
 
     def get_results(self):
         """
@@ -505,7 +561,7 @@ class OLSRobust(Protomodel):
             raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
 
         if group is not None:
-            if not isinstance(group,str) or not group in all_vars:
+            if not isinstance(group, str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
             
         if kfold < 2:
@@ -855,7 +911,7 @@ class LRobust(Protomodel):
         p-values ('p') for each independent variable.
     """
 
-    def __init__(self, *, y, x, data, model_name='LR_sm'):
+    def __init__(self, *, y, x, data, model_name='Logistic Regression Robust'):
         """
         Initialize the LRobust object.
 
@@ -940,7 +996,6 @@ class LRobust(Protomodel):
             r2 = []
             cross_entropy = []
             for k, (train, test) in enumerate(k_fold.split(x, y)):
-
                 out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
                 y_pred = self._predict_LR(x.loc[test], out_k['b'])
                 y_true = y.loc[test]
