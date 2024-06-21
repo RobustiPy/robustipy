@@ -801,10 +801,10 @@ class OLSRobust(Protomodel):
                                    x=x.loc[train])
                 y_pred = self._predict(x.loc[test], out_k['b'])
                 y_true = y.loc[test]
-                if oos_metric_name == 'r-squared':
+                if oos_metric_name == 'rmse':
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
-                elif oos_metric_name == 'rmse':
+                elif oos_metric_name == 'r-squared':
                     k_r2 = r2_score(y_true, y_pred)
                     metric.append(k_r2)
                 else:
