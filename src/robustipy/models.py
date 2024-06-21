@@ -484,6 +484,10 @@ class OLSRobust(Protomodel):
         self.data = data
         self.results = None
         self.model_name = model_name
+        self.parameters = {}
+        self.parameters['y'] = self.y
+        self.parameters['x'] = self.x 
+
 
     def get_results(self):
         """
@@ -510,13 +514,15 @@ class OLSRobust(Protomodel):
                 subset = (subset - subset.mean()) / subset.std()
                 self.y_composites.append(subset.mean(axis=1))
                 self.y_specs.append(spec)
+                self.parameters['y_specs'] = self.y_specs
+                self.parameters['y_composites'] = self.y_composites
 
     def fit(self,
             *,
             controls,
             group=None,
             draws=500,
-            kfold=None,
+            kfold=5,
             shuffle=False):
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
@@ -550,8 +556,11 @@ class OLSRobust(Protomodel):
             if not isinstance(group, str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
             
-        if kfold is not None and kfold < 2:
+        if kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
+        
+        if draws < 1:
+            raise ValueError(f"Draws value mustbe 1 or above, current value is {draws}.")
 
         sample_size = self.data.shape[0]
 

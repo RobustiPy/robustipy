@@ -335,8 +335,12 @@ def plot_kfolds(results_object,
                 color=colors[1])
     sns.histplot(results_object.summary_df['av_k_metric'], ax=ax,
                  color=colors[0],
-                 bins=30, stat='density',
-                 discrete=True)
+                 bins=30, stat='density')
+    val_range = max(results_object.summary_df['av_k_metric']) - min(results_object.summary_df['av_k_metric'])
+    min_lim = min(results_object.summary_df['av_k_metric']) - val_range *.1
+    max_lim = max(results_object.summary_df['av_k_metric']) + val_range *.1
+    ax.set_xlim(min_lim, max_lim)
+    
     ax.yaxis.set_label_position("right")
     ax.grid(linestyle='--',
             color='k',
