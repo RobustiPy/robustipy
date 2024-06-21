@@ -1019,7 +1019,7 @@ class LRobust(Protomodel):
             group=None,
             draws=500,
             sample_size=None,
-            kfold=None,
+            kfold=5,
             shuffle=False,
             oos_metric='r-squared'):
         if not isinstance(controls, list):
@@ -1033,7 +1033,7 @@ class LRobust(Protomodel):
             if not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
             
-        if kfold is not None and kfold < 2:
+        if kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
         
         valid_oos_metric = ['r-squared', 'rmse', 'cross-entropy']
