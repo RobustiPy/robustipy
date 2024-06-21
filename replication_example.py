@@ -1,7 +1,16 @@
 import os
 from robustipy.utils import prepare_union, prepare_asc
 import matplotlib.pyplot as plt
-from robustipy.models import OLSRobust
+from robustipy.models import OLSRobust, LRobust
+
+y, c, x, data = prepare_union(os.path.join('data',
+                                               'input',
+                                               'nlsw88.dta'))
+union_robust = OLSRobust(y=[y], x=[x], data=data)
+union_robust.fit(controls=c,
+                     draws=100)
+union_results = union_robust.get_results()
+
 
 
 def union_example():
@@ -21,6 +30,28 @@ def union_example():
     plt.savefig(os.path.join(os.getcwd(), 'figures',
                              'union_example',
                              'union_curve.png'))
+
+y, c, x, data = prepare_union(os.path.join('data',
+                                           'input',
+                                        'nlsw88.dta'))
+
+# LR
+y = 'union'
+x = 'log_wage'
+
+union_robust = LRobust(y=[y], x=[x], data=data)
+union_robust.fit(controls=c,
+                 draws=10)
+union_results = union_robust.get_results()
+
+union_results.name_av_k_metric
+
+union_results.plot(specs=[['hours', 'collgrad'],
+                          ['collgrad'],
+                          ['hours', 'age']],
+                   ic='hqic',
+                   figsize=(16, 10))
+plt.show()
 
 
 def asc_example():

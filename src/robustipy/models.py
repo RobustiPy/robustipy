@@ -738,7 +738,8 @@ class OLSRobust(Protomodel):
                                 bic_array=bic_array,
                                 hqic_array=hqic_array,
                                 av_k_metric_array=av_k_metric_array,
-                                model_name=self.model_name)
+                                model_name=self.model_name,
+                                name_av_k_metric=self.oos_metric_name)
 
             self.results = results
 
