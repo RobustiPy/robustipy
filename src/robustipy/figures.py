@@ -62,9 +62,8 @@ def plot_curve(results_object,
                     loess_max[:, 1],
                     facecolor=colors_curve[1],
                     alpha=0.075)
-    ax.axhline(y=0,
-               color='k',
-               ls='--')
+    if ax.get_ylim()[0]<0 and ax.get_ylim()[1]>0:
+        ax.axhline(y=0, color='k', ls='--')
     lines = []
     if specs:
         idxs = df.index[df['idx']].tolist()
@@ -525,16 +524,6 @@ def plot_results(results_object,
 
     for ax in [ax2, ax3]:
         ax.yaxis.set_label_position("right")
-    ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .85,
-             (f'Number of specifications:     {len(results_object.specs_names)}\n' +
-              f'Number of bootstraps:          {results_object.draws}\n' +
-              f'Number of folds:                   {results_object.kfold}'
-              ),
-             color='black',
-             fontsize=13,
-             bbox=dict(facecolor='white',
-                       edgecolor='black',
-                       boxstyle='round, pad=1'))
     sns.despine(ax=ax1)
     ax1.set_ylabel('Coefficient Estimates', fontsize=13)
     ax1.set_xlabel('Ordered Specifications', fontsize=13)
@@ -558,8 +547,19 @@ def plot_results(results_object,
     ax5.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax6.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax1.set_xlim(0, len(results_object.specs_names))
-#    ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
-#                 ax1.get_ylim()[1])
+    ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
+                 ax1.get_ylim()[1])
+    ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .94,
+             (f'Number of specifications:     {len(results_object.specs_names)}\n' +
+              f'Number of bootstraps:          {results_object.draws}\n' +
+              f'Number of folds:                   {results_object.kfold}'
+              ),
+             color='black',
+             fontsize=13,
+             bbox=dict(facecolor='white',
+                       edgecolor='black',
+                       boxstyle='round, pad=1'))
+
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     sns.despine(ax=ax4)
