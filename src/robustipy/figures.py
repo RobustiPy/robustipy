@@ -528,7 +528,7 @@ def plot_results(results_object,
     ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .85,
              (f'Number of specifications:     {len(results_object.specs_names)}\n' +
               f'Number of bootstraps:          {results_object.draws}\n' +
-              'Number of folds:                   100'
+              f'Number of folds:                   {results_object.kfold}'
               ),
              color='black',
              fontsize=13,
@@ -538,7 +538,11 @@ def plot_results(results_object,
     sns.despine(ax=ax1)
     ax1.set_ylabel('Coefficient Estimates', fontsize=13)
     ax1.set_xlabel('Ordered Specifications', fontsize=13)
-    ax5.set_xlabel(results_object.name_av_k_metric.title(), fontsize=13)
+    if results_object.name_av_k_metric=='rmse':
+        metric = results_object.name_av_k_metric.upper()
+    else:
+        metric = results_object.name_av_k_metric.title()
+    ax5.set_xlabel(metric, fontsize=13)
     ax2.set_ylabel(f'{ic.upper()} curve', fontsize=13)
     ax2.set_xlabel('Ordered Specifications', fontsize=13)
     ax3.set_ylabel('Density', fontsize=13)
@@ -554,8 +558,8 @@ def plot_results(results_object,
     ax5.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax6.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax1.set_xlim(0, len(results_object.specs_names))
-    ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
-                 ax1.get_ylim()[1])
+#    ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
+#                 ax1.get_ylim()[1])
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     sns.despine(ax=ax4)
