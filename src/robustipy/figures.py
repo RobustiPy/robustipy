@@ -344,7 +344,7 @@ def plot_kfolds(results_object,
         Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1),
               label=r'Histogram')]
     ax.legend(handles=legend_elements,
-              loc='upper right',
+              loc='upper left',
               frameon=True,
               fontsize=10,
               title='Out-of-Sample',
@@ -352,7 +352,7 @@ def plot_kfolds(results_object,
               framealpha=1,
               facecolor='w',
               edgecolor=(0, 0, 0, 1),
-              ncols=1
+              ncols=2
               )
     sns.despine(ax=ax, left=True)
 
