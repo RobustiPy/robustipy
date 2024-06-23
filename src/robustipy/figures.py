@@ -538,7 +538,7 @@ def plot_results(results_object,
     sns.despine(ax=ax1)
     ax1.set_ylabel('Coefficient Estimates', fontsize=13)
     ax1.set_xlabel('Ordered Specifications', fontsize=13)
-    ax5.set_xlabel('Kullback-Leibler Divergence', fontsize=13)
+    ax5.set_xlabel(results_object.name_av_k_metric.title(), fontsize=13)
     ax2.set_ylabel(f'{ic.upper()} curve', fontsize=13)
     ax2.set_xlabel('Ordered Specifications', fontsize=13)
     ax3.set_ylabel('Density', fontsize=13)

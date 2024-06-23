@@ -146,7 +146,7 @@ class OLSResult(Protoresult):
         aic_array (list): List of AIC values for each specification.
         bic_array (list): List of BIC values for each specification.
         hqic_array (list): List of HQIC values for each specification.
-        av_k_metric_array (list, optional): List of average Kullback-Leibler divergence metrics.
+        av_k_metric_array (list, optional): List of average metrics.
 
     Methods:
         save(filename):
