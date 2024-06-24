@@ -981,7 +981,7 @@ class LRobust(Protomodel):
     def multiple_y(self):
         raise NotImplementedError("Not implemented yet")
 
-    def _full_sample(self, comb_var, kfold, oos_metric_name):
+    def _full_sample(self, comb_var, kfold, group, oos_metric_name):
         """
         Call logistic_regression_sm_stripped() over the full data containing y, x, and controls.
 
@@ -1005,6 +1005,7 @@ class LRobust(Protomodel):
         HQIC : float
             Hannan-Quinn information criteria value for the model.
         """
+        #TODO Fixed effects Logistic Regression?
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
 
