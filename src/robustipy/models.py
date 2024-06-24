@@ -666,7 +666,7 @@ class OLSRobust(Protomodel):
                 hqic_array=np.hstack(list_hqic_array),
                 av_k_metric_array=np.hstack(list_av_k_metric_array),
                 model_name=self.model_name,
-                name_av_k_metric=self.oos_metric
+                name_av_k_metric=self.oos_metric_name
             )
 
             self.results = results
