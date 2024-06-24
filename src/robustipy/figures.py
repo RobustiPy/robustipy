@@ -62,9 +62,8 @@ def plot_curve(results_object,
                     loess_max[:, 1],
                     facecolor=colors_curve[1],
                     alpha=0.075)
-    ax.axhline(y=0,
-               color='k',
-               ls='--')
+    if ax.get_ylim()[0]<0 and ax.get_ylim()[1]>0:
+        ax.axhline(y=0, color='k', ls='--')
     lines = []
     if specs:
         idxs = df.index[df['idx']].tolist()
@@ -210,7 +209,7 @@ def plot_ic(results_object,
         full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
         lines.append(ax.vlines(x=full_spec_pos,
                                ymin=ymin,
-                               ymax=loess_max[full_spec_pos, 1],
+                               ymax=df.at[full_spec_pos, ic],
                                color='k',
                                label='Full Model'))
         markers.append(Line2D([0], [0], marker='o',
@@ -239,7 +238,46 @@ def plot_ic(results_object,
         return ic_fig, lines
     else:
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ic_fig, = ax.plot(df[ic])
+        ic_fig, = ax.plot(df[ic], color='#001c54')
+
+        full_spec = list(results_object.specs_names.iloc[-1])
+        full_spec_key = get_selection_key([full_spec])
+#        df['idx'] = df.spec_name.isin(key)
+        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
+
+        ymin = ax.get_ylim()[0]
+        ymax = ax.get_ylim()[1]
+        ax.set_ylim(ymin, ymax)
+        lines = []
+        markers = []
+        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
+        lines.append(ax.vlines(x=full_spec_pos,
+                               ymin=ymin,
+                               ymax=df.at[full_spec_pos, ic],
+                               color='k',
+                               label='Full Model'))
+        markers.append(Line2D([0], [0], marker='o',
+                              color='k',
+                              markerfacecolor='w',
+                              markersize=10,
+                              label='Full Model')
+                       )
+        ax.plot(full_spec_pos,
+                df.at[full_spec_pos, ic],
+                'o',
+                markeredgecolor='k',
+                markerfacecolor='w',
+                markersize=15)
+        ax.legend(handles=markers,
+                  frameon=True,
+                  edgecolor=(0, 0, 0, 1),
+                  fontsize=9,
+                  loc="upper left",
+                  ncols=1,
+                  framealpha=1,
+                  facecolor=((1, 1, 1, 0)
+                  )
+                  )
         return ic_fig
 
 
@@ -264,67 +302,21 @@ def plot_bdist(results_object,
     """
     if ax is None:
         ax = plt.gca()
-    df = results_object.estimates.T
+    df = results_object.estimates.copy().T
     df.columns = results_object.specs_names
-    idx = get_selection_key(specs)
-    if colorset is None:
-        colors = get_default_colormap(specs)
-        plot = df[idx].plot(kind='density',
-                            ax=ax,
-                            color=colors,
-                            legend=False)
-        plot = df.iloc[:, -1:].plot(kind='density',
-                                    legend=False,
-                                    color='k', ax=ax)
-
-        # @TODO this is _very_, _very_ hacky and needs fixing.
-        # It's essentially taken from plot_ic()
-        df = results_object.summary_df.copy()
-        key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
-        idxs = df.index[df['idx']].tolist()
-        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
+    if specs:
         if colorset is None:
             colors = get_default_colormap(specs=specs)
-        lines = []
-        ymin = ax.get_ylim()[0]
-        ymax = ax.get_ylim()[1]
-        xmin = ax.get_xlim()[0]
-        xmax = ax.get_xlim()[1]
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
-            lines.append(ax.vlines(x=-1000000000,
-                                   linewidth=1,
-                                   ymin=ymin,
-                                   ymax=ymax,
-                                   color=colors[i],
-                                   label=label)
-                         )
-        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-        lines.append(ax.vlines(x=-100000000,
-                               linewidth=1,
-                               ymin=ymin,
-                               ymax=ymax,
-                               color='k',
-                               label='Full Model'))
-        ax.set_xlim(xmin, xmax)
-#        ax.legend(handles=lines,
-#                  frameon=True,
-#                  edgecolor=(0, 0, 0, 1),
-#                  fontsize=9,
-#                  loc="upper left",
-#                  ncols=1,
-#                  framealpha=1,
-#                  facecolor=((1, 1, 1, 0)
-#                  )
-#                  )
-        return plot
-    else:
-        return df[idx].plot(kind='density', ax=ax, legend=False)
+        else:
+            colors = colorset
+        key = get_selection_key(specs)
+        matching_cols = [col for col in df.columns if col in key]
+        for i, col in enumerate(matching_cols):
+            sns.kdeplot(df[col].squeeze(), common_norm=True, ax=ax, color=colors[i], legend=False
+                        )
+    sns.kdeplot(df.iloc[:, -1:].squeeze(), common_norm=True, legend=False,
+                color='black', ax=ax, label='Full Model')
+    return ax
 
 
 def plot_kfolds(results_object,
@@ -472,15 +464,17 @@ def plot_results(results_object,
                         )
         ax2.axis('on')
         ax2.patch.set_alpha(0.5)
-    if specs is not None:
-        plot_bdist(results_object=results_object,
-                   lines=lines,
-                   specs=specs,
-                   ax=ax3,
-                   colormap=colormap,
-                   colorset=colorset)
-        ax3.axis('on')
-        ax3.patch.set_alpha(0.5)
+#    if specs is not None:
+    plot_bdist(results_object=results_object,
+               lines=lines,
+               specs=specs,
+               ax=ax3,
+               colormap=colormap,
+               colorset=colorset
+               )
+    ax3.axis('on')
+    ax3.patch.set_alpha(0.5)
+
     ax1.set_title('d.',
                   loc='left',
                   fontsize=16,
@@ -530,20 +524,14 @@ def plot_results(results_object,
 
     for ax in [ax2, ax3]:
         ax.yaxis.set_label_position("right")
-    ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .85,
-             (f'Number of specifications:     {len(results_object.specs_names)}\n' +
-              f'Number of bootstraps:          {results_object.draws}\n' +
-              'Number of folds:                   100'
-              ),
-             color='black',
-             fontsize=13,
-             bbox=dict(facecolor='white',
-                       edgecolor='black',
-                       boxstyle='round, pad=1'))
     sns.despine(ax=ax1)
     ax1.set_ylabel('Coefficient Estimates', fontsize=13)
     ax1.set_xlabel('Ordered Specifications', fontsize=13)
-    ax5.set_xlabel('Kullback-Leibler Divergence', fontsize=13)
+    if results_object.name_av_k_metric=='rmse':
+        metric = results_object.name_av_k_metric.upper()
+    else:
+        metric = results_object.name_av_k_metric.title()
+    ax5.set_xlabel(metric, fontsize=13)
     ax2.set_ylabel(f'{ic.upper()} curve', fontsize=13)
     ax2.set_xlabel('Ordered Specifications', fontsize=13)
     ax3.set_ylabel('Density', fontsize=13)
@@ -561,13 +549,24 @@ def plot_results(results_object,
     ax1.set_xlim(0, len(results_object.specs_names))
     ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
                  ax1.get_ylim()[1])
+    ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .94,
+             (f'Number of specifications:     {len(results_object.specs_names)}\n' +
+              f'Number of bootstraps:          {results_object.draws}\n' +
+              f'Number of folds:                   {results_object.kfold}'
+              ),
+             color='black',
+             fontsize=13,
+             bbox=dict(facecolor='white',
+                       edgecolor='black',
+                       boxstyle='round, pad=1'))
+
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     sns.despine(ax=ax4)
     sns.despine(ax=ax6)
     sns.despine(ax=ax5, right=False, left=True)
     #    plt.tight_layout()
-    return fig
+#    return fig
 
 
 def vars_scatter_plot(results_object,

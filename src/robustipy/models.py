@@ -146,7 +146,7 @@ class OLSResult(Protoresult):
         aic_array (list): List of AIC values for each specification.
         bic_array (list): List of BIC values for each specification.
         hqic_array (list): List of HQIC values for each specification.
-        av_k_metric_array (list, optional): List of average Kullback-Leibler divergence metrics.
+        av_k_metric_array (list, optional): List of average metrics.
 
     Methods:
         save(filename):
@@ -189,6 +189,7 @@ class OLSResult(Protoresult):
                  all_predictors,
                  controls,
                  draws,
+                 kfold,
                  estimates,
                  all_b,
                  all_p,
@@ -208,6 +209,7 @@ class OLSResult(Protoresult):
         self.all_predictors = all_predictors
         self.controls = controls
         self.draws = draws
+        self.kfold = kfold
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
         self.all_b = all_b
@@ -269,6 +271,7 @@ class OLSResult(Protoresult):
         print(f"Independent variable: {self.x_name}")
         print(f"Number of possible controls: {len(self.controls)}")
         print(f"Number of draws: {self.draws}")
+        print(f"Number of folds: {self.kfold}")
         print(f"Number of specifications: {len(self.specs_names)}")
 
         # Prepare the DataFrame for model metrics
@@ -656,6 +659,7 @@ class OLSRobust(Protomodel):
                 all_predictors=list_all_predictors,
                 controls=controls,
                 draws=draws,
+                kfold=kfold,
                 all_b=b_all,
                 all_p=p_all,
                 estimates=np.vstack(list_b_array),
@@ -729,6 +733,7 @@ class OLSRobust(Protomodel):
                                 all_predictors=all_predictors,
                                 controls=controls,
                                 draws=draws,
+                                kfold=kfold,
                                 all_b=b_all_list,
                                 all_p=p_all_list,
                                 estimates=b_array,
@@ -1102,22 +1107,23 @@ class LRobust(Protomodel):
             results = OLSResult(y=self.y[0],
                                 x=self.x,
                                 data=self.data,
-                                       specs=specs,
-                                       all_predictors=all_predictors,
-                                       controls=controls,
-                                       draws=draws,
-                                       all_b=b_all_list,
-                                       all_p=p_all_list,
-                                       estimates=b_array,
-                                       p_values=p_array,
-                                       ll_array=ll_array,
-                                       aic_array=aic_array,
-                                       bic_array=bic_array,
-                                       hqic_array=hqic_array,
-                                       av_k_metric_array=av_k_metric_array,
-                                       model_name=self.model_name,
-                                       name_av_k_metric=self.oos_metric_name
-                                       )
+                                specs=specs,
+                                all_predictors=all_predictors,
+                                controls=controls,
+                                draws=draws,
+                                kfold=kfold,
+                                all_b=b_all_list,
+                                all_p=p_all_list,
+                                estimates=b_array,
+                                p_values=p_array,
+                                ll_array=ll_array,
+                                aic_array=aic_array,
+                                bic_array=bic_array,
+                                hqic_array=hqic_array,
+                                av_k_metric_array=av_k_metric_array,
+                                model_name=self.model_name,
+                                name_av_k_metric=self.oos_metric_name
+                                )
             self.results = results
 
     def _strap_regression(self,
