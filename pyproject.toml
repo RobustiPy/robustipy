@@ -30,7 +30,7 @@ dependencies = [
     'joypy>=0.2.6',
     'linearmodels>=4.27',
     'matplotlib>=3.6.1',
-    'seaborn',
+    'seaborn>=0.13.2',
     'rich',
     'scikit-learn'
 ]
