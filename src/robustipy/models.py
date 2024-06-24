@@ -15,7 +15,7 @@ from robustipy.prototypes import MissingValueWarning
 import _pickle
 import warnings
 from statsmodels.tools.tools import add_constant
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, GroupKFold
 from sklearn.metrics import root_mean_squared_error
 from sklearn.metrics import log_loss
 from sklearn.metrics import r2_score
@@ -615,6 +615,7 @@ class OLSRobust(Protomodel):
 
                     comb = pd.concat([y, comb], axis=1)
                     comb = comb.dropna()
+                    comb = comb.reset_index(drop=True).copy()
 
                     if group:
                         comb = group_demean(comb, group=group)
@@ -622,6 +623,7 @@ class OLSRobust(Protomodel):
                      aic_i, bic_i, hqic_i,
                      av_k_metric_i) = self._full_sample_OLS(comb,
                                                             kfold=kfold,
+                                                            group=group,
                                                             oos_metric_name=self.oos_metric_name)
                     b_list, p_list = (zip(*Parallel(n_jobs=-1)
                     (delayed(self._strap_OLS)
@@ -697,6 +699,7 @@ class OLSRobust(Protomodel):
                     comb = self.data[self.y + self.x + [group] + list(spec)]
 
                 comb = comb.dropna()
+                comb = comb.reset_index(drop=True).copy()
 
                 if group:
                     comb = group_demean(comb, group=group)
@@ -704,6 +707,7 @@ class OLSRobust(Protomodel):
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample_OLS(comb,
                                                         kfold=kfold,
+                                                        group=group,
                                                         oos_metric_name=self.oos_metric_name)
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_OLS)
@@ -769,6 +773,7 @@ class OLSRobust(Protomodel):
     def _full_sample_OLS(self,
                          comb_var,
                          kfold,
+                         group,
                          oos_metric_name):
         """
         Call stripped_ols() over the full data containing y, x, and controls.
@@ -794,27 +799,49 @@ class OLSRobust(Protomodel):
             Hannan-Quinn information criteria value for the model.
         """
         y = comb_var.iloc[:, [0]]
-        x = comb_var.drop(comb_var.columns[0], axis=1)
+        x_temp = comb_var.drop(comb_var.columns[0], axis=1)
+        if group:
+            x = x_temp.drop(columns=group)
+        else:
+            x = x_temp
         out = simple_ols(y=y,
                          x=x)
         av_k_metric = None
         if kfold:
-            k_fold = KFold(kfold)
-            metric = []
-            for k, (train, test) in enumerate(k_fold.split(x, y)):
-                out_k = simple_ols(y=y.loc[train],
-                                   x=x.loc[train])
-                y_pred = self._predict(x.loc[test], out_k['b'])
-                y_true = y.loc[test]
-                if oos_metric_name == 'rmse':
-                    k_rmse = root_mean_squared_error(y_true, y_pred)
-                    metric.append(k_rmse)
-                elif oos_metric_name == 'r-squared':
-                    k_r2 = r2_score(y_true, y_pred)
-                    metric.append(k_r2)
-                else:
-                    raise ValueError('No valid OOS metric provided.')
-            av_k_metric = np.mean(metric)
+            if group:
+                k_fold = GroupKFold(kfold)
+                metric = []
+                for k, (train, test) in enumerate(k_fold.split(x, y, groups=x_temp[group])):
+                    out_k = simple_ols(y=y.loc[train],
+                                       x=x.loc[train])
+                    y_pred = self._predict(x.loc[test], out_k['b'])
+                    y_true = y.loc[test]
+                    if oos_metric_name == 'rmse':
+                        k_rmse = root_mean_squared_error(y_true, y_pred)
+                        metric.append(k_rmse)
+                    elif oos_metric_name == 'r-squared':
+                        k_r2 = r2_score(y_true, y_pred)
+                        metric.append(k_r2)
+                    else:
+                        raise ValueError('No valid OOS metric provided.')
+                av_k_metric = np.mean(metric)
+            else:
+                k_fold = KFold(kfold)
+                metric = []
+                for k, (train, test) in enumerate(k_fold.split(x, y)):
+                    out_k = simple_ols(y=y.loc[train],
+                                       x=x.loc[train])
+                    y_pred = self._predict(x.loc[test], out_k['b'])
+                    y_true = y.loc[test]
+                    if oos_metric_name == 'rmse':
+                        k_rmse = root_mean_squared_error(y_true, y_pred)
+                        metric.append(k_rmse)
+                    elif oos_metric_name == 'r-squared':
+                        k_r2 = r2_score(y_true, y_pred)
+                        metric.append(k_r2)
+                    else:
+                        raise ValueError('No valid OOS metric provided.')
+                av_k_metric = np.mean(metric)
         return (out['b'],
                 out['p'],
                 out['ll'][0][0],
@@ -863,7 +890,7 @@ class OLSRobust(Protomodel):
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
-            output = stripped_ols(y, x)
+            output = stripped_ols(y=y, x=x)
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]
@@ -874,7 +901,7 @@ class OLSRobust(Protomodel):
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
-            output = stripped_ols(y, x)
+            output = stripped_ols(y=y, x=x)
             b = output['b']
             p = output['p']
             return b[0][0], p[0][0]
@@ -1077,12 +1104,13 @@ class LRobust(Protomodel):
                     comb = self.data[self.y + self.x + [group] + list(spec)]
 
                 comb = comb.dropna()
+                comb = comb.reset_index(drop=True).copy()
 
                 if group:
                     comb = group_demean(comb, group=group)
                 (b_all, p_all, ll_i,
                  aic_i, bic_i, hqic_i,
-                 av_k_metric_i) = self._full_sample(comb, kfold=kfold, oos_metric_name=self.oos_metric_name)
+                 av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
 
                 b_list, p_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_regression)
