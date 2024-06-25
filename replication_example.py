@@ -5,7 +5,7 @@ from robustipy.models import OLSRobust, LRobust
 
 y, c, x, data = prepare_union(os.path.join('data',
                                                'input',
-                                               'nlsw88.dta'))
+                                               'nlsw88.csv'))
 union_robust = OLSRobust(y=[y], x=[x], data=data)
 union_robust.fit(controls=c,
                      draws=100)
@@ -16,7 +16,7 @@ union_results = union_robust.get_results()
 def union_example():
     y, c, x, data = prepare_union(os.path.join('data',
                                                'input',
-                                               'nlsw88.dta'))
+                                               'nlsw88.csv'))
     union_robust = OLSRobust(y=[y], x=[x], data=data)
     union_robust.fit(controls=c,
                      draws=100)
@@ -33,7 +33,7 @@ def union_example():
 
 y, c, x, data = prepare_union(os.path.join('data',
                                            'input',
-                                        'nlsw88.dta'))
+                                            'nlsw88.csv'))
 
 # LR
 y = 'union'

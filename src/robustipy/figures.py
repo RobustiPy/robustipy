@@ -413,7 +413,7 @@ def plot_results(results_object,
                  ic=None,
                  colormap=None,
                  colorset=None,
-                 figsize=(26, 8)
+                 figsize=(16, 12)
                  ):
     """
     Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
@@ -547,19 +547,25 @@ def plot_results(results_object,
     ax5.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax6.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax1.set_xlim(0, len(results_object.specs_names))
+
+
     ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
                  ax1.get_ylim()[1])
-    ax1.text(ax1.get_xlim()[1] * .05, ax1.get_ylim()[1] * .94,
-             (f'Number of specifications:     {len(results_object.specs_names)}\n' +
-              f'Number of bootstraps:          {results_object.draws}\n' +
-              f'Number of folds:                   {results_object.kfold}'
-              ),
-             color='black',
-             fontsize=13,
-             bbox=dict(facecolor='white',
-                       edgecolor='black',
-                       boxstyle='round, pad=1'))
-
+    ax1.text(
+        0.05, 0.95,  # x, y coordinates
+        (f'Number of specifications: {len(results_object.specs_names)}\n' +
+         f'Number of bootstraps: {results_object.draws}\n' +
+         f'Number of folds: {results_object.kfold}'
+         ),  # The text string itself
+        transform=ax1.transAxes,
+        verticalalignment='top',
+        horizontalalignment='left',
+        color='black',
+        fontsize=13,
+        bbox=dict(facecolor='white',
+                  edgecolor='black',
+                  boxstyle='round,pad=1')
+    )
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     sns.despine(ax=ax4)
