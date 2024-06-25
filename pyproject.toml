@@ -31,8 +31,8 @@ dependencies = [
     'linearmodels>=4.27',
     'matplotlib>=3.6.1',
     'seaborn>=0.13.2',
-    'rich',
-    'scikit-learn'
+    'rich'>=13.6.0,
+    'scikit-learn>=1.5.0'
 ]
 license = {text = "GPLv3"}
 
