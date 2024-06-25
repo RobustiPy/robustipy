@@ -341,7 +341,7 @@ def prepare_union(path_to_union):
     ----------
     FileNotFoundError: If the file specified in 'path_to_union' does not exist.
     """
-    union_df = pd.read_csv(path_to_union)
+    union_df = pd.read_stata(path_to_union)
     union_df[['smsa','collgrad','married','union']]= union_df[['smsa','collgrad','married','union']].astype('str')
     union_df.loc[:, 'log_wage'] = np.log(union_df['wage'].copy()) * 100
     union_df = union_df[union_df['union'].notnull()].copy()
