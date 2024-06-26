@@ -184,7 +184,7 @@ def group_demean(x, group=None):
         return data - np.mean(data)
     data_gm = data.groupby([group]).transform('mean')
     out = data.drop(columns=group) - data_gm
-    return pd.concat([out, data.pidp], axis=1)
+    return pd.concat([out, data[group]], axis=1)
 
 
 def decorator_timer(some_function):
