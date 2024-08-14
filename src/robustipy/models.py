@@ -1009,6 +1009,8 @@ class LRobust(Protomodel):
             Estimate for x.
         p : float
             P value for x.
+        r2: float
+            r2 value for the full model
         AIC : float
             Akaike information criteria value for the model.
         BIC : float
@@ -1043,6 +1045,7 @@ class LRobust(Protomodel):
             av_k_metric = np.mean(metric)
         return (out['b'],
                 out['p'],
+                out['r2'],
                 out['ll'],
                 out['aic'],
                 out['bic'],
@@ -1098,6 +1101,8 @@ class LRobust(Protomodel):
             p_all_list = []
             b_array = np.empty([space_n, draws])
             p_array = np.empty([space_n, draws])
+            r2_array = np.empty([space_n, draws])
+            r2i_array = np.empty([space_n])
             ll_array = np.empty([space_n])
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
@@ -1119,11 +1124,11 @@ class LRobust(Protomodel):
 
                 if group:
                     comb = group_demean(comb, group=group)
-                (b_all, p_all, ll_i,
+                (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
 
-                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_regression)
                  (comb,
                   group,
@@ -1135,6 +1140,8 @@ class LRobust(Protomodel):
                 all_predictors.append(self.x + list(spec) + ['const'])
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
+                r2_array[index, :] = r2_list
+                r2i_array[index] = r2_i
                 ll_array[index] = ll_i
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
@@ -1155,6 +1162,8 @@ class LRobust(Protomodel):
                                 all_p=p_all_list,
                                 estimates=b_array,
                                 p_values=p_array,
+                                r2_values=r2_array,
+                                r2i_array=r2i_array,
                                 ll_array=ll_array,
                                 aic_array=aic_array,
                                 bic_array=bic_array,
@@ -1184,7 +1193,6 @@ class LRobust(Protomodel):
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
             output = logistic_regression_sm_stripped(y, x)
-            return output['b'][0][0], output['p'][0][0]
         else:
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
@@ -1193,4 +1201,4 @@ class LRobust(Protomodel):
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
             output = logistic_regression_sm(y, x)
-            return output['b'][0][0], output['p'][0][0]
+        return output['b'][0][0], output['p'][0][0], output['r2']
