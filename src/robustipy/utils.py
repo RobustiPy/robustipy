@@ -10,7 +10,7 @@ from itertools import chain, combinations
 import statsmodels.api as sm
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-
+import matplotlib.pyplot as plt
 
 def space_size(iterable) -> int:
     """
@@ -251,24 +251,29 @@ def get_selection_key(specs):
         raise ValueError('Argument `specs` must be a list of list.')
 
 
-def get_default_colormap(specs):
-    """
-    Generate default colormap for visualizing specifications.
+def get_colormap_colors(colormap_name, num_colors=3, brightness_threshold=0.7):
+    # Get the colormap by name
+    colormap = plt.get_cmap(colormap_name)
 
-    Parameters
-    ----------
-    specs: list
-        List of lists containing specifications.
+    # Generate evenly spaced intervals between 0 and 1
+    indices = np.linspace(0, 1, num_colors)
 
-    Returns
-    ----------
-    list: List of colors from the default colormap.
-    """
-    from matplotlib.colors import ListedColormap
-    default_cm = ListedColormap(['#4D0009', '#007D59', '#734C95']
-                               )
-    if all(isinstance(ele, list) for ele in specs):
-        colors = default_cm.resampled(len(specs)).colors
+    # Extract the corresponding colors from the colormap
+    colors = []
+    for i in indices:
+        color = colormap(i)
+
+        # Calculate brightness (using a simple average of the RGB values)
+        brightness = sum(color[:3]) / 3
+
+        # If brightness is too high, move to a darker color
+        while brightness > brightness_threshold and i > 0:
+            i -= 0.05  # Move to a slightly darker color in the colormap
+            color = colormap(i)
+            brightness = sum(color[:3]) / 3
+
+        colors.append(color)
+
     return colors
 
 

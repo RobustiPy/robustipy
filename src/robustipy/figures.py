@@ -3,12 +3,14 @@ import seaborn as sns
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
+import matplotlib as mpl
 from robustipy.utils import get_selection_key
-from robustipy.utils import get_default_colormap
+from robustipy.utils import get_colormap_colors
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import FancyArrowPatch
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+mpl.rcParams['font.family'] = 'Helvetica'
 
 
 def plot_curve(results_object,
@@ -30,7 +32,8 @@ def plot_curve(results_object,
     Returns:
         matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted curve.
     """
-    colors_curve = ['#001c54', '#E89818']
+    print('test2')
+    colors_curve = get_colormap_colors('Spectral_r', 2)
     if ax is None:
         ax = plt.gca()
     if colormap is None:
@@ -60,7 +63,7 @@ def plot_curve(results_object,
     ax.fill_between(df.index,
                     loess_min[:, 1],
                     loess_max[:, 1],
-                    facecolor=colors_curve[1],
+                    facecolor='#FEE08B',
                     alpha=0.075)
     if ax.get_ylim()[0]<0 and ax.get_ylim()[1]>0:
         ax.axhline(y=0, color='k', ls='--')
@@ -68,7 +71,7 @@ def plot_curve(results_object,
     if specs:
         idxs = df.index[df['idx']].tolist()
         if colorset is None:
-            colors = get_default_colormap(specs)
+            colors = get_colormap_colors('Spectral_r', len(specs))
         for idx, i in zip(idxs, range(len(specs))):
             control_names = list(df.spec_name.iloc[idx])
             label = 'Controls: ' + ', '.join(control_names).title()
@@ -126,10 +129,6 @@ def plot_curve(results_object,
               )
               )
     ax.set_axisbelow(False)
-    ax.grid(linestyle='--',
-            color='k',
-            alpha=0.15,
-            zorder=100)
     return ax
 
 
@@ -175,7 +174,7 @@ def plot_ic(results_object,
         idxs = df.index[df['idx']].tolist()
         full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
         if colorset is None:
-            colors = get_default_colormap(specs=specs)
+            colors = get_colormap_colors('Spectral_r', len(specs))
         ymin = ax.get_ylim()[0]
         ymax = ax.get_ylim()[1]
         ax.set_ylim(ymin, ymax)
@@ -306,7 +305,7 @@ def plot_bdist(results_object,
     df.columns = results_object.specs_names
     if specs:
         if colorset is None:
-            colors = get_default_colormap(specs=specs)
+            colors = get_colormap_colors('Spectral_r', len(specs))
         else:
             colors = colorset
         key = get_selection_key(specs)
@@ -321,27 +320,20 @@ def plot_bdist(results_object,
 
 def plot_kfolds(results_object,
                 ax):
-    # @TODO: hardcoding these is bad
-    colors = ['#001c54', '#E89818', '#8b0000']
-    sns.kdeplot(results_object.summary_df['av_k_metric'], ax=ax,
-                color=colors[1])
-    sns.histplot(results_object.summary_df['av_k_metric'], ax=ax,
-                 color=colors[0],
+    sns.kdeplot(results_object.summary_df['av_k_metric'], ax=ax, alpha=1,
+                color=get_colormap_colors('Spectral_r', 100)[99])
+    sns.histplot(results_object.summary_df['av_k_metric'], ax=ax, alpha=1,
+                 color=get_colormap_colors('Spectral_r', 100)[0],
                  bins=30, stat='density')
     val_range = max(results_object.summary_df['av_k_metric']) - min(results_object.summary_df['av_k_metric'])
     min_lim = min(results_object.summary_df['av_k_metric']) - val_range *.1
     max_lim = max(results_object.summary_df['av_k_metric']) + val_range *.1
     ax.set_xlim(min_lim, max_lim)
-    
     ax.yaxis.set_label_position("right")
-    ax.grid(linestyle='--',
-            color='k',
-            alpha=0.15,
-            zorder=100)
     legend_elements = [
-        Line2D([0], [0], color=colors[1], lw=2, linestyle='-',
-               label=r'Kernel Density', alpha=0.7),
-        Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1),
+        Line2D([0], [0], color=get_colormap_colors('Spectral_r', 100)[99], lw=2, linestyle='-',
+               label=r'Kernel Density', alpha=1),
+        Patch(facecolor=get_colormap_colors('Spectral_r', 100)[0], edgecolor=(0, 0, 0, 1),
               label=r'Histogram')]
     ax.legend(handles=legend_elements,
               loc='upper left',
@@ -361,18 +353,19 @@ def plot_bma(results_object, ax_left, ax_right):
     """
     Plots the Bayesian Model Averaging (BMA) probabilities and average coefficients.
     """
-    colors = ['#001c54', '#E89818', '#8b0000']
     bma = results_object.compute_bma()
     bma = bma.set_index('control_var')
     bma = bma.sort_values(by='probs', ascending=False)
     bma['probs'].plot(kind='barh',
                       ax=ax_left,
-                      color=(0 / 255, 28 / 255, 84 / 255, 0.75),
+                      alpha=1,
+                      color=get_colormap_colors('Spectral_r', 100)[0],
                       edgecolor='k',
                       )
     bma['average_coefs'].plot(kind='barh',
                               ax=ax_right,
-                              color=(232 / 255, 152 / 255, 24 / 255, .75),
+                              alpha=1,
+                              color=get_colormap_colors('Spectral_r', 100)[99],
                               edgecolor='k',
                               )
     ax_right.set_yticklabels([])
@@ -380,8 +373,8 @@ def plot_bma(results_object, ax_left, ax_right):
     ax_left.set_ylabel('')
 
     legend_elements = [
-        Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1),
-              label='     BMA      \nProbabilities', alpha=0.75)
+        Patch(facecolor=get_colormap_colors('Spectral_r', 100)[0], edgecolor=(0, 0, 0, 1),
+              label='     BMA      \nProbabilities', alpha=1)
     ]
     ax_left.legend(handles=legend_elements,
                    loc='upper right',
@@ -394,8 +387,8 @@ def plot_bma(results_object, ax_left, ax_right):
                    )
 
     legend_elements = [
-        Patch(facecolor=colors[1], edgecolor=(0, 0, 0, 1),
-              label='     BMA      \nCoefficients', alpha=0.75)
+        Patch(facecolor=get_colormap_colors('Spectral_r', 100)[99], edgecolor=(0, 0, 0, 1),
+              label='     BMA      \nCoefficients', alpha=1)
     ]
     ax_right.legend(handles=legend_elements,
                     loc='upper right',
@@ -429,15 +422,18 @@ def plot_results(results_object,
     Returns:
         matplotlib.figure.Figure: Figure containing the plotted results.
     """
-    fig = plt.figure(figsize=figsize)
-    gs = GridSpec(6, 12, wspace=0.25, hspace=1)
-    ax4 = fig.add_subplot(gs[0:2, 0:3])
-    ax6 = fig.add_subplot(gs[0:2, 3:6])
-    ax5 = fig.add_subplot(gs[0:2, 6:12])
-    ax1 = fig.add_subplot(gs[2:6, 0:8])
-    ax2 = fig.add_subplot(gs[2:4, 8:12])
-    ax3 = fig.add_subplot(gs[4:6, 8:12])
+    fig = plt.figure(figsize=(16, 16))
+    gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
+    ax7 = fig.add_subplot(gs[0:3, 0:12])
+    ax8 = fig.add_subplot(gs[0:3, 13:24])
+    ax4 = fig.add_subplot(gs[3:5, 0:6])
+    ax6 = fig.add_subplot(gs[3:5, 6:12])
+    ax5 = fig.add_subplot(gs[3:5, 12:23])
+    ax1 = fig.add_subplot(gs[5:9, 0:15])
+    ax2 = fig.add_subplot(gs[5:7, 16:23])
+    ax3 = fig.add_subplot(gs[7:9, 16:23])
 
+    color_map = plt.cm.Spectral_r
     ax2.axis('off')
     ax2.patch.set_alpha(0)
     ax3.axis('off')
@@ -475,52 +471,49 @@ def plot_results(results_object,
     ax3.axis('on')
     ax3.patch.set_alpha(0.5)
 
-    ax1.set_title('d.',
+    ax1.set_title('f.',
                   loc='left',
                   fontsize=16,
                   y=1)
-    ax2.set_title('e.',
+    ax2.set_title('g.',
                   loc='left',
                   fontsize=16,
                   y=1)
-    ax3.set_title('f.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-
-    ax4.set_title('a.',
+    ax3.set_title('h.',
                   loc='left',
                   fontsize=16,
                   y=1)
 
-    ax5.set_title('c.',
+    ax4.set_title('c.',
                   loc='left',
                   fontsize=16,
                   y=1)
 
-    ax6.set_title('b.',
+    ax5.set_title('e.',
                   loc='left',
                   fontsize=16,
                   y=1)
-    for ax in [ax1, ax2, ax3, ax4, ax5]:
-        ax1.tick_params(axis='both',
+
+    ax6.set_title('d.',
+                  loc='left',
+                  fontsize=16,
+                  y=1)
+    ax7.set_title('a.',
+                  loc='left',
+                  fontsize=16,
+                  y=1)
+    ax8.set_title('b.',
+                  loc='left',
+                  fontsize=16,
+                  y=1)
+
+    for ax in [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8]:
+        ax.tick_params(axis='both',
                         which='major',
                         labelsize=13)
-        ax2.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
-        ax3.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
-        ax4.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
-        ax5.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
-        ax6.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
+        ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
+        ax.set_axisbelow(True)
+
 
     for ax in [ax2, ax3]:
         ax.yaxis.set_label_position("right")
@@ -529,9 +522,11 @@ def plot_results(results_object,
     ax1.set_xlabel('Ordered Specifications', fontsize=13)
     if results_object.name_av_k_metric=='rmse':
         metric = results_object.name_av_k_metric.upper()
+    elif results_object.name_av_k_metric=='R-Squared':
+        metric = r'R$^2'
     else:
         metric = results_object.name_av_k_metric.title()
-    ax5.set_xlabel(metric, fontsize=13)
+    ax5.set_xlabel('Out-of-Sample Evaluation Metric: ' + metric, fontsize=13)
     ax2.set_ylabel(f'{ic.upper()} curve', fontsize=13)
     ax2.set_xlabel('Ordered Specifications', fontsize=13)
     ax3.set_ylabel('Density', fontsize=13)
@@ -539,13 +534,6 @@ def plot_results(results_object,
     ax4.set_xlabel('Probabilities', fontsize=13)
     ax6.set_xlabel('Average Coefficients', fontsize=13)
     ax3.set_xlabel('Coefficient Estimate', fontsize=13)
-    ax2.set_axisbelow(True)
-    ax3.set_axisbelow(True)
-    ax2.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
-    ax3.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
-    ax4.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
-    ax5.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
-    ax6.grid(linestyle='--', color='k', alpha=0.15, zorder=0)
     ax1.set_xlim(0, len(results_object.specs_names))
 
 
@@ -566,6 +554,37 @@ def plot_results(results_object,
                   edgecolor='black',
                   boxstyle='round,pad=1')
     )
+
+    image = ax7.hexbin(results_object.estimates.stack(),
+                       results_object.r2_values.stack(), cmap=color_map, gridsize=20,  # extent=extent,
+                       mincnt=1,
+                       # bins='log',
+                       edgecolor='k')
+    cb = fig.colorbar(image, ax=ax7, spacing='uniform', pad=0.05, extend='max')
+    cb.ax.set_title('Count')
+    ax7.set_ylabel(r'In-Sample R$^2$', fontsize=13)
+    ax7.set_xlabel(r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', fontsize=13)
+    ticks = cb.get_ticks()
+    cb.set_ticklabels([f'{int(tick / 1000)}k' for tick in ticks])
+
+    image = ax8.hexbin([arr[0][0] for arr in results_object.all_b],
+                       results_object.summary_df['ll'],
+                       cmap=color_map,
+                       gridsize=20,
+                       # extent=extent,
+                       mincnt=1,
+                       #                   bins='log',
+                       edgecolor='k')
+
+    cb = fig.colorbar(image, ax=ax8, spacing='uniform', extend='max', pad=0.05)
+    cb.ax.set_title('Count')
+    ax8.set_ylabel('')
+    ax8.set_ylabel(r'Full Model Log Likelihood', fontsize=13)
+    ax8.set_xlabel(r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', fontsize=13)
+
+    sns.despine()
+
+
     sns.despine(ax=ax2, right=False, left=True)
     sns.despine(ax=ax3, right=False, left=True)
     sns.despine(ax=ax4)
