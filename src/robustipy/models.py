@@ -21,18 +21,14 @@ from sklearn.metrics import log_loss
 from sklearn.metrics import r2_score
 
 
-
 class MergedResult(Protoresult):
-    def __init__(self, *,
-                 y,
-                 specs,
-                 estimates,
-                 p_values, ):
+    def __init__(self, *, y, specs, estimates, p_values, r2_values):
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
+        self.r2_values = pd.DataFrame(r2_values)
         self.summary_df = self._compute_summary()
         self.summary_df['spec_name'] = self.specs_names
 
@@ -119,12 +115,14 @@ class MergedResult(Protoresult):
         specs = specs_original + specs_new
         estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True)
         p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
+        r2_values = pd.concat([self.r2_values, result_obj.r2_values], ignore_index=True)
 
         return MergedResult(
             y=y,
             specs=specs,
             estimates=estimates,
-            p_values=p_values
+            p_values=p_values,
+            r2_values=r2_values
         )
 
 
@@ -142,6 +140,8 @@ class OLSResult(Protoresult):
         all_b (list of lists): List of coefficient estimates for each specification and draw.
         all_p (list of lists): List of p-values for each specification and draw.
         p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.
+        r2_values (pd.DataFrame): DataFrame containing r2 for each specification and draw.
+        r2i_array (pd.DataFrame): DataFrame containing r2 for each specification (no straps).
         ll_array (list): List of log-likelihood values for each specification.
         aic_array (list): List of AIC values for each specification.
         bic_array (list): List of BIC values for each specification.
@@ -194,6 +194,8 @@ class OLSResult(Protoresult):
                  all_b,
                  all_p,
                  p_values,
+                 r2_values,
+                 r2i_array,
                  ll_array,
                  aic_array,
                  bic_array,
@@ -212,9 +214,11 @@ class OLSResult(Protoresult):
         self.kfold = kfold
         self.estimates = pd.DataFrame(estimates)
         self.p_values = pd.DataFrame(p_values)
+        self.r2_values = pd.DataFrame(r2_values)
         self.all_b = all_b
         self.all_p = all_p
         self.summary_df = self._compute_summary()
+        self.summary_df['r2'] = pd.Series(r2i_array)
         self.summary_df['ll'] = pd.Series(ll_array)
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
@@ -277,7 +281,8 @@ class OLSResult(Protoresult):
         # Prepare the DataFrame for model metrics
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
-            'p_values': [p[0][0] for p in self.all_p]
+            'p_values': [p[0][0] for p in self.all_p],
+            'r2_values': [r2 for r2 in self.all_r2]
         })
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
@@ -291,7 +296,7 @@ class OLSResult(Protoresult):
         print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
         print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
         print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
-
+        print(f"Mean R2: {df_model_result['r2_values'].mean():.2f}")
         print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
@@ -304,9 +309,6 @@ class OLSResult(Protoresult):
         print(f'Min: {oos_min_row["av_k_metric"]}, Specs: {list(oos_min_row["spec_name"])} ')
         print(f"Mean: {self.summary_df['av_k_metric'].mean():.2f}")
         print(f"Median: {self.summary_df['av_k_metric'].median():.2f}")
-
-
-
 
 
     def plot(self,
@@ -428,13 +430,9 @@ class OLSResult(Protoresult):
         specs = specs_original + specs_new
         estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True)
         p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
+        r2_values = pd.concat([self.r2_values, result_obj.r2_values], ignore_index=True)
 
-        return MergedResult(
-            y=y,
-            specs=specs,
-            estimates=estimates,
-            p_values=p_values
-        )
+        return MergedResult(y=y, specs=specs, estimates=estimates, p_values=p_values, r2_values=r2_values)
 
     def save_to_csv(self, path: str):
         """
@@ -510,9 +508,10 @@ class OLSRobust(Protomodel):
         """
         return self.results
 
+
     def multiple_y(self):
         """
-        Cumputes composite y based on multiple indicators provided.
+        Computes composite y based on multiple indicators provided.
         """
         self.y_specs = []
         self.y_composites = []
@@ -586,6 +585,7 @@ class OLSRobust(Protomodel):
             list_all_predictors = []
             list_b_array = []
             list_p_array = []
+            list_r2_array = []
             list_ll_array = []
             list_aic_array = []
             list_bic_array = []
@@ -598,6 +598,8 @@ class OLSRobust(Protomodel):
                 space_n = space_size(controls)
                 b_array = np.empty([space_n, draws])
                 p_array = np.empty([space_n, draws])
+                r2_array = np.empty([space_n, draws])
+                r2i_array = np.empty([space_n])
                 ll_array = np.empty([space_n])
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
@@ -619,25 +621,27 @@ class OLSRobust(Protomodel):
 
                     if group:
                         comb = group_demean(comb, group=group)
-                    (b_all, p_all, ll_i,
+                    (b_all, p_all, r2_i, ll_i,
                      aic_i, bic_i, hqic_i,
                      av_k_metric_i) = self._full_sample_OLS(comb,
                                                             kfold=kfold,
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
-                    b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                    b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
                     (delayed(self._strap_OLS)
                      (comb,
                       group,
                       sample_size,
                       shuffle)
-                     for i in range(0,
+                     for _ in range(0,
                                     draws))))
                     y_names.append(y_name)
                     specs.append(frozenset(list(y_name) + list(spec)))
                     all_predictors.append(self.x + list(spec) + ['const'])
                     b_array[index, :] = b_list
                     p_array[index, :] = p_list
+                    r2_array[index, :] = r2_list
+                    r2i_array[index] = r2_i
                     ll_array[index] = ll_i
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
@@ -647,6 +651,8 @@ class OLSRobust(Protomodel):
                 list_all_predictors.append(all_predictors)
                 list_b_array.append(b_array)
                 list_p_array.append(p_array)
+                list_r2_array.append(r2_array)
+                list_r2i_array.append(r2i_array)
                 list_ll_array.append(ll_array)
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
@@ -666,6 +672,8 @@ class OLSRobust(Protomodel):
                 all_p=p_all,
                 estimates=np.vstack(list_b_array),
                 p_values=np.vstack(list_p_array),
+                r2_values=np.vstack(list_r2_array),
+                r2_array=np.hstack(list_r2i_array),
                 ll_array=np.hstack(list_ll_array),
                 aic_array=np.hstack(list_aic_array),
                 bic_array=np.hstack(list_bic_array),
@@ -674,9 +682,7 @@ class OLSRobust(Protomodel):
                 model_name=self.model_name,
                 name_av_k_metric=self.oos_metric_name
             )
-
             self.results = results
-
         else:
             space_n = space_size(controls)
             specs = []
@@ -685,6 +691,8 @@ class OLSRobust(Protomodel):
             p_all_list = []
             b_array = np.empty([space_n, draws])
             p_array = np.empty([space_n, draws])
+            r2_array = np.empty([space_n, draws])
+            r2i_array = np.empty([space_n])
             ll_array = np.empty([space_n])
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
@@ -703,13 +711,13 @@ class OLSRobust(Protomodel):
 
                 if group:
                     comb = group_demean(comb, group=group)
-                (b_all, p_all, ll_i,
+                (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample_OLS(comb,
                                                         kfold=kfold,
                                                         group=group,
                                                         oos_metric_name=self.oos_metric_name)
-                b_list, p_list = (zip(*Parallel(n_jobs=-1)
+                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
                 (delayed(self._strap_OLS)
                  (comb,
                   group,
@@ -722,6 +730,8 @@ class OLSRobust(Protomodel):
                 all_predictors.append(self.x + list(spec) + ['const'])
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
+                r2_array[index, :] = r2_list
+                r2i_array[index] = r2_i
                 ll_array[index] = ll_i
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
@@ -729,7 +739,6 @@ class OLSRobust(Protomodel):
                 av_k_metric_array[index] = av_k_metric_i
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
-
             results = OLSResult(y=self.y[0],
                                 x=self.x[0],
                                 data=self.data,
@@ -742,6 +751,8 @@ class OLSRobust(Protomodel):
                                 all_p=p_all_list,
                                 estimates=b_array,
                                 p_values=p_array,
+                                r2_values=r2_array,
+                                r2i_array=r2i_array,
                                 ll_array=ll_array,
                                 aic_array=aic_array,
                                 bic_array=bic_array,
@@ -749,8 +760,8 @@ class OLSRobust(Protomodel):
                                 av_k_metric_array=av_k_metric_array,
                                 model_name=self.model_name,
                                 name_av_k_metric=self.oos_metric_name)
-
             self.results = results
+
 
     def _predict(self, x_test, betas):
         """
@@ -769,6 +780,7 @@ class OLSRobust(Protomodel):
             Predicted values for the dependent variable.
         """
         return np.dot(x_test, betas)
+
     
     def _full_sample_OLS(self,
                          comb_var,
@@ -791,6 +803,8 @@ class OLSRobust(Protomodel):
             Estimate for x.
         p : float
             P value for x.
+        r2: float
+            R2 value for the model
         AIC : float
             Akaike information criteria value for the model.
         BIC : float
@@ -844,6 +858,7 @@ class OLSRobust(Protomodel):
                 av_k_metric = np.mean(metric)
         return (out['b'],
                 out['p'],
+                out['r2'],
                 out['ll'][0][0],
                 out['aic'][0][0],
                 out['bic'][0][0],
@@ -890,10 +905,6 @@ class OLSRobust(Protomodel):
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
-            output = stripped_ols(y=y, x=x)
-            b = output['b']
-            p = output['p']
-            return b[0][0], p[0][0]
         else:
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
@@ -901,11 +912,11 @@ class OLSRobust(Protomodel):
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
-            output = stripped_ols(y=y, x=x)
-            b = output['b']
-            p = output['p']
-            return b[0][0], p[0][0]
-
+        output = stripped_ols(y=y, x=x)
+        b = output['b']
+        p = output['p']
+        r2 = output['r2']
+        return b[0][0], p[0][0], r2
 
 class LRobust(Protomodel):
     """
@@ -1008,7 +1019,6 @@ class LRobust(Protomodel):
         #TODO Fixed effects Logistic Regression?
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
-
         out = logistic_regression_sm(y=y, x=x)
         av_k_metric = None
 
@@ -1184,4 +1194,3 @@ class LRobust(Protomodel):
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
             output = logistic_regression_sm(y, x)
             return output['b'][0][0], output['p'][0][0]
-
