@@ -41,7 +41,6 @@ class MergedResult(Protoresult):
     def _compute_summary(self):
         """
         Computes summary statistics based on coefficient estimates.
-
         Returns:
             pd.DataFrame: DataFrame containing summary statistics.
         """
@@ -292,11 +291,13 @@ class OLSResult(Protoresult):
         print('2.1 Inference Metrics')
         print_separator()
 
+        print(f"Mean R2: {df_model_result['r2_values'].mean():.2f}")
         print(f"Mean beta: {df_model_result['betas'].mean():.2f}")
         print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
         print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
         print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
-        print(f"Mean R2: {df_model_result['r2_values'].mean():.2f}")
+        print(f"Negative and Significant portion of beta: {((1 - df_model_result['positive_beta']) & df_model_result['significant']).mean():.2f}")
+
         print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
@@ -1018,7 +1019,7 @@ class LRobust(Protomodel):
         HQIC : float
             Hannan-Quinn information criteria value for the model.
         """
-        #TODO Fixed effects Logistic Regression?
+        # TODO Fixed effects Logistic Regression?
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
         out = logistic_regression_sm(y=y, x=x)
