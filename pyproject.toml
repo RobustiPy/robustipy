@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robustipy"
-version = "1.0b1"
+version = "1.0b2"
 authors = [
   { name="Daniel Valdenegro", email="daniel.valdenegro@demography.ox.ac.uk" },
   { name="Charles Rahal", email="charles.rahal@demography.ox.ac.uk" },

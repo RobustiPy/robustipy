@@ -21,7 +21,6 @@ from sklearn.metrics import log_loss
 from sklearn.metrics import r2_score
 
 
-
 class MergedResult(Protoresult):
     def __init__(self, *,
                  y,
