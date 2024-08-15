@@ -532,7 +532,12 @@ def plot_results(results_object,
     data = image.get_array()
     ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
     cb.set_ticks(ticks)
-    cb.set_ticklabels([f'{int(tick / 1000)}k' for tick in ticks])
+    if (data.max() >= 1000) and (data.max() < 10000):
+        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
+    elif (data.max() >= 10000):
+        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
+    else:
+        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
     ax7.set_ylabel(r'In-Sample R$^2$', fontsize=13)
     ax7.set_xlabel(r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', fontsize=13)
@@ -549,6 +554,12 @@ def plot_results(results_object,
     data = image.get_array()
     ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
     cb.set_ticks(ticks)
+    if (data.max() >= 1000) and (data.max() < 10000):
+        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
+    elif (data.max() >= 10000):
+        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
+    else:
+        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
     ax8.set_ylabel('')
     ax8.set_ylabel(r'Full Model Log Likelihood', fontsize=13)
