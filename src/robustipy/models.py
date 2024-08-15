@@ -9,7 +9,7 @@ from robustipy.utils import simple_ols, logistic_regression_sm, logistic_regress
 from robustipy.bootstrap_utils import stripped_ols
 from robustipy.utils import space_size
 from robustipy.utils import all_subsets
-from robustipy.figures import plot_results, plot_curve
+from robustipy.figures import plot_results#, plot_curve
 from robustipy.utils import group_demean
 from robustipy.prototypes import MissingValueWarning
 import _pickle
@@ -57,9 +57,8 @@ class MergedResult(Protoresult):
 
     def plot(self,
              specs=None,
-             colormap=None,
-             colorset=None,
-             figsize=(12, 6)):
+             colormap='Spectral_r',
+             figsize=(16, 14)):
         """
         Plots the regression results using specified options.
 
@@ -78,11 +77,10 @@ class MergedResult(Protoresult):
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
 
-        plot_curve(results_object=self,
+        plot_results(results_object=self,
                    specs=specs,
                    ax=ax,
-                   colormap=colormap,
-                   colorset=colorset)
+                   colormap='Spectral_r')
         return fig
 
     def merge(self, result_obj, left_prefix, right_prefix):
@@ -157,7 +155,7 @@ class OLSResult(Protoresult):
         summary():
             Placeholder for a method to generate a summary of the results.
 
-        plot(specs=None, ic=None, colormap=None, colorset=None, figsize=(12, 6)):
+        plot(specs=None, ic=None, colormap=None, figsize=(12, 6)):
             Generate plots of the OLS results.
 
         compute_bma():
@@ -315,8 +313,7 @@ class OLSResult(Protoresult):
     def plot(self,
              specs=None,
              ic='aic',
-             colormap=None,
-             colorset=None,
+             colormap='Spectral_r',
              figsize=(12, 6)):
         """
         Plots the regression results using specified options.
@@ -325,7 +322,6 @@ class OLSResult(Protoresult):
             specs (list, optional): List of list of specification names to include in the plot.
             ic (str, optional): Information criterion to use for model selection (e.g., 'bic', 'aic').
             colormap (str, optional): Colormap to use for the plot.
-            colorset (list, optional): List of colors to use for different specifications.
             figsize (tuple, optional): Size of the figure (width, height) in inches.
 
         Returns:
@@ -348,7 +344,6 @@ class OLSResult(Protoresult):
                             specs=specs,
                             ic=ic,
                             colormap=colormap,
-                            colorset=colorset,
                             figsize=figsize)
 
     def _compute_summary(self):
