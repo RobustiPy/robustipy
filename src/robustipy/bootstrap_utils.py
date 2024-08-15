@@ -50,5 +50,8 @@ def stripped_ols(y, x) -> dict:
     se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
     t = b / se  # coef. t-statistics
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
+    R2 = 1 - e.var() / y.var()  # model R-squared
+    R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     return {'b': b,
-            'p': p}
+            'p': p,
+            'r2': R2adj}

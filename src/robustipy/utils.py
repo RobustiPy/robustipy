@@ -10,7 +10,7 @@ from itertools import chain, combinations
 import statsmodels.api as sm
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-
+import matplotlib.pyplot as plt
 
 def space_size(iterable) -> int:
     """
@@ -82,8 +82,14 @@ def logistic_regression_sm(y, x) -> dict:
     n = result.nobs
     k = result.df_model + 1
     ll = result.llf
+
+    null_model = sm.Logit(y, np.ones_like(y))  # only intercept
+    result_null = null_model.fit(disp=0)
+    ll_null = result_null.llf
+    r2 = 1 - (ll / ll_null)
     return {'b': [[x] for x in result.params.values],
             'p': [[x] for x in result.pvalues.values],
+            'r2': r2,
             'll': ll,
             'aic': make_aic(ll, n),
             'bic': make_bic(ll, n, k),
@@ -111,8 +117,22 @@ def logistic_regression_sm_stripped(y, x) -> dict:
     X_const = sm.add_constant(x, prepend=False)
     model = sm.Logit(y, X_const)
     result = model.fit(disp=0)
+#    n = result.nobs
+#    k = result.df_model + 1
+    ll = result.llf
+    null_model = sm.Logit(y, np.ones_like(y))  # only intercept
+    result_null = null_model.fit(disp=0)
+    ll_null = result_null.llf
+    r2 = 1 - (ll / ll_null)
     return {'b': [[x] for x in result.params.values],
-            'p': [[x] for x in result.pvalues.values]}
+            'p': [[x] for x in result.pvalues.values],
+            'r2': r2,
+#            'll': ll#,
+#            'aic': make_aic(ll, n),
+#            'bic': make_bic(ll, n, k),
+#            'hqic': make_hqic(ll, n, k)
+            }
+
 
 
 def simple_ols(y, x) -> dict:
@@ -151,12 +171,13 @@ def simple_ols(y, x) -> dict:
     se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
     t = b / se  # coef. t-statistics
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
-    #R2 = 1 - e.var() / y.var()  # model R-squared
-    #R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
+    R2 = 1 - e.var() / y.var()  # model R-squared
+    R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     ll = (-(nobs * 1 / 2) * (1 + np.log(2 * np.pi)) - (nobs / 2)
           * np.log(abs(np.dot(e.T, e) / nobs)))
     return {'b': b,
             'p': p,
+            'r2': R2adj,
             'll': ll,
             'aic': make_aic(ll, nobs),
             'bic': make_bic(ll, nobs, ncoef),
@@ -230,24 +251,29 @@ def get_selection_key(specs):
         raise ValueError('Argument `specs` must be a list of list.')
 
 
-def get_default_colormap(specs):
-    """
-    Generate default colormap for visualizing specifications.
+def get_colormap_colors(colormap_name, num_colors=3, brightness_threshold=0.7):
+    # Get the colormap by name
+    colormap = plt.get_cmap(colormap_name)
 
-    Parameters
-    ----------
-    specs: list
-        List of lists containing specifications.
+    # Generate evenly spaced intervals between 0 and 1
+    indices = np.linspace(0, 1, num_colors)
 
-    Returns
-    ----------
-    list: List of colors from the default colormap.
-    """
-    from matplotlib.colors import ListedColormap
-    default_cm = ListedColormap(['#4D0009', '#007D59', '#734C95']
-                               )
-    if all(isinstance(ele, list) for ele in specs):
-        colors = default_cm.resampled(len(specs)).colors
+    # Extract the corresponding colors from the colormap
+    colors = []
+    for i in indices:
+        color = colormap(i)
+
+        # Calculate brightness (using a simple average of the RGB values)
+        brightness = sum(color[:3]) / 3
+
+        # If brightness is too high, move to a darker color
+        while brightness > brightness_threshold and i > 0:
+            i -= 0.05  # Move to a slightly darker color in the colormap
+            color = colormap(i)
+            brightness = sum(color[:3]) / 3
+
+        colors.append(color)
+
     return colors
 
 
