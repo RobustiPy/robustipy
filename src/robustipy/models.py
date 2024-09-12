@@ -279,7 +279,7 @@ class OLSResult(Protoresult):
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
-            'r2_values': [r2 for r2 in self.all_r2]
+            'r2_values': [r2 for r2 in self.r2_values]
         })
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
