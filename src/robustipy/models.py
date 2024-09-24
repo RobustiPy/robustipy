@@ -1,5 +1,7 @@
 from robustipy.prototypes import Protomodel
 from robustipy.prototypes import Protoresult
+import sklearn
+import shap
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +17,7 @@ from robustipy.prototypes import MissingValueWarning
 import _pickle
 import warnings
 from statsmodels.tools.tools import add_constant
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold, GroupKFold
 from sklearn.metrics import root_mean_squared_error
 from sklearn.metrics import log_loss
@@ -199,7 +202,8 @@ class OLSResult(Protoresult):
                  hqic_array,
                  av_k_metric_array=None,
                  model_name,
-                 name_av_k_metric=None):
+                 name_av_k_metric=None,
+                 shap_return=None):
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -225,6 +229,7 @@ class OLSResult(Protoresult):
         self.summary_df['y'] = self.y_name
         self.model_name = model_name
         self.name_av_k_metric = name_av_k_metric
+        self.shap_return = shap_return
 
     def save(self, filename):
         """
@@ -602,7 +607,15 @@ class OLSRobust(Protomodel):
                 hqic_array = np.empty([space_n])
                 all_predictors = []
                 av_k_metric_array = np.empty([space_n])
-
+                x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
+                                                               self.data[self.y],
+                                                               test_size=0.2,
+                                                               random_state=72
+                                                               )
+                model = sklearn.linear_model.LinearRegression()
+                model.fit(x_train, y_train)
+                explainer = shap.LinearExplainer(model, x_train, feature_perturbation="correlation_dependent")
+                shap_return = [explainer.shap_values(x_test), x_test]
                 for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                     if len(spec) == 0:
                         comb = self.data[self.x]
@@ -676,7 +689,8 @@ class OLSRobust(Protomodel):
                 hqic_array=np.hstack(list_hqic_array),
                 av_k_metric_array=np.hstack(list_av_k_metric_array),
                 model_name=self.model_name,
-                name_av_k_metric=self.oos_metric_name
+                name_av_k_metric=self.oos_metric_name,
+                shap_return=shap_return
             )
             self.results = results
         else:
@@ -694,6 +708,15 @@ class OLSRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
+            x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
+                                                           self.data[self.y],
+                                                           test_size=0.2,
+                                                           random_state=72
+                                                           )
+            model = sklearn.linear_model.LogisticRegression(penalty="l1", C=0.1)
+            model.fit(x_train, y_train)
+            explainer = shap.LinearExplainer(model, x_train, feature_perturbation="correlation_dependent")
+            shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
@@ -755,7 +778,8 @@ class OLSRobust(Protomodel):
                                 hqic_array=hqic_array,
                                 av_k_metric_array=av_k_metric_array,
                                 model_name=self.model_name,
-                                name_av_k_metric=self.oos_metric_name)
+                                name_av_k_metric=self.oos_metric_name,
+                                shap_return=shap_return)
             self.results = results
 
 
@@ -1104,7 +1128,7 @@ class LRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-
+# HERE
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
 
                 if len(spec) == 0:

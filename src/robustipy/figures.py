@@ -1,3 +1,7 @@
+from __future__ import annotations
+import matplotlib.cm as cm
+from scipy.stats import gaussian_kde
+from shap.plots._labels import labels
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -10,7 +14,195 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import FancyArrowPatch
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+plt.rcParams['axes.unicode_minus'] = False
 mpl.rcParams['font.family'] = 'Helvetica'
+
+
+def shap_violin(
+        ax,
+        shap_values,
+        features=None,
+        feature_names=None,
+        max_display=10,
+        color=None,
+        alpha=1,
+        cmap='Spectral_r',
+        use_log_scale=False,
+):
+    """Create a SHAP beeswarm plot, colored by feature values when they are provided.
+
+    Parameters
+    ----------
+    shap_values : numpy.array
+        For single output explanations this is a matrix of SHAP values (# samples x # features).
+        For multi-output explanations this is a list of such matrices of SHAP values.
+
+    features : numpy.array or pandas.DataFrame or list
+        Matrix of feature values (# samples x # features) or a feature_names list as shorthand
+
+    feature_names : list
+        Names of the features (length # features)
+
+    max_display : int
+        How many top features to include in the plot (default is 20, or 7 for interaction plots)
+    """
+    if str(type(shap_values)).endswith("Explanation'>"):
+        shap_exp = shap_values
+        shap_values = shap_exp.values
+        if features is None:
+            features = shap_exp.data
+        if feature_names is None:
+            feature_names = shap_exp.feature_names
+        if len(shap_exp.base_values.shape) == 2 and shap_exp.base_values.shape[1] > 2:
+            shap_values = [shap_values[:, :, i] for i in range(shap_exp.base_values.shape[1])]
+    if isinstance(features, pd.DataFrame):
+        if feature_names is None:
+            feature_names = features.columns
+        features = features.values
+    elif isinstance(features, list):
+        if feature_names is None:
+            feature_names = features
+        features = None
+    elif (features is not None) and len(features.shape) == 1 and feature_names is None:
+        feature_names = features
+        features = None
+    num_features = shap_values.shape[1]
+    if features is not None:
+        shape_msg = "The shape of the shap_values matrix does not match the shape of the provided data matrix."
+        if num_features - 1 == features.shape[1]:
+            raise ValueError(
+                shape_msg + " Perhaps the extra column in the shap_values matrix is the "
+                            "constant offset? Of so just pass shap_values[:,:-1]."
+            )
+        else:
+            assert num_features == features.shape[1], shape_msg
+    if feature_names is None:
+        feature_names = np.array([labels["FEATURE"] % str(i) for i in range(num_features)])
+    if use_log_scale:
+        ax.xscale("symlog")
+    if max_display is None:
+        max_display = 20
+    feature_order = np.argsort(np.sum(np.abs(shap_values), axis=0))
+    feature_order = feature_order[-min(max_display, len(feature_order)):]
+    for pos in range(len(feature_order)):
+        ax.axhline(y=pos, color="#cccccc", lw=0.5, dashes=(1, 5), zorder=-1)
+
+    if features is not None:
+        global_low = np.nanpercentile(shap_values[:, : len(feature_names)].flatten(), 1)
+        global_high = np.nanpercentile(shap_values[:, : len(feature_names)].flatten(), 99)
+        for pos, i in enumerate(feature_order):
+            shaps = shap_values[:, i]
+            shap_min, shap_max = np.min(shaps), np.max(shaps)
+            rng = shap_max - shap_min
+            xs = np.linspace(np.min(shaps) - rng * 0.2, np.max(shaps) + rng * 0.2, 100)
+            if np.std(shaps) < (global_high - global_low) / 100:
+                ds = gaussian_kde(shaps + np.random.randn(len(shaps)) * (global_high - global_low) / 100)(xs)
+            else:
+                ds = gaussian_kde(shaps)(xs)
+            ds /= np.max(ds) * 3
+            values = features[:, i]
+            smooth_values = np.zeros(len(xs) - 1)
+            sort_inds = np.argsort(shaps)
+            trailing_pos = 0
+            leading_pos = 0
+            running_sum = 0
+            back_fill = 0
+            for j in range(len(xs) - 1):
+                while leading_pos < len(shaps) and xs[j] >= shaps[sort_inds[leading_pos]]:
+                    running_sum += values[sort_inds[leading_pos]]
+                    leading_pos += 1
+                    if leading_pos - trailing_pos > 20:
+                        running_sum -= values[sort_inds[trailing_pos]]
+                        trailing_pos += 1
+                if leading_pos - trailing_pos > 0:
+                    smooth_values[j] = running_sum / (leading_pos - trailing_pos)
+                    for k in range(back_fill):
+                        smooth_values[j - k - 1] = smooth_values[j]
+                else:
+                    back_fill += 1
+            vmin = np.nanpercentile(values, 5)
+            vmax = np.nanpercentile(values, 95)
+            if vmin == vmax:
+                vmin = np.nanpercentile(values, 1)
+                vmax = np.nanpercentile(values, 99)
+                if vmin == vmax:
+                    vmin = np.min(values)
+                    vmax = np.max(values)
+            nan_mask = np.isnan(values)
+            ax.scatter(
+                shaps[nan_mask],
+                np.ones(shap_values[nan_mask].shape[0]) * pos,
+                color="#777777",
+                s=9,
+                alpha=alpha,
+                linewidth=0,
+                zorder=1,
+            )
+            cvals = values[np.invert(nan_mask)].astype(np.float64)
+            cvals_imp = cvals.copy()
+            cvals_imp[np.isnan(cvals)] = (vmin + vmax) / 2.0
+            cvals[cvals_imp > vmax] = vmax
+            cvals[cvals_imp < vmin] = vmin
+            ax.scatter(
+                shaps[np.invert(nan_mask)],
+                np.ones(shap_values[np.invert(nan_mask)].shape[0]) * pos,
+                cmap='Spectral_r',
+                vmin=vmin,
+                vmax=vmax,
+                s=9,
+                c=cvals,
+                alpha=alpha,
+                linewidth=0,
+                zorder=1,
+            )
+            smooth_values -= vmin
+            if vmax - vmin > 0:
+                smooth_values /= vmax - vmin
+            from matplotlib.colors import LinearSegmentedColormap
+            for i in range(len(xs) - 1):
+                if ds[i] > 0.05 or ds[i + 1] > 0.05:
+                    ax.fill_between(
+                        [xs[i], xs[i + 1]],
+                        [pos + ds[i], pos + ds[i + 1]],
+                        [pos - ds[i], pos - ds[i + 1]],
+                        color=plt.get_cmap(cmap)(smooth_values[i]),
+                        zorder=2,
+                    )
+    else:
+        parts = ax.violinplot(
+            shap_values[:, feature_order],
+            range(len(feature_order)),
+            points=200,
+            vert=False,
+            widths=0.7,
+            showmeans=False,
+            showextrema=False,
+            showmedians=False,
+        )
+        for pc in parts["bodies"]:
+            pc.set_facecolor(color)
+            pc.set_edgecolor("none")
+            pc.set_alpha(alpha)
+
+    m = cm.ScalarMappable(cmap=cmap)
+    m.set_array([0, 1])
+    cb = plt.colorbar(m, ax=ax, ticks=[0, 1], aspect=20)
+    cb.set_ticklabels(['Low', 'High'])
+    cb.set_label('Feature Value', size=12, labelpad=-20)
+    cb.outline.set_edgecolor('k')
+    cb.ax.tick_params(labelsize=11, length=0)
+    cb.set_alpha(1)
+    cb.outline.set_visible(True)
+    ax.xaxis.set_ticks_position("bottom")
+    ax.spines["left"].set_visible(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    feature_name_order = [feature_names[i] for i in feature_order]
+    ax.set_yticks(range(len(feature_order)), feature_name_order, fontsize=13)
+    ax.set_ylim(-1, len(feature_order))
+    ax.set_xlabel('SHAP Values', fontsize=13)
+    return feature_name_order
+
 
 
 def plot_curve(results_object,
@@ -332,56 +524,56 @@ def plot_kfolds(results_object,
     sns.despine(ax=ax, left=True)
 
 
-def plot_bma(results_object, colormap, ax_left, ax_right):
+def plot_bma(results_object, colormap, ax_left, feature_order):
     """
     Plots the Bayesian Model Averaging (BMA) probabilities and average coefficients.
     """
     bma = results_object.compute_bma()
     bma = bma.set_index('control_var')
-    bma = bma.sort_values(by='probs', ascending=False)
+    bma = bma.reindex(feature_order)
+#    bma = bma.sort_values(by='probs', ascending=False)
     bma['probs'].plot(kind='barh',
                       ax=ax_left,
                       alpha=1,
                       color=get_colormap_colors(colormap, 100)[0],
                       edgecolor='k',
                       )
-    bma['average_coefs'].plot(kind='barh',
-                              ax=ax_right,
-                              alpha=1,
-                              color=get_colormap_colors(colormap, 100)[99],
-                              edgecolor='k',
-                              )
-    ax_right.set_yticklabels([])
-    ax_right.set_ylabel('')
+#    bma['average_coefs'].plot(kind='barh',
+#                              ax=ax_right,
+#                              alpha=1,
+#                              color=get_colormap_colors(colormap, 100)[99],
+#                              edgecolor='k',
+#                              )
+#    ax_right.set_yticklabels([])
+#    ax_right.set_ylabel('')
     ax_left.set_ylabel('')
-    legend_elements = [
-        Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
-              label='     BMA      \nProbabilities', alpha=1)
-    ]
-    ax_left.legend(handles=legend_elements,
-                   loc='upper right',
-                   frameon=True,
-                   fontsize=10,
-                   framealpha=1,
-                   facecolor='w',
-                   edgecolor=(0, 0, 0, 1),
-                   ncols=1
-                   )
+#    legend_elements = [
+#        Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
+#              label='     BMA      \nProbabilities', alpha=1)
+#    ]
+#    ax_left.legend(handles=legend_elements,
+#                   loc='upper right',
+#                   frameon=True,
+#                   fontsize=10,
+#                   framealpha=1,
+#                   facecolor='w',
+#                   edgecolor=(0, 0, 0, 1),
+#                   ncols=1
+#                   )
 
-    legend_elements = [
-        Patch(facecolor=get_colormap_colors(colormap, 100)[99], edgecolor=(0, 0, 0, 1),
-              label='     BMA      \nCoefficients', alpha=1)
-    ]
-    ax_right.legend(handles=legend_elements,
-                    loc='upper right',
-                    frameon=True,
-                    fontsize=10,
-                    framealpha=1,
-                    facecolor='w',
-                    edgecolor=(0, 0, 0, 1),
-                    ncols=1
-                    )
-
+#    legend_elements = [
+#        Patch(facecolor=get_colormap_colors(colormap, 100)[99], edgecolor=(0, 0, 0, 1),
+#              label='     BMA      \nCoefficients', alpha=1)
+#    ]
+#    ax_right.legend(handles=legend_elements,
+#                    loc='upper right',
+#                    frameon=True,
+#                    fontsize=10,
+#                    framealpha=1,
+#                    facecolor='w',
+#                    edgecolor=(0, 0, 0, 1),
+#                    ncols=1
+#                    )
 
 def plot_results(results_object,
                  specs=None,
@@ -407,9 +599,9 @@ def plot_results(results_object,
     gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
     ax7 = fig.add_subplot(gs[0:3, 0:12])
     ax8 = fig.add_subplot(gs[0:3, 13:24])
-    ax4 = fig.add_subplot(gs[3:5, 0:6])
-    ax6 = fig.add_subplot(gs[3:5, 6:12])
-    ax5 = fig.add_subplot(gs[3:5, 12:23])
+    ax4 = fig.add_subplot(gs[3:5, 0:7])
+    ax6 = fig.add_subplot(gs[3:5, 7:14], sharey=ax4)  #
+    ax5 = fig.add_subplot(gs[3:5, 14:23])
     ax1 = fig.add_subplot(gs[5:9, 0:15])
     ax2 = fig.add_subplot(gs[5:7, 16:23])
     ax3 = fig.add_subplot(gs[7:9, 16:23])
@@ -426,7 +618,14 @@ def plot_results(results_object,
                colormap=colormap)
 
     plot_kfolds(results_object, colormap, ax5)
-    plot_bma(results_object, colormap, ax4, ax6)
+
+    feature_order = shap_violin(ax6,
+                                np.delete(results_object.shap_return[0], 0, axis=1),
+                                results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy(),
+                                results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
+                                )
+
+    plot_bma(results_object, colormap, ax4, feature_order)
     ax5.axis('on')
     ax5.patch.set_alpha(0.5)
     if ic is not None:
@@ -500,8 +699,8 @@ def plot_results(results_object,
     ax2.set_xlabel('Ordered Specifications', fontsize=13)
     ax3.set_ylabel('Density', fontsize=13)
     ax5.set_ylabel('Density', fontsize=13)
-    ax4.set_xlabel('Probabilities', fontsize=13)
-    ax6.set_xlabel('Average Coefficients', fontsize=13)
+    ax4.set_xlabel('BMA Probabilities', fontsize=13)
+    ax6.set_xlabel('SHAP Values', fontsize=13)
     ax3.set_xlabel('Coefficient Estimate', fontsize=13)
     ax1.set_xlim(0, len(results_object.specs_names))
     ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
