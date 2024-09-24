@@ -607,15 +607,6 @@ class OLSRobust(Protomodel):
                 hqic_array = np.empty([space_n])
                 all_predictors = []
                 av_k_metric_array = np.empty([space_n])
-                x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
-                                                               self.data[self.y],
-                                                               test_size=0.2,
-                                                               random_state=72
-                                                               )
-                model = sklearn.linear_model.LinearRegression()
-                model.fit(x_train, y_train)
-                explainer = shap.LinearExplainer(model, x_train, feature_perturbation="correlation_dependent")
-                shap_return = [explainer.shap_values(x_test), x_test]
                 for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                     if len(spec) == 0:
                         comb = self.data[self.x]
@@ -690,7 +681,7 @@ class OLSRobust(Protomodel):
                 av_k_metric_array=np.hstack(list_av_k_metric_array),
                 model_name=self.model_name,
                 name_av_k_metric=self.oos_metric_name,
-                shap_return=shap_return
+                shap_return=None
             )
             self.results = results
         else:
@@ -713,7 +704,7 @@ class OLSRobust(Protomodel):
                                                            test_size=0.2,
                                                            random_state=72
                                                            )
-            model = sklearn.linear_model.LogisticRegression(penalty="l1", C=0.1)
+            model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
             explainer = shap.LinearExplainer(model, x_train, feature_perturbation="correlation_dependent")
             shap_return = [explainer.shap_values(x_test), x_test]
@@ -1128,7 +1119,15 @@ class LRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-# HERE
+            x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
+                                                       self.data[self.y],
+                                                       test_size=0.2,
+                                                       random_state=72
+                                                       )
+            model = sklearn.linear_model.LinearRegression()
+            model.fit(x_train, y_train)
+            explainer = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
 
                 if len(spec) == 0:
@@ -1190,7 +1189,8 @@ class LRobust(Protomodel):
                                 hqic_array=hqic_array,
                                 av_k_metric_array=av_k_metric_array,
                                 model_name=self.model_name,
-                                name_av_k_metric=self.oos_metric_name
+                                name_av_k_metric=self.oos_metric_name,
+                                shap_return = shap_return
                                 )
             self.results = results
 

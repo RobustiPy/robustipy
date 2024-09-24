@@ -519,7 +519,7 @@ def plot_kfolds(results_object,
               framealpha=1,
               facecolor='w',
               edgecolor=(0, 0, 0, 1),
-              ncols=2
+              ncols=1
               )
     sns.despine(ax=ax, left=True)
 
