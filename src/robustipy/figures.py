@@ -7,7 +7,6 @@ import seaborn as sns
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
-import matplotlib as mpl
 from robustipy.utils import get_selection_key
 from robustipy.utils import get_colormap_colors
 from matplotlib.gridspec import GridSpec
@@ -15,7 +14,6 @@ from matplotlib.patches import FancyArrowPatch
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 plt.rcParams['axes.unicode_minus'] = False
-mpl.rcParams['font.family'] = 'Helvetica'
 
 
 def shap_violin(
