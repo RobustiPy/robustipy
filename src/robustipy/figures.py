@@ -259,6 +259,7 @@ def shap_violin(
 
 
 def plot_curve(results_object,
+               loess=True,
                specs=None,
                ax=None,
                colormap='Spectral_r',
@@ -269,10 +270,10 @@ def plot_curve(results_object,
 
     Parameters:
         results_object (object): Object containing the results data.
+        loess (bool, optional): Whether to apply LOESS smoothing to the curve. Default is True.
         specs (list, optional): List of specification names to be highlighted.
         ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
         colormap (str, optional): Colormap to use for highlighting specifications.
-        colorset (list, optional): List of colors for specification highlighting.
 
     Returns:
         matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted curve.
@@ -292,23 +293,34 @@ def plot_curve(results_object,
     df['median'].plot(ax=ax,
                       color=get_colormap_colors(colormap, 100)[0],
                       linestyle='-')
-    loess_min = sm.nonparametric.lowess(df['min'],
-                                        pd.to_numeric(df.index),
-                                        frac=0.05
-                                        )
-    loess_max = sm.nonparametric.lowess(df['max'],
-                                        pd.to_numeric(df.index),
-                                        frac=0.05
-                                        )
-    ax.plot(loess_min[:, 0], loess_min[:, 1], color=get_colormap_colors(colormap, 100)[99],linestyle='--')
-    ax.plot(loess_max[:, 0], loess_max[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
-    ax.fill_between(df.index,
-                    loess_min[:, 1],
-                    loess_max[:, 1],
-                    facecolor= get_colormap_colors(colormap, 100)[50],
-                    alpha=0.04)
-    if ax.get_ylim()[0]<0 and ax.get_ylim()[1]>0:
+
+    if loess:  # Check if LOESS should be applied
+        loess_min = sm.nonparametric.lowess(df['min'],
+                                            pd.to_numeric(df.index),
+                                            frac=0.05)
+        loess_max = sm.nonparametric.lowess(df['max'],
+                                            pd.to_numeric(df.index),
+                                            frac=0.05)
+        ax.plot(loess_min[:, 0], loess_min[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
+        ax.plot(loess_max[:, 0], loess_max[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
+        ax.fill_between(df.index,
+                        loess_min[:, 1],
+                        loess_max[:, 1],
+                        facecolor='#FFD700',
+                        alpha=0.04)
+    else:
+        # Plot raw min and max as dashed lines similar to loess
+        ax.plot(df.index, df['min'], color=get_colormap_colors(colormap, 100)[99], linestyle='--', label='Min')
+        ax.plot(df.index, df['max'], color=get_colormap_colors(colormap, 100)[99], linestyle='--', label='Max')
+        ax.fill_between(df.index,
+                        df['min'],
+                        df['max'],
+                        facecolor='#FFD700',
+                        alpha=0.04)
+
+    if ax.get_ylim()[0] < 0 and ax.get_ylim()[1] > 0:
         ax.axhline(y=0, color='k', ls='--')
+
     lines = []
     markers = []
     if specs:
@@ -317,8 +329,8 @@ def plot_curve(results_object,
             control_names = list(df.spec_name.iloc[idx])
             label = ', '.join(control_names).title()
             lines.append(ax.vlines(x=idx,
-                                   ymin=loess_min[idx, 1],
-                                   ymax=loess_max[idx, 1],
+                                   ymin=df['min'].iloc[idx] if not loess else loess_min[idx, 1],
+                                   ymax=df['max'].iloc[idx] if not loess else loess_max[idx, 1],
                                    color=colorset[i],
                                    label=label))
             markers.append(Line2D([0], [0],
@@ -328,8 +340,8 @@ def plot_curve(results_object,
                                   markersize=10,
                                   label=label)
                            )
-            myArrow = FancyArrowPatch(posA=(idx, loess_min[idx, 1]),
-                                      posB=(idx, loess_max[idx, 1]),
+            myArrow = FancyArrowPatch(posA=(idx, df['min'].iloc[idx] if not loess else loess_min[idx, 1]),
+                                      posB=(idx, df['max'].iloc[idx] if not loess else loess_max[idx, 1]),
                                       arrowstyle='<|-|>',
                                       color=colorset[i],
                                       mutation_scale=20,
@@ -342,10 +354,11 @@ def plot_curve(results_object,
                     markeredgecolor=colorset[i],
                     markerfacecolor='w',
                     markersize=15)
+
     full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
     lines.append(ax.vlines(x=full_spec_pos,
-                           ymin=loess_min[full_spec_pos, 1],
-                           ymax=loess_max[full_spec_pos, 1],
+                           ymin=df['min'].iloc[full_spec_pos] if not loess else loess_min[full_spec_pos, 1],
+                           ymax=df['max'].iloc[full_spec_pos] if not loess else loess_max[full_spec_pos, 1],
                            color='k',
                            label='Full Model'))
     markers.append(Line2D([0], [0],
@@ -355,15 +368,14 @@ def plot_curve(results_object,
                           markersize=10,
                           label='Full Model')
                    )
-    myArrow = FancyArrowPatch(posA=(full_spec_pos,
-                                    loess_min[full_spec_pos, 1]),
-                              posB=(full_spec_pos,
-                                    loess_max[full_spec_pos, 1]),
-                              arrowstyle='<|-|>',
-                              color='k',
-                              mutation_scale=20,
-                              shrinkA=0,
-                              shrinkB=0)
+    myArrow = FancyArrowPatch(
+        posA=(full_spec_pos, df['min'].iloc[full_spec_pos] if not loess else loess_min[full_spec_pos, 1]),
+        posB=(full_spec_pos, df['max'].iloc[full_spec_pos] if not loess else loess_max[full_spec_pos, 1]),
+        arrowstyle='<|-|>',
+        color='k',
+        mutation_scale=20,
+        shrinkA=0,
+        shrinkB=0)
     ax.add_artist(myArrow)
     ax.plot(full_spec_pos,
             df['median'].iloc[full_spec_pos],
@@ -371,6 +383,7 @@ def plot_curve(results_object,
             markeredgecolor='k',
             markerfacecolor='w',
             markersize=15)
+
     ax.legend(handles=markers,
               frameon=True,
               edgecolor=(0, 0, 0, 1),
@@ -405,7 +418,6 @@ def plot_curve(results_object,
     )
     sns.despine(ax=ax)
     return ax
-
 
 def plot_ic(results_object,
             ic,
@@ -731,6 +743,7 @@ def title_setter(ax, title):
 
 
 def plot_results(results_object,
+                 loess=True,
                  specs=None,
                  ic=None,
                  colormap='Spectral_r',
@@ -777,7 +790,7 @@ def plot_results(results_object,
     feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
     plot_bma(results_object, colormap, ax3, feature_order, title='c.')
     plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
-    plot_curve(results_object=results_object, specs=specs, ax=ax6, colormap=colormap, title='f.')
+    plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax6, colormap=colormap, title='f.')
     plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
     plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
     plt.savefig(os.path.join(figpath, project_name + '_all.pdf'), bbox_inches='tight')

@@ -59,6 +59,7 @@ class MergedResult(Protoresult):
         return out
 
     def plot(self,
+             loess=True,
              specs=None,
              colormap='Spectral_r',
              figsize=(16, 14),
@@ -82,6 +83,7 @@ class MergedResult(Protoresult):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
 
         plot_results(results_object=self,
+                     loess=True,
                      specs=specs,
                      ax=ax,
                      colormap='Spectral_r',
@@ -318,6 +320,7 @@ class OLSResult(Protoresult):
 
 
     def plot(self,
+             loess=True,
              specs=None,
              ic='aic',
              colormap='Spectral_r',
@@ -349,6 +352,7 @@ class OLSResult(Protoresult):
             raise ValueError(f"'ic' must be one of the following: {valid_ic}")
 
         return plot_results(results_object=self,
+                            loess=loess,
                             specs=specs,
                             ic=ic,
                             colormap=colormap,
