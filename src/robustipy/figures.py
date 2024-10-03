@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import matplotlib.cm as cm
 from scipy.stats import gaussian_kde
 from shap.plots._labels import labels
@@ -16,6 +17,57 @@ from matplotlib.lines import Line2D
 plt.rcParams['axes.unicode_minus'] = False
 
 
+def axis_formatter(ax, ylabel, xlabel, title):
+    ax.tick_params(axis='both', which='major', labelsize=13)
+    ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
+    ax.set_axisbelow(True)
+    ax.set_ylabel(ylabel, fontsize=13)
+    title_setter(ax, title)
+    ax.set_xlabel(xlabel, fontsize=13)
+
+def plot_hexbin_r2(results_object, ax, fig, colormap, title=''):
+    image = ax.hexbin(results_object.estimates.stack(),
+                      results_object.r2_values.stack(),
+                      cmap=colormap, gridsize=20,
+                      mincnt=1,
+                      edgecolor='k')
+    cb = fig.colorbar(image, ax=ax, spacing='uniform', pad=0.05, extend='max')
+    data = image.get_array()
+    ticks = np.linspace(data.min(), data.max(), num=6)
+    cb.set_ticks(ticks)
+    if (data.max() >= 1000) and (data.max() < 10000):
+        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
+    elif data.max() >= 10000:
+        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
+    else:
+        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
+    cb.ax.set_title('Count')
+    axis_formatter(ax, r'In-Sample R$^2$', r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', title)
+    sns.despine(ax=ax)
+
+
+def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
+    image = ax.hexbin([arr[0][0] for arr in results_object.all_b],
+                      results_object.summary_df['ll'],
+                      cmap=colormap,
+                      gridsize=20,
+                      mincnt=1,
+                      edgecolor='k')
+    cb = fig.colorbar(image, ax=ax, spacing='uniform', extend='max', pad=0.05)
+    data = image.get_array()
+    ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
+    cb.set_ticks(ticks)
+    if (data.max() >= 1000) and (data.max() < 10000):
+        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
+    elif data.max() >= 10000:
+        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
+    else:
+        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
+    cb.ax.set_title('Count')
+    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', title)
+    sns.despine(ax=ax)
+
+
 def shap_violin(
         ax,
         shap_values,
@@ -26,6 +78,8 @@ def shap_violin(
         alpha=1,
         cmap='Spectral_r',
         use_log_scale=False,
+        title='',
+        clear_yticklabels=False
 ):
     """Create a SHAP beeswarm plot, colored by feature values when they are provided.
 
@@ -156,7 +210,6 @@ def shap_violin(
             smooth_values -= vmin
             if vmax - vmin > 0:
                 smooth_values /= vmax - vmin
-            from matplotlib.colors import LinearSegmentedColormap
             for i in range(len(xs) - 1):
                 if ds[i] > 0.05 or ds[i + 1] > 0.05:
                     ax.fill_between(
@@ -198,15 +251,18 @@ def shap_violin(
     feature_name_order = [feature_names[i] for i in feature_order]
     ax.set_yticks(range(len(feature_order)), feature_name_order, fontsize=13)
     ax.set_ylim(-1, len(feature_order))
-    ax.set_xlabel('SHAP Values', fontsize=13)
+    axis_formatter(ax, r'', r'SHAP Values', title)
+    title_setter(ax, title)
+    if clear_yticklabels:
+        ax.set_yticklabels([])
     return feature_name_order
-
 
 
 def plot_curve(results_object,
                specs=None,
                ax=None,
-               colormap='Spectral_r'):
+               colormap='Spectral_r',
+               title=''):
     """
     Plots the curve of median, confidence intervals, minimum, and maximum
     coefficient estimates for a given results object.
@@ -234,7 +290,7 @@ def plot_curve(results_object,
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
     df['median'].plot(ax=ax,
-                      color='#002d87',
+                      color=get_colormap_colors(colormap, 100)[0],
                       linestyle='-')
     loess_min = sm.nonparametric.lowess(df['min'],
                                         pd.to_numeric(df.index),
@@ -244,16 +300,17 @@ def plot_curve(results_object,
                                         pd.to_numeric(df.index),
                                         frac=0.05
                                         )
-    ax.plot(loess_min[:, 0], loess_min[:, 1], color='#002d87', linestyle='--')
-    ax.plot(loess_max[:, 0], loess_max[:, 1], color='#002d87', linestyle='--')
+    ax.plot(loess_min[:, 0], loess_min[:, 1], color=get_colormap_colors(colormap, 100)[99],linestyle='--')
+    ax.plot(loess_max[:, 0], loess_max[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
     ax.fill_between(df.index,
                     loess_min[:, 1],
                     loess_max[:, 1],
-                    facecolor='#FEE08B',
-                    alpha=0.05)
+                    facecolor= get_colormap_colors(colormap, 100)[50],
+                    alpha=0.04)
     if ax.get_ylim()[0]<0 and ax.get_ylim()[1]>0:
         ax.axhline(y=0, color='k', ls='--')
     lines = []
+    markers = []
     if specs:
         idxs = df.index[df['idx']].tolist()
         for idx, i in zip(idxs, range(len(specs))):
@@ -264,6 +321,13 @@ def plot_curve(results_object,
                                    ymax=loess_max[idx, 1],
                                    color=colorset[i],
                                    label=label))
+            markers.append(Line2D([0], [0],
+                                  marker='o',
+                                  color=colorset[i],
+                                  markerfacecolor='w',
+                                  markersize=10,
+                                  label=label)
+                           )
             myArrow = FancyArrowPatch(posA=(idx, loess_min[idx, 1]),
                                       posB=(idx, loess_max[idx, 1]),
                                       arrowstyle='<|-|>',
@@ -284,7 +348,13 @@ def plot_curve(results_object,
                            ymax=loess_max[full_spec_pos, 1],
                            color='k',
                            label='Full Model'))
-
+    markers.append(Line2D([0], [0],
+                          marker='o',
+                          color='k',
+                          markerfacecolor='w',
+                          markersize=10,
+                          label='Full Model')
+                   )
     myArrow = FancyArrowPatch(posA=(full_spec_pos,
                                     loess_min[full_spec_pos, 1]),
                               posB=(full_spec_pos,
@@ -301,17 +371,39 @@ def plot_curve(results_object,
             markeredgecolor='k',
             markerfacecolor='w',
             markersize=15)
-    ax.legend(handles=lines,
+    ax.legend(handles=markers,
               frameon=True,
               edgecolor=(0, 0, 0, 1),
-              fontsize=13,
-              loc="lower center",
-              ncols=4,
+              fontsize=11,
+              loc="lower right",
+              ncols=2,
               framealpha=1,
               facecolor=((1, 1, 1, 0)
               )
               )
-    ax.set_axisbelow(False)
+
+    axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
+    ax.set_xlim(0, len(results_object.specs_names))
+    ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 20,
+                ax.get_ylim()[1])
+    ax.text(
+        0.05, 0.95,
+        (f'Number of specifications: {len(results_object.specs_names)}\n' +
+         f'Number of bootstraps: {results_object.draws}\n' +
+         f'Number of folds: {results_object.kfold}\n'
+         # @TODO placeholder
+         f'Joint Significance: 0.12345'
+         ),
+        transform=ax.transAxes,
+        verticalalignment='top',
+        horizontalalignment='left',
+        color='black',
+        fontsize=12,
+        bbox=dict(facecolor='white',
+                  edgecolor='black',
+                  boxstyle='round,pad=1')
+    )
+    sns.despine(ax=ax)
     return ax
 
 
@@ -319,7 +411,9 @@ def plot_ic(results_object,
             ic,
             specs=None,
             ax=None,
-            colormap='Spectral_r'):
+            colormap='Spectral_r',
+            title='',
+            despine_left=True):
     """
     Plots the information criterion (IC) curve for the given results object.
 
@@ -338,10 +432,9 @@ def plot_ic(results_object,
         ax = plt.gca()
     colorset = get_colormap_colors(colormap, len(specs))
     df = results_object.summary_df.copy()
-
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
-
+    axis_formatter(ax, f'{ic.upper()} curve', 'Coeficient Estimate', title)
     if specs:
         key = get_selection_key(specs)
         full_spec = list(results_object.specs_names.iloc[-1])
@@ -349,7 +442,7 @@ def plot_ic(results_object,
         df['idx'] = df.spec_name.isin(key)
         df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ic_fig, = ax.plot(df[ic], color='#002d87')
+        ax.plot(df[ic], color='#002d87')
         idxs = df.index[df['idx']].tolist()
         ymin = ax.get_ylim()[0]
         ymax = ax.get_ylim()[1]
@@ -407,11 +500,15 @@ def plot_ic(results_object,
                   facecolor=((1, 1, 1, 0)
                   )
                   )
-
-        return ic_fig, lines
+        if despine_left is True:
+            sns.despine(ax=ax, right=False, left=True)
+            ax.yaxis.set_label_position("right")
+        else:
+            ax.yaxis.set_label_position("left")
+            sns.despine(ax=ax)
     else:
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ic_fig, = ax.plot(df[ic], color='#002d87')
+        ax.plot(df[ic], color='#002d87')
         full_spec = list(results_object.specs_names.iloc[-1])
         full_spec_key = get_selection_key([full_spec])
         df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
@@ -448,13 +545,22 @@ def plot_ic(results_object,
                   facecolor=((1, 1, 1, 0)
                   )
                   )
-        return ic_fig
+        if despine_left is True:
+            ax.yaxis.set_label_position("right")
+            sns.despine(ax=ax, right=False, left=True)
+        else:
+            ax.yaxis.set_label_position("left")
+            sns.despine(ax=ax)
 
 
 def plot_bdist(results_object,
                specs=None,
                ax=None,
-               colormap='Spectral_r'):
+               colormap='Spectral_r',
+               title='',
+               despine_left=True,
+               legend_bool=False
+               ):
     """
     Plots the distribution of coefficient estimates for the specified specifications.
 
@@ -468,6 +574,25 @@ def plot_bdist(results_object,
     Returns:
         matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted distribution.
     """
+
+    def make_leg(results_object):
+        df = results_object.summary_df.copy()
+        df = df.sort_values(by='median')
+        df = df.reset_index(drop=True)
+        key = get_selection_key(specs)
+        full_spec = list(results_object.specs_names.iloc[-1])
+        full_spec_key = get_selection_key([full_spec])
+        df['idx'] = df.spec_name.isin(key)
+        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
+        idxs = df.index[df['idx']].tolist()
+        leg = []
+        for idx, i in zip(idxs, range(len(specs))):
+            control_names = list(df.spec_name.iloc[idx])
+            label = ', '.join(control_names).title()
+            leg.append([colorset[i], label])
+        leg.append(['k', 'Full Model'])
+        return leg
+
     colorset = get_colormap_colors(colormap, len(specs))
     if ax is None:
         ax = plt.gca()
@@ -477,16 +602,65 @@ def plot_bdist(results_object,
         key = get_selection_key(specs)
         matching_cols = [col for col in df.columns if col in key]
         for i, col in enumerate(matching_cols):
-            sns.kdeplot(df[col].squeeze(), common_norm=True, ax=ax, color=colorset[i], legend=False
-                        )
+            sns.kdeplot(df[col].squeeze(), common_norm=True, ax=ax, color=colorset[i], legend=False)
     sns.kdeplot(df.iloc[:, -1:].squeeze(), common_norm=True, legend=False,
                 color='black', ax=ax, label='Full Model')
-    return ax
+    markers=[]
+    if legend_bool:
+        leg = make_leg(results_object)
+        for ele in leg:
+            markers.append(Line2D([0], [0],
+                                  marker='o',
+                                  color=ele[0],
+                                  markerfacecolor='w',
+                                  markersize=0,
+                                  label=ele[1])
+                           )
+        # Temporarily place the legend at "upper left" to check for overlap
+        temp_legend = ax.legend(handles=markers,
+                                frameon=True,
+                                edgecolor=(0, 0, 0, 1),
+                                fontsize=9,
+                                loc="upper left",  # Start with "upper left"
+                                ncols=1,
+                                framealpha=1,
+                                facecolor=((1, 1, 1, 0)
+                                )
+                                )
 
+        # Get the bounding box of the plot and the legend
+        plot_bbox = ax.get_tightbbox(plt.gcf().canvas.get_renderer())
+        legend_bbox = temp_legend.get_window_extent(plt.gcf().canvas.get_renderer())
+
+        # Check if the legend overlaps with the plot area
+        if legend_bbox.overlaps(plot_bbox):
+            # Remove the temporary legend
+            temp_legend.remove()
+
+            # Place the legend in the upper right to avoid overlap
+            ax.legend(handles=markers,
+                      frameon=True,
+                      edgecolor=(0, 0, 0, 1),
+                      fontsize=9,
+                      loc="upper right",  # Move to "upper right" if overlapping
+                      ncols=1,
+                      framealpha=1,
+                      facecolor=((1, 1, 1, 0)
+                      )
+                      )
+    axis_formatter(ax, 'Density', 'Ordered Specifications', title)
+    if despine_left is True:
+        ax.yaxis.set_label_position("right")
+        sns.despine(ax=ax, right=False, left=True)
+    else:
+        sns.despine(ax=ax)
+    return ax
 
 def plot_kfolds(results_object,
                 colormap,
                 ax=None,
+                title='',
+                despine_left=True
                 ):
     """
 
@@ -502,7 +676,6 @@ def plot_kfolds(results_object,
     min_lim = min(results_object.summary_df['av_k_metric']) - val_range *.1
     max_lim = max(results_object.summary_df['av_k_metric']) + val_range *.1
     ax.set_xlim(min_lim, max_lim)
-    ax.yaxis.set_label_position("right")
     legend_elements = [
         Line2D([0], [0], color=get_colormap_colors(colormap, 100)[99], lw=2, linestyle='-',
                label=r'Kernel Density', alpha=1),
@@ -519,65 +692,50 @@ def plot_kfolds(results_object,
               edgecolor=(0, 0, 0, 1),
               ncols=1
               )
-    sns.despine(ax=ax, left=True)
+    ax.tick_params(axis='both', which='major', labelsize=13)
+    ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
+    ax.set_axisbelow(True)
+    if results_object.name_av_k_metric=='rmse':
+        metric = results_object.name_av_k_metric.upper()
+    elif results_object.name_av_k_metric.upper=='R-SQUARED':
+        metric = r'R$^2'
+    else:
+        metric = results_object.name_av_k_metric.title()
+    axis_formatter(ax, r'OOS Metric: ' + metric , 'Density', title)
+    if despine_left is True:
+        ax.yaxis.set_label_position("right")
+        sns.despine(ax=ax, right=False, left=True)
+    else:
+        sns.despine(ax=ax)
 
 
-def plot_bma(results_object, colormap, ax_left, feature_order):
+def plot_bma(results_object, colormap, ax, feature_order, title=''):
     """
-    Plots the Bayesian Model Averaging (BMA) probabilities and average coefficients.
+    Plots the Bayesian Model Averaging (BMA)
     """
     bma = results_object.compute_bma()
     bma = bma.set_index('control_var')
     bma = bma.reindex(feature_order)
-#    bma = bma.sort_values(by='probs', ascending=False)
     bma['probs'].plot(kind='barh',
-                      ax=ax_left,
+                      ax=ax,
                       alpha=1,
                       color=get_colormap_colors(colormap, 100)[0],
                       edgecolor='k',
                       )
-#    bma['average_coefs'].plot(kind='barh',
-#                              ax=ax_right,
-#                              alpha=1,
-#                              color=get_colormap_colors(colormap, 100)[99],
-#                              edgecolor='k',
-#                              )
-#    ax_right.set_yticklabels([])
-#    ax_right.set_ylabel('')
-    ax_left.set_ylabel('')
-#    legend_elements = [
-#        Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
-#              label='     BMA      \nProbabilities', alpha=1)
-#    ]
-#    ax_left.legend(handles=legend_elements,
-#                   loc='upper right',
-#                   frameon=True,
-#                   fontsize=10,
-#                   framealpha=1,
-#                   facecolor='w',
-#                   edgecolor=(0, 0, 0, 1),
-#                   ncols=1
-#                   )
+    axis_formatter(ax, r'', 'BMA Probabilities', title)
+    sns.despine(ax=ax)
 
-#    legend_elements = [
-#        Patch(facecolor=get_colormap_colors(colormap, 100)[99], edgecolor=(0, 0, 0, 1),
-#              label='     BMA      \nCoefficients', alpha=1)
-#    ]
-#    ax_right.legend(handles=legend_elements,
-#                    loc='upper right',
-#                    frameon=True,
-#                    fontsize=10,
-#                    framealpha=1,
-#                    facecolor='w',
-#                    edgecolor=(0, 0, 0, 1),
-#                    ncols=1
-#                    )
+
+def title_setter(ax, title):
+    return ax.set_title(title, loc='left', fontsize=16, y=1)
+
 
 def plot_results(results_object,
                  specs=None,
                  ic=None,
                  colormap='Spectral_r',
-                 figsize=(16, 12)
+                 figsize=(16, 16),
+                 project_name='no_project_name'
                  ):
     """
     Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
@@ -593,284 +751,67 @@ def plot_results(results_object,
     Returns:
         matplotlib.figure.Figure: Figure containing the plotted results.
     """
+
+    figpath = os.path.join(os.getcwd(), 'figures', project_name)
+    if not os.path.exists(figpath):
+        os.makedirs(figpath)
+
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
-    ax7 = fig.add_subplot(gs[0:3, 0:12])
-    ax8 = fig.add_subplot(gs[0:3, 13:24])
-    ax4 = fig.add_subplot(gs[3:5, 0:7])
-    ax6 = fig.add_subplot(gs[3:5, 7:14], sharey=ax4)  #
+    ax1 = fig.add_subplot(gs[0:3, 0:12])
+    ax2 = fig.add_subplot(gs[0:3, 13:24])
+    ax4 = fig.add_subplot(gs[3:5, 6:14])
+    ax3 = fig.add_subplot(gs[3:5, 0:6])
     ax5 = fig.add_subplot(gs[3:5, 14:23])
-    ax1 = fig.add_subplot(gs[5:9, 0:15])
-    ax2 = fig.add_subplot(gs[5:7, 16:23])
-    ax3 = fig.add_subplot(gs[7:9, 16:23])
+    ax6 = fig.add_subplot(gs[5:9, 0:13])
+    ax7 = fig.add_subplot(gs[5:7, 13:23])
+    ax8 = fig.add_subplot(gs[7:9, 13:23])
 
-    ax2.axis('off')
-    ax2.patch.set_alpha(0)
-    ax3.axis('off')
-    ax3.patch.set_alpha(0)
-    ax5.axis('off')
-    ax5.patch.set_alpha(0)
-    plot_curve(results_object=results_object,
-               specs=specs,
-               ax=ax1,
-               colormap=colormap)
-
-    plot_kfolds(results_object, colormap, ax5)
-
-    feature_order = shap_violin(ax6,
-                                np.delete(results_object.shap_return[0], 0, axis=1),
-                                results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy(),
-                                results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
-                                )
-
-    plot_bma(results_object, colormap, ax4, feature_order)
-    ax5.axis('on')
-    ax5.patch.set_alpha(0.5)
-    if ic is not None:
-        lines = plot_ic(results_object=results_object,
-                        ic=ic,
-                        specs=specs,
-                        ax=ax2,
-                        colormap=colormap,
-                        )
-        ax2.axis('on')
-        ax2.patch.set_alpha(0.5)
-#    if specs is not None:
-    plot_bdist(results_object=results_object,
-               specs=specs,
-               ax=ax3,
-               colormap=colormap
-               )
-    ax3.axis('on')
-    ax3.patch.set_alpha(0.5)
-    ax1.set_title('f.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax2.set_title('g.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax3.set_title('h.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax4.set_title('c.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax5.set_title('e.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax6.set_title('d.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax7.set_title('a.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    ax8.set_title('b.',
-                  loc='left',
-                  fontsize=16,
-                  y=1)
-    for ax in [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8]:
-        ax.tick_params(axis='both',
-                        which='major',
-                        labelsize=13)
-        ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
-        ax.set_axisbelow(True)
-    for ax in [ax2, ax3]:
-        ax.yaxis.set_label_position("right")
-    sns.despine(ax=ax1)
-    ax1.set_ylabel('Coefficient Estimates', fontsize=13)
-    ax1.set_xlabel('Ordered Specifications', fontsize=13)
-    if results_object.name_av_k_metric=='rmse':
-        metric = results_object.name_av_k_metric.upper()
-    elif results_object.name_av_k_metric=='R-Squared':
-        metric = r'R$^2'
-    else:
-        metric = results_object.name_av_k_metric.title()
-    ax5.set_xlabel('Out-of-Sample Evaluation Metric: ' + metric, fontsize=13)
-    ax2.set_ylabel(f'{ic.upper()} curve', fontsize=13)
-    ax2.set_xlabel('Ordered Specifications', fontsize=13)
-    ax3.set_ylabel('Density', fontsize=13)
-    ax5.set_ylabel('Density', fontsize=13)
-    ax4.set_xlabel('BMA Probabilities', fontsize=13)
-    ax6.set_xlabel('SHAP Values', fontsize=13)
-    ax3.set_xlabel('Coefficient Estimate', fontsize=13)
-    ax1.set_xlim(0, len(results_object.specs_names))
-    ax1.set_ylim(ax1.get_ylim()[0] - (np.abs(ax1.get_ylim()[1]) - np.abs(ax1.get_ylim()[0])) / 20,
-                 ax1.get_ylim()[1])
-    ax1.text(
-        0.05, 0.95,  # x, y coordinates
-        (f'Number of specifications: {len(results_object.specs_names)}\n' +
-         f'Number of bootstraps: {results_object.draws}\n' +
-         f'Number of folds: {results_object.kfold}'
-         ),  # The text string itself
-        transform=ax1.transAxes,
-        verticalalignment='top',
-        horizontalalignment='left',
-        color='black',
-        fontsize=13,
-        bbox=dict(facecolor='white',
-                  edgecolor='black',
-                  boxstyle='round,pad=1')
-    )
-
-    image = ax7.hexbin(results_object.estimates.stack(),
-                       results_object.r2_values.stack(),
-                       cmap=colormap, gridsize=20,  # extent=extent,
-                       mincnt=1,
-                       # bins='log',
-                       edgecolor='k')
-    cb = fig.colorbar(image, ax=ax7, spacing='uniform', pad=0.05, extend='max')
-    data = image.get_array()
-    ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
-    cb.set_ticks(ticks)
-    if (data.max() >= 1000) and (data.max() < 10000):
-        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
-    elif (data.max() >= 10000):
-        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
-    else:
-        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
-    cb.ax.set_title('Count')
-    ax7.set_ylabel(r'In-Sample R$^2$', fontsize=13)
-    ax7.set_xlabel(r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', fontsize=13)
-    image = ax8.hexbin([arr[0][0] for arr in results_object.all_b],
-                       results_object.summary_df['ll'],
-                       cmap=colormap,
-                       gridsize=20,
-                       # extent=extent,
-                       mincnt=1,
-                       #                   bins='log',
-                       edgecolor='k')
-
-    cb = fig.colorbar(image, ax=ax8, spacing='uniform', extend='max', pad=0.05)
-    data = image.get_array()
-    ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
-    cb.set_ticks(ticks)
-    if (data.max() >= 1000) and (data.max() < 10000):
-        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
-    elif (data.max() >= 10000):
-        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
-    else:
-        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
-    cb.ax.set_title('Count')
-    ax8.set_ylabel('')
-    ax8.set_ylabel(r'Full Model Log Likelihood', fontsize=13)
-    ax8.set_xlabel(r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', fontsize=13)
-    sns.despine()
-    sns.despine(ax=ax2, right=False, left=True)
-    sns.despine(ax=ax3, right=False, left=True)
-    sns.despine(ax=ax4)
-    sns.despine(ax=ax6)
-    sns.despine(ax=ax5, right=False, left=True)
-    #    plt.tight_layout()
-#    return fig
+    shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
+    shap_x = results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy()
+    shap_cols = results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
 
 
-#def vars_scatter_plot(results_object,
-#                      var_name,
-#                      ax=None,
-#                      bin_size=1):
-#    """
-#    Plots the scatter plot of the specified covariate in the specifications.
-#
-#    Parameters:
-#        results_object (object): Object containing the results data.
-#        var_name (str): Name of the covariate to be plotted.
-#        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-#        bin_size (int, optional): Size of bins for scatter plot.
-#
-#    Returns:
-#        matplotlib.axes._subplots.AxesSubplot: Axes containing the scatter plot.
-#    """
-#    if ax is None:
-#        ax = plt.gca()
-#    df = results_object.summary_df.sort_values(by='median').copy()
-#    count_bool = [var_name in ele for ele in df.spec_name]
-#    index = []
-#    for i, ele in enumerate(count_bool):
-#        if ele:
-#            new_index = np.floor(i / bin_size) * bin_size
-#            index.append(new_index)
-#    x = index
-#    y = np.zeros(len(x)) + np.random.normal(0, .01, size=len(x))
-#    ax.scatter(x, y, alpha=.2, s=50, linewidth=0, color='black')
-#    ax.axis(ymin=-1, ymax=1)
-#    ax.set_title(var_name)
-#    ax.yaxis.label.set(rotation='horizontal', ha='right')
-#    ax.tick_params(grid_alpha=0, colors='w')
-#    return ax
-#
-#
-#def vars_hist_plot(results_object,
-#                   var_name,
-#                   ax=None,
-#                   bin_size=50):
-#    """
-#    Plots the histogram of the specified covariate in the specifications.
-#
-#    Parameters:
-#        results_object (object): Object containing the results data.
-#        var_name (str): Name of the covariate to be plotted.
-#        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-#        bin_size (int, optional): Size of bins for histogram.
-#
-#    Returns:
-#        matplotlib.axes._subplots.AxesSubplot: Axes containing the histogram plot.
-#    """
-#    if ax is None:
-#        ax = plt.gca()
-#    df = results_object.summary_df.sort_values(by='median').copy()
-#    count_bool = [var_name in ele for ele in df.spec_name]
-#    index = []
-#    for i, ele in enumerate(count_bool):
-#        if ele:
-#            new_index = np.floor(i / 1) * 1
-#            index.append(new_index)
-#    x = index
-#    ax.hist(x, bin_size, color='black')
-#    ax.set_title(var_name)
-#    ax.yaxis.label.set(rotation='horizontal', ha='right')
-#    ax.tick_params(grid_alpha=0, colors='w')
-#    return ax
+    plot_hexbin_r2(results_object, ax1, fig, colormap, title='a.')
+    plot_hexbin_log(results_object, ax2, fig, colormap, title='b.')
+    feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
+    plot_bma(results_object, colormap, ax3, feature_order, title='c.')
+    plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
+    plot_curve(results_object=results_object, specs=specs, ax=ax6, colormap=colormap, title='f.')
+    plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
+    plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
+    plt.savefig(os.path.join(figpath, project_name + '_all.pdf'), bbox_inches='tight')
 
 
-#def vars_line_plot(results_object,
-#                   var_name,
-#                   ax=None,
-#                   bin_size=None):
-#    """
-#    Plots the line plot of the specified covariate in the specifications.
-#
-#    Parameters:
-#        results_object (object): Object containing the results data.
-#        var_name (str): Name of the covariate to be plotted.
-#        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-#        bin_size (int, optional): Size of bins for the line plot.
-#
-#    Returns:
-#        matplotlib.axes._subplots.AxesSubplot: Axes containing the line plot.
-#    """
-#    if ax is None:
-#        ax = plt.gca()
-#    df = results_object.summary_df.sort_values(by='median').copy()
-#    count_bool = [var_name in ele for ele in df.spec_name]
-#    count_list = [int(ele) for ele in count_bool]
-#    bin_sums = []
-#    index = []
-#    if bin_size is None:
-#       bin_size = 50
-#    for i, ele in enumerate(count_list):
-#        if i % bin_size == 0:
-#            bin_sum = np.sum(count_list[i - bin_size:i])
-#            bin_sums.append(bin_sum)
-#            index.append(i)
-#    ax.plot(index, bin_sums, color='black')
-#    ax.set_title(var_name)
-#    ax.yaxis.label.set(rotation='horizontal', ha='right')
-#    ax.tick_params(grid_alpha=0, colors='w')
-#    return ax
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_hexbin_r2(results_object, ax, fig, colormap)
+    plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_hexbin_log(results_object, ax, fig, colormap)
+    plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
+    plt.savefig(os.path.join(figpath, project_name + '_SHAP.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_bma(results_object, colormap, ax, feature_order)
+    plt.savefig(os.path.join(figpath, project_name + '_BMA.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_kfolds(results_object, colormap, ax, despine_left=False)
+    plt.savefig(os.path.join(figpath, project_name + '_OOS.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
+    plt.savefig(os.path.join(figpath, project_name + '_curve.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.', despine_left=False)
+    plt.savefig(os.path.join(figpath, project_name + '_IC.pdf'), bbox_inches='tight')
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
+    plt.savefig(os.path.join(figpath, project_name + '_bdist.pdf'), bbox_inches='tight')
+    plt.close(fig)

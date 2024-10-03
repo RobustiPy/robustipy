@@ -61,7 +61,8 @@ class MergedResult(Protoresult):
     def plot(self,
              specs=None,
              colormap='Spectral_r',
-             figsize=(16, 14)):
+             figsize=(16, 14),
+             project_name='no_project_name'):
         """
         Plots the regression results using specified options.
 
@@ -81,9 +82,10 @@ class MergedResult(Protoresult):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
 
         plot_results(results_object=self,
-                   specs=specs,
-                   ax=ax,
-                   colormap='Spectral_r')
+                     specs=specs,
+                     ax=ax,
+                     colormap='Spectral_r',
+                     project_name='no_project_name')
         return fig
 
     def merge(self, result_obj, left_prefix, right_prefix):
@@ -319,7 +321,8 @@ class OLSResult(Protoresult):
              specs=None,
              ic='aic',
              colormap='Spectral_r',
-             figsize=(12, 6)):
+             figsize=(12, 6),
+             project_name='no_project_name'):
         """
         Plots the regression results using specified options.
 
@@ -349,7 +352,8 @@ class OLSResult(Protoresult):
                             specs=specs,
                             ic=ic,
                             colormap=colormap,
-                            figsize=figsize)
+                            figsize=figsize,
+                            project_name=project_name)
 
     def _compute_summary(self):
         """
