@@ -310,7 +310,7 @@ class OLSResult(Protoresult):
         print(
             f"Max Log Likelihood: {self.summary_df['ll'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
         print(
-            f"Max R2: {self.summary_df['r2'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
+            f"Max R2: {self.summary_df['r2'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
 
         print_separator()
         print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric})')
