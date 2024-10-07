@@ -283,12 +283,10 @@ class OLSResult(Protoresult):
         print(f"Number of draws: {self.draws}")
         print(f"Number of folds: {self.kfold}")
         print(f"Number of specifications: {len(self.specs_names)}")
-
         # Prepare the DataFrame for model metrics
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
-            'r2_values': [r2 for r2 in self.r2_values]
         })
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
@@ -297,19 +295,25 @@ class OLSResult(Protoresult):
         print_separator("2.Model Robustness Metrics")
         print('2.1 Inference Metrics')
         print_separator()
-
-        print(f"Mean R2: {df_model_result['r2_values'].mean():.2f}")
         print(f"Mean beta: {df_model_result['betas'].mean():.2f}")
         print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
         print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
         print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
         print(f"Negative and Significant portion of beta: {((1 - df_model_result['positive_beta']) & df_model_result['significant']).mean():.2f}")
 
+        print_separator()
+        print(f'2.1 In-Sample Metrics')
+        print_separator()
         print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
+        print(
+            f"Max Log Likelihood: {self.summary_df['ll'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
+        print(
+            f"Max R2: {self.summary_df['r2'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
+
         print_separator()
-        print(f'2.2 Averaged Out-Of-Sample Metrics ({self.name_av_k_metric})')
+        print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric})')
         print_separator()
         oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
         print(f'Max: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
