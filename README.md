@@ -64,7 +64,7 @@ Where `y` is a list of variable names used to create your dependent variable, an
 
 A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
 
-![Union dataset example](./figures/union_example/union_curve.svg)
+![Union dataset example](./figures/union_example/union_example_all.svg)
 
 ## Website
 

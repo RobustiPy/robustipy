@@ -63,6 +63,7 @@ class MergedResult(Protoresult):
              specs=None,
              colormap='Spectral_r',
              figsize=(16, 14),
+             ext='pdf',
              project_name='no_project_name'):
         """
         Plots the regression results using specified options.
@@ -87,6 +88,7 @@ class MergedResult(Protoresult):
                      specs=specs,
                      ax=ax,
                      colormap='Spectral_r',
+                     ext=ext,
                      project_name='no_project_name')
         return fig
 
@@ -329,6 +331,7 @@ class OLSResult(Protoresult):
              ic='aic',
              colormap='Spectral_r',
              figsize=(12, 6),
+             ext='pdf',
              project_name='no_project_name'):
         """
         Plots the regression results using specified options.
@@ -342,7 +345,6 @@ class OLSResult(Protoresult):
         Returns:
             matplotlib.figure.Figure: Plot showing the regression results.
         """
-
         valid_ic = ['bic', 'aic', 'hqic']
 
         if specs is not None:
@@ -361,6 +363,7 @@ class OLSResult(Protoresult):
                             ic=ic,
                             colormap=colormap,
                             figsize=figsize,
+                            ext=ext,
                             project_name=project_name)
 
     def _compute_summary(self):

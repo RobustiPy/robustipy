@@ -748,6 +748,7 @@ def plot_results(results_object,
                  ic=None,
                  colormap='Spectral_r',
                  figsize=(16, 16),
+                 ext='pdf',
                  project_name='no_project_name'
                  ):
     """
@@ -793,38 +794,38 @@ def plot_results(results_object,
     plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax6, colormap=colormap, title='f.')
     plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
     plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
-    plt.savefig(os.path.join(figpath, project_name + '_all.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
 
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_r2(results_object, ax, fig, colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_log(results_object, ax, fig, colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
-    plt.savefig(os.path.join(figpath, project_name + '_SHAP.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_SHAP.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bma(results_object, colormap, ax, feature_order)
-    plt.savefig(os.path.join(figpath, project_name + '_BMA.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_BMA.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_kfolds(results_object, colormap, ax, despine_left=False)
-    plt.savefig(os.path.join(figpath, project_name + '_OOS.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_curve.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.', despine_left=False)
-    plt.savefig(os.path.join(figpath, project_name + '_IC.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
-    plt.savefig(os.path.join(figpath, project_name + '_bdist.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
     plt.close(fig)
