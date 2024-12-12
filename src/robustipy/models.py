@@ -22,6 +22,7 @@ from sklearn.model_selection import KFold, GroupKFold
 from sklearn.metrics import root_mean_squared_error
 from sklearn.metrics import log_loss
 from sklearn.metrics import r2_score
+from multiprocessing import cpu_count
 
 
 class MergedResult(Protoresult):
@@ -549,7 +550,10 @@ class OLSRobust(Protomodel):
             draws=500,
             kfold=5,
             shuffle=False,
-            oos_metric='r-squared'):
+            oos_metric='r-squared',
+            n_cpu=None,
+            seed=None
+            ):
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
@@ -592,6 +596,17 @@ class OLSRobust(Protomodel):
 
         if oos_metric not in valid_oos_metric:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
+        
+        if n_cpu is None:
+            n_cpu = cpu_count()
+
+        if not isinstance(n_cpu, int):
+            raise TypeError("n_cpu must be an integer")
+        
+        if seed is not None:
+            if not isinstance(seed, int):
+                raise TypeError("seed must be an integer")
+            np.random.seed(seed)
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -602,6 +617,7 @@ class OLSRobust(Protomodel):
             list_b_array = []
             list_p_array = []
             list_r2_array = []
+            list_r2i_array = []
             list_ll_array = []
             list_aic_array = []
             list_bic_array = []
@@ -642,7 +658,7 @@ class OLSRobust(Protomodel):
                                                             kfold=kfold,
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
-                    b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
+                    b_list, p_list, r2_list = (zip(*Parallel(n_jobs=n_cpu)
                     (delayed(self._strap_OLS)
                      (comb,
                       group,
@@ -742,7 +758,7 @@ class OLSRobust(Protomodel):
                                                         kfold=kfold,
                                                         group=group,
                                                         oos_metric_name=self.oos_metric_name)
-                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
+                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_OLS)
                  (comb,
                   group,
@@ -1093,7 +1109,9 @@ class LRobust(Protomodel):
             sample_size=None,
             kfold=5,
             shuffle=False,
-            oos_metric='r-squared'):
+            oos_metric='r-squared',
+            n_cpu=None,
+            seed=None):
         if not isinstance(controls, list):
             raise TypeError("'controls' must be a list.")
 
@@ -1112,6 +1130,18 @@ class LRobust(Protomodel):
         
         if oos_metric not in valid_oos_metric:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
+        
+        if n_cpu is None:
+            n_cpu = cpu_count()
+
+        if not isinstance(n_cpu, int):
+            raise TypeError("n_cpu must be an integer")
+        
+        if seed is not None:
+            if not isinstance(seed, int):
+                raise TypeError("seed must be an integer")
+            np.random.seed(seed)
+            
 
         self.oos_metric_name = oos_metric
 
@@ -1162,7 +1192,7 @@ class LRobust(Protomodel):
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
 
-                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=-1)
+                b_list, p_list, r2_list = (zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_regression)
                  (comb,
                   group,
