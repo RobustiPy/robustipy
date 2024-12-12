@@ -607,6 +607,10 @@ class OLSRobust(Protomodel):
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
+        
+        non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+        if non_numeric_columns:
+            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -1141,7 +1145,10 @@ class LRobust(Protomodel):
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
-            
+        
+        non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+        if non_numeric_columns:
+            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")    
 
         self.oos_metric_name = oos_metric
 
