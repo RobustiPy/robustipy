@@ -299,6 +299,8 @@ class OLSResult(Protoresult):
         print('2.1 Inference Metrics')
         print_separator()
         print(f"Mean beta: {df_model_result['betas'].mean():.2f}")
+        print(f"Min beta: {df_model_result['betas'].min():.2f}")
+        print(f"Max beta: {df_model_result['betas'].max():.2f}")
         print(f"Significant portion of beta: {df_model_result['significant'].mean():.2f}")
         print(f"Positive portion of beta: {df_model_result['positive_beta'].mean():.2f}")
         print(f"Positive and Significant portion of beta: {(df_model_result['positive_beta'] & df_model_result['significant']).mean():.2f}")
@@ -307,14 +309,17 @@ class OLSResult(Protoresult):
         print_separator()
         print(f'2.1 In-Sample Metrics')
         print_separator()
-        print(f"Min AIC: {self.summary_df['aic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
+        print(f"Min AIC: {self.summary_df['aic'].min()},Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print(
             f"Max Log Likelihood: {self.summary_df['ll'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
         print(
+            f"Min Log Likelihood: {self.summary_df['ll'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
+        print(
             f"Max R2: {self.summary_df['r2'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
-
+        print(
+            f"Min R2: {self.summary_df['r2'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
         print_separator()
         print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric})')
         print_separator()
@@ -511,7 +516,7 @@ class OLSRobust(Protomodel):
         self.model_name = model_name
         self.parameters = {}
         self.parameters['y'] = self.y
-        self.parameters['x'] = self.x 
+        self.parameters['x'] = self.x
 
 
     def get_results(self):
@@ -585,13 +590,13 @@ class OLSRobust(Protomodel):
         if group is not None:
             if not isinstance(group, str) or not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-            
+
         if kfold < 2:
             raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
-        
+
         if draws < 1:
             raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
-        
+
         valid_oos_metric = ['r-squared', 'rmse']
 
         if oos_metric not in valid_oos_metric:
@@ -741,7 +746,7 @@ class OLSRobust(Protomodel):
                                                            )
             model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
-            explainer = shap.LinearExplainer(model, x_train, feature_perturbation="correlation_dependent")
+            explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
                 if len(spec) == 0:
@@ -827,7 +832,7 @@ class OLSRobust(Protomodel):
         """
         return np.dot(x_test, betas)
 
-    
+
     def _full_sample_OLS(self,
                          comb_var,
                          kfold,
@@ -1104,7 +1109,7 @@ class LRobust(Protomodel):
         """
         x_test = add_constant(x_test, prepend=False)
         return 1 / (1 + np.exp(-x_test.dot(betas)))
-    
+
     def fit(self,
             *,
             controls,
@@ -1126,12 +1131,12 @@ class LRobust(Protomodel):
         if group is not None:
             if not group in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-            
+
         if kfold < 2:
             raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
-        
+
         valid_oos_metric = ['r-squared', 'rmse', 'cross-entropy']
-        
+
         if oos_metric not in valid_oos_metric:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
         
