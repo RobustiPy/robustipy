@@ -375,7 +375,7 @@ def prepare_union(path_to_union):
     union_df.loc[:, 'married'] = np.where(union_df['married'] == 'married', 1, 0)
     union_df.loc[:, 'collgrad'] = np.where(union_df['collgrad'] == 'college grad', 1, 0)
     union_df.loc[:, 'smsa'] = np.where(union_df['smsa'] == 'SMSA', 1, 0)
-    union_df[['smsa', 'collgrad', 'married', 'union']] = union_df[['smsa', 'collgrad', 'married', 'union']].astype('category')
+    union_df[['smsa', 'collgrad', 'married', 'union']] = union_df[['smsa', 'collgrad', 'married', 'union']].astype('int')
     indep_list = ['hours',
                   'age',
                   'grade',
@@ -426,7 +426,6 @@ def prepare_asc(asc_path):
     ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
     one_hot = pd.get_dummies(ASC_df['year'])
     ASC_df = ASC_df.join(one_hot)
-    #ASC_df = ASC_df.set_index(['pidp', 'year'])
     ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew'] * ASC_df['lrealgs']
     #ASC_df['constant'] = 1
     ASC_df = ASC_df[['wellbeing_kikert', 'lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
@@ -439,7 +438,7 @@ def prepare_asc(asc_path):
                      #'constant'
                      'pidp'
                      ]]
-    #ASC_df = ASC_df.dropna()
+    ASC_df = ASC_df.dropna()
     y = 'wellbeing_kikert'
     x = ['lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
          'DR', 'lgva', 'Mtotp', 'ddgree', 'age',
@@ -450,7 +449,7 @@ def prepare_asc(asc_path):
          'house_ownership', 'hhsize', 'work', 'retired'
          ]
     group = 'pidp'
-
+    ASC_df['pidp'] = ASC_df['pidp'].astype(int)
     return y, c, x, group, ASC_df
 
 
