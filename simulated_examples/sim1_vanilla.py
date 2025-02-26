@@ -9,10 +9,6 @@ import matplotlib.pyplot as plt
 def sim1(project_name):
 
     beta1 = np.array([.2, .5, -.4, -.7, .2])
-    beta2 = np.array([.3, .4, -.35, -.8, .2])
-    beta3 = np.array([.15, .6, -.45, -.1, .2])
-    beta4= np.array([.4, .3, -.5, -.1, .2])
-
     cov_matrix = np.array([[1, 0.7, 0.5, 0.7, 0.1],
                            [0.7, 1, 0.5, 0.3, 0.2],
                            [0.5, 0.5, 1, 0.4, 0.2],
