@@ -601,19 +601,22 @@ class OLSRobust(Protomodel):
 
         if oos_metric not in valid_oos_metric:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
-        
+
         if n_cpu is None:
             n_cpu = cpu_count()
 
         if not isinstance(n_cpu, int):
             raise TypeError("n_cpu must be an integer")
-        
+
         if seed is not None:
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
-        
-        non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+        if group is not None:
+            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+        else:
+            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(
+                exclude=[np.number]).columns.tolist()
         if non_numeric_columns:
             raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
@@ -1139,21 +1142,21 @@ class LRobust(Protomodel):
 
         if oos_metric not in valid_oos_metric:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
-        
+
         if n_cpu is None:
             n_cpu = cpu_count()
 
         if not isinstance(n_cpu, int):
             raise TypeError("n_cpu must be an integer")
-        
+
         if seed is not None:
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
-        
+
         non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
         if non_numeric_columns:
-            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")    
+            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
         self.oos_metric_name = oos_metric
 
