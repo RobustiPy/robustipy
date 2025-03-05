@@ -398,7 +398,7 @@ def plot_curve(results_object,
     axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
     ax.set_xlim(0, len(results_object.specs_names))
     ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 20,
-                ax.get_ylim()[1])
+                ax.get_ylim()[1] + (ax.get_ylim()[1]/10))
     ax.text(
         0.05, 0.95,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
@@ -446,7 +446,7 @@ def plot_ic(results_object,
     df = results_object.summary_df.copy()
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
-    axis_formatter(ax, f'{ic.upper()} curve', 'Coeficient Estimate', title)
+    axis_formatter(ax, f'{ic.upper()} curve', 'Ordered Specifications', title)
     if specs:
         key = get_selection_key(specs)
         full_spec = list(results_object.specs_names.iloc[-1])
@@ -660,7 +660,7 @@ def plot_bdist(results_object,
                       facecolor=((1, 1, 1, 0)
                       )
                       )
-    axis_formatter(ax, 'Density', 'Ordered Specifications', title)
+    axis_formatter(ax, 'Density', 'Coefficient Estimate', title)
     if despine_left is True:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
@@ -817,7 +817,7 @@ def plot_results(results_object,
     plot_kfolds(results_object, colormap, ax, despine_left=False)
     plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
+    fig, ax = plt.subplots(figsize=(12, 5.5))
     plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
     plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
