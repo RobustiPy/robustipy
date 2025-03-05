@@ -1153,8 +1153,12 @@ class LRobust(Protomodel):
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
-
-        non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+        if group is not None:
+            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(
+                exclude=[np.number]).columns.tolist()
+        else:
+            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(
+                exclude=[np.number]).columns.tolist()
         if non_numeric_columns:
             raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
@@ -1186,7 +1190,8 @@ class LRobust(Protomodel):
                                                        )
             model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
-            explainer = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            #explainer = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
 
