@@ -80,6 +80,9 @@ class MergedResult(Protoresult):
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
+            
+            if len(specs) > 3:
+                raise ValueError("The max number of specifications to highlight is 3")
 
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
@@ -351,6 +354,9 @@ class OLSResult(Protoresult):
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
+            
+            if len(specs) > 3:
+                raise ValueError("The max number of specifications to highlight is 3") 
 
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
@@ -608,9 +614,14 @@ class OLSRobust(Protomodel):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
         
-        non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
-        if non_numeric_columns:
-            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
+        if group is not None:
+            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+            if non_numeric_columns:
+                raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
+        else:
+            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(exclude=[np.number]).columns.tolist()
+            if non_numeric_columns:
+                raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
