@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-from robustipy.models import OLSRobust
+from robustipy.models import LRobust
 
 
-def sim1(project_name):
+def sim4(project_name):
     np.random.seed(192735)
     beta1 = np.array([0.2, 0.5, -0.4, -0.7, 0.2, 0.5, 0.2, 0.5, 0.3])
     L = np.array([
@@ -34,7 +34,7 @@ def sim1(project_name):
     y = ['y1']
     x = ['x1']
     c = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7']
-    sim1 =OLSRobust(y=y, x=x, data=data)
+    sim1 = LRobust(y=y, x=x, data=data)
     sim1.fit(controls=c, draws=1000, kfold=10, seed=192735)
     sim1_results = sim1.get_results()
     sim1_results.plot(specs=[['z1', 'z2', 'z3']],
@@ -43,4 +43,4 @@ def sim1(project_name):
 
 
 if __name__ == "__main__":
-    sim1('sim1_example')
+    sim4('sim4_example')
