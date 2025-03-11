@@ -229,6 +229,7 @@ class OLSResult(Protoresult):
         self.all_b = all_b
         self.all_p = all_p
         self.summary_df = self._compute_summary()
+        self._compute_number_of_significant_betas()
         self.summary_df['r2'] = pd.Series(r2i_array)
         self.summary_df['ll'] = pd.Series(ll_array)
         self.summary_df['aic'] = pd.Series(aic_array)
@@ -240,6 +241,65 @@ class OLSResult(Protoresult):
         self.model_name = model_name
         self.name_av_k_metric = name_av_k_metric
         self.shap_return = shap_return
+
+    def join_sig_test(self, n_samples=500):
+        """
+        Perform a joint significance test on the model results.
+        
+        Parameters:
+        n_samples (int): Number of bootstrap samples to generate. Default is 500.
+        """
+        samples = []
+        count_greater_neg_sig = 0
+        count_greater_pos_sig = 0
+        
+        # Generate bootstrap samples
+        for _ in range(n_samples):
+            temp_data = self.data.sample(frac=1, replace=True)
+            samples.append(temp_data)
+        
+        k_specs = []
+        
+        # Iterate over each specification and its corresponding median estimate
+        for spec, est in track(zip(self.summary_df['spec_name'], self.summary_df['median']), description="Working...", total=len(self.summary_df)):
+            p_values = []
+            
+            # Calculate the predicted values (x_beta) and residuals (y_star)
+            x_beta = np.dot(self.data[self.x_name], est)
+            y_star = self.data[self.y_name] - x_beta
+            
+            # Iterate over each bootstrap sample
+            for sample in samples:
+                x_data = sample[[self.x_name] + list(spec)].copy()
+                
+                # Perform OLS regression on the sample
+                out = simple_ols(y=y_star, x=x_data)
+                p = out['p'][0]
+                b = out['b'][0]
+                
+                # Adjust p-value based on the sign of the coefficient
+                if b < 0:
+                    p = -p
+                p_values.append(p)
+            
+            k_specs.append(p_values)
+        
+        # Store the raw joint significance data
+        self.raw_joinsig_data = pd.DataFrame(k_specs)
+        
+        # Count the number of significant positive and negative coefficients
+        for run in self.raw_joinsig_data.columns:
+            pos_sig = self.raw_joinsig_data[run].apply(lambda x: 1 if x < 0.05 else 0).sum()
+            neg_sig = self.raw_joinsig_data[run].apply(lambda x: 1 if x > -0.05 else 0).sum()
+            
+            if pos_sig >= self.pos_sig:
+                count_greater_pos_sig += 1
+            if neg_sig >= self.neg_sig:
+                count_greater_neg_sig += 1
+        
+        # Calculate the proportion of significant positive and negative coefficients
+        self.join_pos_sig = count_greater_pos_sig / n_samples
+        self.join_neg_sig = count_greater_neg_sig / n_samples
 
     def save(self, filename):
         """
@@ -264,6 +324,16 @@ class OLSResult(Protoresult):
         """
         with open(filename, 'rb') as f:
             return _pickle.load(f)
+    
+    def _compute_number_of_significant_betas(self):
+        df_model_result = pd.DataFrame({
+            'betas': [b[0][0] for b in self.all_b],
+            'p_values': [p[0][0] for p in self.all_p],
+        })
+        df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
+        df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
+        self.pos_sig = (df_model_result['positive_beta'] & df_model_result['significant']).sum()
+        self.neg_sig = ((1 - df_model_result['positive_beta']) & df_model_result['significant']).sum()
 
     def summary(self):
         """
