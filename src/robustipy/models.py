@@ -276,15 +276,22 @@ class OLSResult(Protoresult):
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
         })
+        if self.estimates_ystar.isna().all().all():
+            inference = False
+        else:
+            inference = True
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['negative_beta'] = df_model_result['betas'].apply(lambda x: 1 if x < 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
-        self.inference['median_p'] = (((self.estimates_ystar.median(axis=1) >
-                                        df_model_result['betas']).sum())/
-                                      self.estimates_ystar.shape[1])
+        if inference is False:
+            self.inference['median_p'] = np.nan
+        else:
+            self.inference['median_p'] = (((self.estimates_ystar.median(axis=1) >
+                                            df_model_result['betas']).sum())/
+                                          self.estimates_ystar.shape[1])
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
         self.inference['max_ns'] = df_model_result['betas'].max()
@@ -294,26 +301,32 @@ class OLSResult(Protoresult):
         self.inference['pos_prop_ns'] = df_model_result['positive_beta'].mean()
         self.inference['pos'] = (self.estimates > 0.0).sum().sum()
         self.inference['pos_prop'] = (self.estimates > 0.0).mean().mean()
-        self.inference['pos_p'] = ((((self.estimates_ystar > 0.0).sum(axis=0) >
-                                     df_model_result['positive_beta'].sum()).sum()) /
-                                   self.estimates_ystar.shape[1])
-
+        if inference is False:
+            self.inference['pos_p'] = np.nan
+        else:
+            self.inference['pos_p'] = ((((self.estimates_ystar > 0.0).sum(axis=0) >
+                                         df_model_result['positive_beta'].sum()).sum()) /
+                                       self.estimates_ystar.shape[1])
         self.inference['neg_ns'] = df_model_result['negative_beta'].sum()
         self.inference['neg_prop_ns'] = df_model_result['negative_beta'].mean()
         self.inference['neg'] = (self.estimates < 0.0).sum().sum()
         self.inference['neg_prop'] = (self.estimates < 0.0).mean().mean()
-        self.inference['neg_p'] = ((((self.estimates_ystar < 0.0).sum(axis=0) >
-                                     df_model_result['negative_beta'].sum()).sum()) /
-                                   self.estimates_ystar.shape[1])
-
+        if inference is False:
+            self.inference['neg_p'] = np.nan
+        else:
+            self.inference['neg_p'] = ((((self.estimates_ystar < 0.0).sum(axis=0) >
+                                         df_model_result['negative_beta'].sum()).sum()) /
+                                       self.estimates_ystar.shape[1])
         self.inference['sig_ns'] = df_model_result['significant'].sum()
         self.inference['sig_prop_ns'] = df_model_result['significant'].mean()
         self.inference['sig'] = (self.p_values.stack() < 0.05).sum().sum()
         self.inference['sig_prop'] = (self.p_values.stack() < 0.05).mean().mean()
-        self.inference['sig_p'] = ((((self.p_values_ystar < 0.05).sum(axis=0) >
-                                     df_model_result['significant'].sum()).sum()) /
-                                   self.p_values_ystar.shape[1])
-
+        if inference is False:
+            self.inference['sig_p'] = np.nan
+        else:
+            self.inference['sig_p'] = ((((self.p_values_ystar < 0.05).sum(axis=0) >
+                                         df_model_result['significant'].sum()).sum()) /
+                                       self.p_values_ystar.shape[1])
         self.inference['pos_sig_ns'] = (df_model_result['positive_beta'] &
                                      df_model_result['significant']).sum()
         self.inference['pos_sig_prop_ns'] = (df_model_result['positive_beta'] &
@@ -322,11 +335,14 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['pos_sig_prop'] = ((self.estimates > 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        self.inference['pos_sig_p'] = (((((self.estimates_ystar > 0.0) &
-                                          (self.p_values_ystar < 0.05)).sum(axis=0) >
-                                         ((df_model_result['positive_beta'] &
-                                           df_model_result['significant'])).sum()).sum()) /
-                                       self.estimates_ystar.shape[1])
+        if inference is False:
+            self.inference['pos_sig_p'] = np.nan
+        else:
+            self.inference['pos_sig_p'] = (((((self.estimates_ystar > 0.0) &
+                                              (self.p_values_ystar < 0.05)).sum(axis=0) >
+                                             ((df_model_result['positive_beta'] &
+                                               df_model_result['significant'])).sum()).sum()) /
+                                           self.estimates_ystar.shape[1])
 
         self.inference['neg_sig_ns'] = (df_model_result['negative_beta'] &
                                         df_model_result['significant']).sum()
@@ -336,11 +352,14 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['neg_sig_prop'] = ((self.estimates < 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        self.inference['neg_sig_p'] = (((((self.estimates_ystar < 0.0) &
-                                          (self.p_values_ystar < 0.05)).sum(axis=0) >
-                                         ((df_model_result['negative_beta'] &
-                                           df_model_result['significant'])).sum()).sum()) /
-                                       self.estimates_ystar.shape[1])
+        if inference is False:
+            self.inference['neg_sig_p'] = np.nan
+        else:
+            self.inference['neg_sig_p'] = (((((self.estimates_ystar < 0.0) &
+                                              (self.p_values_ystar < 0.05)).sum(axis=0) >
+                                             ((df_model_result['negative_beta'] &
+                                               df_model_result['significant'])).sum()).sum()) /
+                                           self.estimates_ystar.shape[1])
 
 
     def summary(self):
@@ -361,6 +380,12 @@ class OLSResult(Protoresult):
         # Display basic model information
         print_separator("1. Model Summary")
         print(f"Model: {self.model_name}")
+        if self.estimates_ystar.isna().all().all():
+            inference = False
+            print('Inference Tests: No')
+        else:
+            inference = True
+            print('Inference Tests: Yes')
         print(f"Dependent variable: {self.y_name}")
         print(f"Independent variable: {self.x_name}")
         print(f"Number of possible controls: {len(self.controls)}")
@@ -372,8 +397,10 @@ class OLSResult(Protoresult):
         print_separator("2.Model Robustness Metrics")
         print('2.1 Inference Metrics')
         print_separator()
-
-        print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']:.2f} (p-value: {self.inference['median_p']})")
+        if inference is False:
+            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']:.2f}")
+        else:
+            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']:.2f} (p-value: {self.inference['median_p']})")
         print(f"Median beta (all bootstraps and specifications): {self.inference['median']:.2f}")
 
         print(f"Min beta (all specifications, no resampling): {self.inference['min_ns']:.2f}")
@@ -382,19 +409,33 @@ class OLSResult(Protoresult):
         print(f"Max beta (all specifications, no resampling): {self.inference['max_ns']:.2f}")
         print(f"Max beta (all bootstraps and specifications): {self.inference['max']:.2f}")
 
-        print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']:.2f} (p-value: {self.inference['sig_p']})")
+        if inference is False:
+            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']:.2f}")
+        else:
+            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']:.2f} (p-value: {self.inference['sig_p']})")
         print(f"Significant portion of beta (all bootstraps and specifications): {self.inference['sig_prop']:.2f}")
-
-        print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']} (p-value: {self.inference['pos_p']})")
+        if inference is False:
+            print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']}")
+        else:
+            print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']} (p-value: {self.inference['pos_p']})")
         print(f"Positive portion of beta (all bootstraps and specifications): {self.inference['pos_prop']}")
-        
-        print(f"Negative portion of beta (all specifications, no resampling): {self.inference['neg_prop_ns']} (p-value: {self.inference['neg_p']})")
+
+        if inference is False:
+            print(f"Negative portion of beta (all specifications, no resampling): {self.inference['neg_prop_ns']}")
+        else:
+            print(f"Negative portion of beta (all specifications, no resampling): {self.inference['neg_prop_ns']} (p-value: {self.inference['neg_p']})")
         print(f"Negative portion of beta (all bootstraps and specifications): {self.inference['neg_prop']}")
 
-        print(f"Positive and Significant portion of beta (all specifications, no resampling): {self.inference['pos_sig_prop_ns']} (p-value: {self.inference['pos_sig_p']})")
+        if inference is False:
+            print(f"Positive and Significant portion of beta (all specifications, no resampling): {self.inference['pos_sig_prop_ns']}")
+        else:
+            print(f"Positive and Significant portion of beta (all specifications, no resampling): {self.inference['pos_sig_prop_ns']} (p-value: {self.inference['pos_sig_p']})")
         print(f"Positive and Significant portion of beta (all bootstraps and specifications): {self.inference['pos_sig_prop']}")
 
-        print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
+        if inference is False:
+            print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']}")
+        else:
+            print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
         print(f"Negative and Significant portion of beta (all bootstraps and specifications): {self.inference['neg_sig_prop']}")
 
         print_separator()
@@ -778,7 +819,7 @@ class OLSRobust(Protomodel):
                                                             kfold=kfold,
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
-                    y_star = comb.iloc[:, [0]] - np.dot(self.x, b_all[0])
+                    y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                     b_list, p_list, r2_list, b_list_ystar, p_list_ystar = (zip(*Parallel(n_jobs=n_cpu)
                     (delayed(self._strap_OLS)
                      (comb,
@@ -1072,6 +1113,7 @@ class OLSRobust(Protomodel):
             P value for x.
         """
         temp_data = comb_var.copy()
+        temp_data['y_star'] = y_star
 
 #        if shuffle:
 #            y = temp_data.iloc[:, [0]]
@@ -1084,15 +1126,18 @@ class OLSRobust(Protomodel):
             samp_df = temp_data.sample(n=sample_size, replace=True)
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
-            x = samp_df.drop(samp_df.columns[0], axis=1)
+            y_star = samp_df.iloc[:, [-1]]
+            x = samp_df.drop('y_star', axis=1)
+            x = x.drop(samp_df.columns[0], axis=1)
         else:
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
-            y_star = no_singleton.iloc[:, y_star]
-            x = no_singleton.drop(no_singleton.columns[0], axis=1)
+            y_star = no_singleton.iloc[:, 'y_star']
+            x = no_singleton.drop('y_star', axis=1)
+            x = x.drop(no_singleton.columns[0], axis=1)
         output = stripped_ols(y=y, x=x)
         output_ystar = stripped_ols(y=y_star, x=x)
         b = output['b']
@@ -1343,21 +1388,25 @@ class LRobust(Protomodel):
                 (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
-
-                b_list, p_list, r2_list, b_list_ystar, p_list_ystar= (zip(*Parallel(n_jobs=n_cpu)
+#                y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                (b_list, p_list, r2_list,
+                 #b_list_ystar, p_list_ystar
+                 )= (zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_regression)
                  (comb,
                   group,
                   sample_size,
-                  shuffle)
+                  shuffle,
+#                  y_star
+                  )
                  for i in range(0, draws))))
 
                 specs.append(frozenset(spec))
                 all_predictors.append(self.x + list(spec) + ['const'])
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
-                b_array[index, :] = b_list_ystar
-                p_array[index, :] = p_list_ystar
+                b_array_ystar[index, :] = np.nan*len(b_list)
+                p_array_ystar[index, :] = np.nan*len(p_list)
                 r2_array[index, :] = r2_list
                 r2i_array[index] = r2_i
                 ll_array[index] = ll_i
@@ -1399,27 +1448,36 @@ class LRobust(Protomodel):
                           comb_var,
                           group,
                           sample_size,
-                          shuffle):
+                          shuffle,
+#                          y_star
+                          ):
         temp_data = comb_var.copy()
 
-        if shuffle:
-            y = temp_data.iloc[:, [0]]
-            idx_y = np.random.permutation(y.index)
-            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
-            x = temp_data.drop(temp_data.columns[0], axis=1)
-            temp_data = pd.concat([y, x], axis=1)
+#        if shuffle:
+#            y = temp_data.iloc[:, [0]]
+#            idx_y = np.random.permutation(y.index)
+#            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
+#            x = temp_data.drop(temp_data.columns[0], axis=1)
+#            temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
             samp_df = temp_data.sample(n=sample_size, replace=True)
             y = samp_df.iloc[:, [0]]
+#            y_star = samp_df.iloc[:, [-1]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
+#            x = x.drop('y_star', axis=1)
             output = logistic_regression_sm_stripped(y, x)
+#            output_ystar = logistic_regression_sm_stripped(y_star, x)
         else:
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
+#            y_star = no_singleton.iloc[:, [-1]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
+#            x = x.drop('y_star', axis=1)
             output = logistic_regression_sm(y, x)
-        return output['b'][0][0], output['p'][0][0], output['r2']
+#            output_ystar = logistic_regression_sm(y_star, x)
+
+        return output['b'][0][0], output['p'][0][0], output['r2']#, output_ystar['b'][0][0], output_ystar['p'][0][0]
