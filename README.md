@@ -66,7 +66,7 @@ Where `y` is a list of (string) variable names used to create your dependent var
 
 There are five empirical example notebooks [here](https://github.com/RobustiPy/robustipy/empirical_examples) and five simulated examples scripts [here]([here](https://github.com/RobustiPy/robustipy/simulated_examples). The below is the output of a ```results.plot()``` function call made on the canonical [union dataset]((https://github.com/RobustiPy/robustipy/empirical_examples/empirical1_union.ipynb)). Note: ```results.summary()``` also prints out a *large* number of helpful statistics about your models! 
 
-![Union dataset example](./figures/union_example/union_example_all.svg)
+![Union dataset example](./empirical_examples/figures/union_example/union_example_all.svg)
 
 ## Website
 
