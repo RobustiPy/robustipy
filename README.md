@@ -5,7 +5,7 @@
 [![Generic badge](https://img.shields.io/badge/R-brightgreen.svg)](https://shields.io/)
 [![Generic badge](https://img.shields.io/badge/License-GNU3.0-purple.svg)](https://shields.io/)
 
-Welcome to the home of `RobustiPy`, a library for the creation of a more robust and stable model space. Kindly note: **this project is in the early stages of development. Its functionally and API might change without notice**!
+Welcome to the home of `RobustiPy`, a library for the creation of a more robust and stable model space. RobustiPy does a large number of things, included but not limited to: high dimensional visualisation, Bayesian Model Averaging, bootstrapped resampling, (in- and)out-of-sample model evaluation, model selection via Information Criterion, explainable AI (via [SHAP](https://www.nature.com/articles/s42256-019-0138-9)), and joint inference tests (as per [Simonsohn et al. 2019](https://www.nature.com/articles/s41562-020-0912-z)). Kindly note: **this project is in the early stages of development. Its functionally and API might change without notice**! A working paper and a release are coming soon.
 
 `RobustiPy` performs Multiversal/Specification Curve Analysis. Multiversal/Specification Curve Analysis attempts to compute most or all reasonable specifications of a statistical model, understanding a specification as a single attempt to estimate an estimand of interest, whether through a particular choice of covariates, hyperparameters, data cleaning decisions, and so forth.
 
@@ -15,7 +15,7 @@ $$
 y = f(x, \textbf{z}) + \epsilon .
 $$
 
-We are essentially attempting to model a dependent variable $y$ using some kind of function $f()$, some predictor(s) $x$, some covariates $z$, and random error $\epsilon$. For all of these elements, different estimates of the coefficient of interest are produced. Lets assume $y$, $x$ and $z$ are imperfect latent variables or a collection of latent variables. Researchers can come up with _reasonable_ operationalisations of $y$, $x$ and $z$, running the analysis most usually with one or a small number of combinations of them. Ideally -- in an age of vast computational resources -- we should take all such _reasonable_ operationalisations, and store them in sets:
+We are essentially attempting to model a dependent variable $y$ using some kind of function $f()$, some predictor(s) $x$, some covariates $z$, and random error $\epsilon$. For all of these elements, different estimates of the coefficient of interest are produced. Let's assume $y$, $x$ and $z$ are imperfect latent variables or a collection of latent variables. Researchers can come up with _reasonable_ operationalisations of $y$, $x$ and $z$, running the analysis most usually with one or a small number of combinations of them. Ideally -- in an age of vast computational resources -- we should take all such _reasonable_ operationalisations, and store them in sets:
 
 ```math
 Y = \{y_{1}, y_{2}, \dots, y_{n}\}
@@ -52,23 +52,25 @@ In a Python script (or Jupyter Notebook), import the `OLSRobust` class by runnin
 ```python
 from robustipy.models import OLSRobust
 model_robust = OLSRobust(y=y, x=x, data=data)
-model_robust.fit(controls=c,
-	         draws=100,
-                 sample_size=100)
+model_robust.fit(controls=c, # a list of control variables
+	         draws=1000, # number of bootstrap resamples
+                 kfold=10, # number of folds for OOS evaluation
+                 seed=192735 # an optional but randomly chosen seed for consistent reproducibility
+)
 model_results = model_robust.get_results()
 ```
 
-Where `y` is a list of variable names used to create your dependent variable, and `x` is a list of variable names used as predictors.
+Where `y` is a list of (string) variable names used to create your dependent variable, `x` is your dependent (string) variable name of interest (which can be a list len>1), and c is a list of control (string) variable names predictors.
 
-## Example
+## Examples
 
-A working usage example script -- `replication_example.py` -- is provided at the root of this repository. You can also find a number of empirical examples [here](https://github.com/RobustiPy/Empirical-Examples) and some simulated examples [here](Simulated-Examples).
+There are five empirical example notebooks [here](https://github.com/RobustiPy/robustipy/empirical_examples) and five simulated examples scripts [here]([here](https://github.com/RobustiPy/robustipy/simulated_examples). The below is the output of a ```results.plot()``` function call made on the canonical [union dataset]((https://github.com/RobustiPy/robustipy/empirical_examples/empirical1_union.ipynb)). Note: ```results.summary()``` also prints out a *large* number of helpful statistics about your models! 
 
 ![Union dataset example](./figures/union_example/union_example_all.svg)
 
 ## Website
 
-We have a website made with [jekkyl-theme-minimal](https://github.com/pages-themes/minimal) that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon!
+We have a website made with [jekkyl-theme-minimal](https://github.com/pages-themes/minimal) that you can find [here](https://robustipy.github.io/). It also contains details of a Hackathon we ran in 2024!
 
 ## Contributing and Code of Conduct
 
