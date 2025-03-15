@@ -289,8 +289,8 @@ class OLSResult(Protoresult):
         if inference is False:
             self.inference['median_p'] = np.nan
         else:
-            self.inference['median_p'] = (((self.estimates_ystar.median(axis=1) >
-                                            df_model_result['betas']).sum())/
+            self.inference['median_p'] = (((self.estimates_ystar.median(axis=0) >
+                                            df_model_result['betas'].median()).sum())/
                                           self.estimates_ystar.shape[1])
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
@@ -461,8 +461,8 @@ class OLSResult(Protoresult):
         print(f'Max Average: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
         oos_min_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmin(),]
         print(f'Min Average: {oos_min_row["av_k_metric"]}, Specs: {list(oos_min_row["spec_name"])} ')
-        print(f"Mean Average: {self.summary_df['av_k_metric'].mean():.2f}")
-        print(f"Median Average: {self.summary_df['av_k_metric'].median():.2f}")
+        print(f"Mean Average: {self.summary_df['av_k_metric'].mean()}")
+        print(f"Median Average: {self.summary_df['av_k_metric'].median()}")
 
 
     def plot(self,
