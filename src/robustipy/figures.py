@@ -19,7 +19,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 def axis_formatter(ax, ylabel, xlabel, title):
     ax.tick_params(axis='both', which='major', labelsize=13)
-    ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
+    ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
     ax.set_ylabel(ylabel, fontsize=13)
     title_setter(ax, title)
@@ -306,8 +306,8 @@ def plot_curve(results_object,
         ax.fill_between(df.index,
                         loess_min[:, 1],
                         loess_max[:, 1],
-                        facecolor='#FFD700',
-                        alpha=0.04)
+                        facecolor='#fee08b',
+                        alpha=0.15)
     else:
         # Plot raw min and max as dashed lines similar to loess
         ax.plot(df.index, df['min'], color=get_colormap_colors(colormap, 100)[99], linestyle='--', label='Min')
@@ -315,8 +315,8 @@ def plot_curve(results_object,
         ax.fill_between(df.index,
                         df['min'],
                         df['max'],
-                        facecolor='#FFD700',
-                        alpha=0.04)
+                        facecolor='#fee08b',
+                        alpha=0.15)
 
     if ax.get_ylim()[0] < 0 and ax.get_ylim()[1] > 0:
         ax.axhline(y=0, color='k', ls='--')
@@ -404,8 +404,7 @@ def plot_curve(results_object,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
          f'Number of bootstraps: {results_object.draws}\n' +
          f'Number of folds: {results_object.kfold}\n'
-         # @TODO placeholder
-         f'Joint Significance: 0.12345'
+         f'Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})'
          ),
         transform=ax.transAxes,
         verticalalignment='top',
@@ -705,7 +704,7 @@ def plot_kfolds(results_object,
               ncols=1
               )
     ax.tick_params(axis='both', which='major', labelsize=13)
-    ax.grid(linestyle='--', color='k', alpha=0.15, zorder=-1)
+    ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
     if results_object.name_av_k_metric=='rmse':
         metric = results_object.name_av_k_metric.upper()
