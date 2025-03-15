@@ -1134,17 +1134,17 @@ class OLSRobust(Protomodel):
             x = samp_df.drop('y_star', axis=1)
             x = x.drop(samp_df.columns[0], axis=1)
         else:
-            np.random_seed.seed()
+            np.random.seed(seed)
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
-            y_star = no_singleton.iloc[:, 'y_star']
+            y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')]
             x = no_singleton.drop('y_star', axis=1)
             x = x.drop(no_singleton.columns[0], axis=1)
         output = stripped_ols(y=y, x=x)
-        output_ystar = stripped_ols(y=y_star, x=x)
+        output_ystar = stripped_ols(y=y_star.to_frame(), x=x)
         b = output['b']
         p = output['p']
         r2 = output['r2']
@@ -1477,7 +1477,7 @@ class LRobust(Protomodel):
             output = logistic_regression_sm_stripped(y, x)
 #            output_ystar = logistic_regression_sm_stripped(y_star, x)
         else:
-            np.random_seed=seed
+            np.random.seed(seed)
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
