@@ -1141,10 +1141,11 @@ class OLSRobust(Protomodel):
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')]
+            y_star = y_star.to_frame()
             x = no_singleton.drop('y_star', axis=1)
             x = x.drop(no_singleton.columns[0], axis=1)
         output = stripped_ols(y=y, x=x)
-        output_ystar = stripped_ols(y=y_star.to_frame(), x=x)
+        output_ystar = stripped_ols(y=y_star, x=x)
         b = output['b']
         p = output['p']
         r2 = output['r2']

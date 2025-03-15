@@ -8,6 +8,7 @@ import seaborn as sns
 import numpy as np
 import statsmodels.api as sm
 import pandas as pd
+import matplotlib.ticker as mticker
 from robustipy.utils import get_selection_key
 from robustipy.utils import get_colormap_colors
 from matplotlib.gridspec import GridSpec
@@ -55,7 +56,7 @@ def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
                       edgecolor='k')
     cb = fig.colorbar(image, ax=ax, spacing='uniform', extend='max', pad=0.05)
     data = image.get_array()
-    ticks = np.linspace(data.min(), data.max(), num=6)  # Adjust this as needed
+    ticks = np.linspace(data.min(), data.max(), num=6)
     cb.set_ticks(ticks)
     if (data.max() >= 1000) and (data.max() < 10000):
         cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
@@ -65,8 +66,9 @@ def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
     axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', title)
+    ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
     sns.despine(ax=ax)
-
 
 def shap_violin(
         ax,
@@ -696,8 +698,8 @@ def plot_kfolds(results_object,
               loc='upper left',
               frameon=True,
               fontsize=10,
-              title='Out-of-Sample',
-              title_fontsize=12,
+              #title='Out-of-Sample',
+              title_fontsize=8,
               framealpha=1,
               facecolor='w',
               edgecolor=(0, 0, 0, 1),
