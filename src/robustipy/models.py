@@ -311,6 +311,7 @@ class OLSResult(Protoresult):
         self.inference['neg_prop_ns'] = df_model_result['negative_beta'].mean()
         self.inference['neg'] = (self.estimates < 0.0).sum().sum()
         self.inference['neg_prop'] = (self.estimates < 0.0).mean().mean()
+
         if inference is False:
             self.inference['neg_p'] = np.nan
         else:
@@ -398,22 +399,22 @@ class OLSResult(Protoresult):
         print('2.1 Inference Metrics')
         print_separator()
         if inference is False:
-            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']:.2f}")
+            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']}")
         else:
-            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']:.2f} (p-value: {self.inference['median_p']})")
-        print(f"Median beta (all bootstraps and specifications): {self.inference['median']:.2f}")
+            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']} (p-value: {self.inference['median_p']})")
+        print(f"Median beta (all bootstraps and specifications): {self.inference['median']}")
 
-        print(f"Min beta (all specifications, no resampling): {self.inference['min_ns']:.2f}")
-        print(f"Min beta (all bootstraps and specifications): {self.inference['min']:.2f}")
+        print(f"Min beta (all specifications, no resampling): {self.inference['min_ns']}")
+        print(f"Min beta (all bootstraps and specifications): {self.inference['min']}")
 
-        print(f"Max beta (all specifications, no resampling): {self.inference['max_ns']:.2f}")
-        print(f"Max beta (all bootstraps and specifications): {self.inference['max']:.2f}")
+        print(f"Max beta (all specifications, no resampling): {self.inference['max_ns']}")
+        print(f"Max beta (all bootstraps and specifications): {self.inference['max']}")
 
         if inference is False:
-            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']:.2f}")
+            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']}")
         else:
-            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']:.2f} (p-value: {self.inference['sig_p']})")
-        print(f"Significant portion of beta (all bootstraps and specifications): {self.inference['sig_prop']:.2f}")
+            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']} (p-value: {self.inference['sig_p']})")
+        print(f"Significant portion of beta (all bootstraps and specifications): {self.inference['sig_prop']}")
         if inference is False:
             print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']}")
         else:
@@ -820,16 +821,17 @@ class OLSRobust(Protomodel):
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = (zip(*Parallel(n_jobs=n_cpu)
+                    seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
+                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
                     (delayed(self._strap_OLS)
                      (comb,
                       group,
                       sample_size,
                       shuffle,
+                      seed,
                       y_star
                       )
-                     for _ in range(0,
-                                    draws))))
+                     for seed in seeds))
                     y_names.append(y_name)
                     specs.append(frozenset(list(y_name) + list(spec)))
                     all_predictors.append(self.x + list(spec) + ['const'])
@@ -905,7 +907,7 @@ class OLSRobust(Protomodel):
             x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
                                                            self.data[self.y],
                                                            test_size=0.2,
-                                                           random_state=72
+                                                           random_state=seed
                                                            )
             model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
@@ -931,15 +933,16 @@ class OLSRobust(Protomodel):
                                                         group=group,
                                                         oos_metric_name=self.oos_metric_name)
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = (zip(*Parallel(n_jobs=n_cpu)
+                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
+                b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_OLS)
                  (comb,
                   group,
                   sample_size,
                   shuffle,
+                  seed,
                   y_star)
-                 for i in range(0,
-                                draws))))
+                 for seed in seeds))
 
                 specs.append(frozenset(spec))
                 all_predictors.append(self.x + list(spec) + ['const'])
@@ -1090,6 +1093,7 @@ class OLSRobust(Protomodel):
                    group,
                    sample_size,
                    shuffle,
+                   seed,
                    y_star):
         """
         Call stripped_ols() over a random sample of the data containing y, x, and controls.
@@ -1123,13 +1127,14 @@ class OLSRobust(Protomodel):
 #            temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size, replace=True)
+            samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
             # @TODO generalize the frac to the function call
             y = samp_df.iloc[:, [0]]
             y_star = samp_df.iloc[:, [-1]]
             x = samp_df.drop('y_star', axis=1)
             x = x.drop(samp_df.columns[0], axis=1)
         else:
+            np.random_seed.seed()
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
@@ -1363,7 +1368,7 @@ class LRobust(Protomodel):
             x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
                                                        self.data[self.y],
                                                        test_size=0.2,
-                                                       random_state=72
+                                                       random_state=seed
                                                        )
             model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
@@ -1389,17 +1394,19 @@ class LRobust(Protomodel):
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
 #                y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
                 (b_list, p_list, r2_list,
                  #b_list_ystar, p_list_ystar
-                 )= (zip(*Parallel(n_jobs=n_cpu)
+                 )= zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_regression)
                  (comb,
                   group,
                   sample_size,
                   shuffle,
+                  seed,
 #                  y_star
                   )
-                 for i in range(0, draws))))
+                 for seed in seeds))
 
                 specs.append(frozenset(spec))
                 all_predictors.append(self.x + list(spec) + ['const'])
@@ -1449,6 +1456,7 @@ class LRobust(Protomodel):
                           group,
                           sample_size,
                           shuffle,
+                          seed,
 #                          y_star
                           ):
         temp_data = comb_var.copy()
@@ -1461,7 +1469,7 @@ class LRobust(Protomodel):
 #            temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
-            samp_df = temp_data.sample(n=sample_size, replace=True)
+            samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
             y = samp_df.iloc[:, [0]]
 #            y_star = samp_df.iloc[:, [-1]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
@@ -1469,6 +1477,7 @@ class LRobust(Protomodel):
             output = logistic_regression_sm_stripped(y, x)
 #            output_ystar = logistic_regression_sm_stripped(y_star, x)
         else:
+            np.random_seed=seed
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
