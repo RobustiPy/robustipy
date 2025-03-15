@@ -3,7 +3,7 @@ import pandas as pd
 from robustipy.models import OLSRobust
 
 
-def sim1(project_name):
+def sim3(project_name):
     np.random.seed(192735)
     beta1 = np.array([0.2, 0.5, -0.4, -0.7, 0.2, 0.5, 0.2, 0.5, 0.3])
     L = np.array([
@@ -16,7 +16,7 @@ def sim1(project_name):
         [0.2, 0.3],
         [0.1, -0.2]
     ])
-    D = np.diag([0.3] * 8)
+    D = np.diag([5] * 8)
     cov_matrix = L.dot(L.T) + D
     num_samples = 1000
     mean_vector = np.zeros(8)
@@ -29,16 +29,16 @@ def sim1(project_name):
                                           'z3', 'z4', 'z5', 'z6', 'z7'])
 
     y = ['y1']
-    x = ['x1']
-    c = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7']
-    sim1 = OLSRobust(y=y, x=x, data=data)
-    sim1.fit(controls=c, draws=1000, kfold=10, seed=192735)
-    sim1_results = sim1.get_results()
-    sim1_results.plot(specs=[['z1', 'z2', 'z3']],
+    x = ['x1', 'z1']
+    c = ['z2', 'z3','z4', 'z5', 'z6', 'z7']
+    sim3 = OLSRobust(y=y, x=x, data=data)
+    sim3.fit(controls=c, draws=1000, kfold=10, seed=192735)
+    sim3_results = sim3.get_results()
+    sim3_results.plot(specs=[['z4', 'z5']],
                       ic='hqic', figsize=(16, 16),
                       ext='pdf', project_name=project_name)
-    sim1_results.summary()
+    sim3_results.summary()
 
 
 if __name__ == "__main__":
-    sim1('sim1_example')
+    sim3('sim3_example')
