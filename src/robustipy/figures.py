@@ -19,7 +19,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 
 def axis_formatter(ax, ylabel, xlabel, title):
-    ax.tick_params(axis='both', which='major', labelsize=13)
+    ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
     ax.set_ylabel(ylabel, fontsize=13)
@@ -44,6 +44,8 @@ def plot_hexbin_r2(results_object, ax, fig, colormap, title=''):
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
     axis_formatter(ax, r'In-Sample R$^2$', r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', title)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
+    ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     sns.despine(ax=ax)
 
 
@@ -67,6 +69,7 @@ def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
     cb.ax.set_title('Count')
     axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
     sns.despine(ax=ax)
 
@@ -399,8 +402,8 @@ def plot_curve(results_object,
 
     axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
     ax.set_xlim(0, len(results_object.specs_names))
-    ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 20,
-                ax.get_ylim()[1] + (ax.get_ylim()[1]/10))
+    ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10,
+                ax.get_ylim()[1] + (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10)
     ax.text(
         0.05, 0.95,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
@@ -691,7 +694,7 @@ def plot_kfolds(results_object,
     ax.set_xlim(min_lim, max_lim)
     legend_elements = [
         Line2D([0], [0], color=get_colormap_colors(colormap, 100)[99], lw=2, linestyle='-',
-               label=r'Kernel Density', alpha=1),
+               label=r'Density', alpha=1),
         Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
               label=r'Histogram')]
     ax.legend(handles=legend_elements,
@@ -705,7 +708,7 @@ def plot_kfolds(results_object,
               edgecolor=(0, 0, 0, 1),
               ncols=1
               )
-    ax.tick_params(axis='both', which='major', labelsize=13)
+    ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
     if results_object.name_av_k_metric=='rmse':
