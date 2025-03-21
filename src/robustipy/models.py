@@ -1,6 +1,7 @@
 from robustipy.prototypes import Protomodel
 from robustipy.prototypes import Protoresult
 import sklearn
+import scipy.stats as stats
 import shap
 import pandas as pd
 import numpy as np
@@ -270,7 +271,8 @@ class OLSResult(Protoresult):
         """
         with open(filename, 'rb') as f:
             return _pickle.load(f)
-    
+
+
     def _compute_inference(self):
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
@@ -361,8 +363,22 @@ class OLSResult(Protoresult):
                                              ((df_model_result['negative_beta'] &
                                                df_model_result['significant'])).sum()).sum()) /
                                            self.estimates_ystar.shape[1])
-
-
+        if inference is False:
+            self.inference['Stouffers'] = np.nan
+        else:
+            ystar_stouffers = pd.DataFrame()
+            for col in self.p_values_ystar.columns:
+                ystar_stouffers['z_one_tailed_' +
+                                str(col)] = stats.norm.ppf(1 -
+                                                           self.p_values_ystar[col])
+            y_stouffers = pd.DataFrame()
+            for col in self.p_values.columns:
+                y_stouffers['z_one_tailed_' +
+                            str(col)] = stats.norm.ppf(1 -
+                                                       self.p_values[col])
+            self.inference['Stouffers'] = (((ystar_stouffers >
+                                             y_stouffers).sum().sum()) /
+                                           y_stouffers.shape[1])
     def summary(self):
         """
         Prints a summary of the model including basic configuration and robustness metrics.
@@ -438,6 +454,9 @@ class OLSResult(Protoresult):
         else:
             print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
         print(f"Negative and Significant portion of beta (all bootstraps and specifications): {self.inference['neg_sig_prop']}")
+
+        if inference is True:
+            print(f"Stouffer's Z-score test: {self.inference['Stouffers']}")
 
         print_separator()
         print(f'2.1 In-Sample Metrics (Full Sample)')

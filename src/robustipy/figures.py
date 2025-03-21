@@ -409,7 +409,8 @@ def plot_curve(results_object,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
          f'Number of bootstraps: {results_object.draws}\n' +
          f'Number of folds: {results_object.kfold}\n'
-         f'Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})'
+         f"Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})"
+
          ),
         transform=ax.transAxes,
         verticalalignment='top',
