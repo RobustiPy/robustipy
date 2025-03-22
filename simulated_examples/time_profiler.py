@@ -1,8 +1,9 @@
+import os
 import time, numpy as np, pandas as pd, matplotlib as mpl
 from robustipy.models import OLSRobust, LRobust
 from tqdm import tqdm
 
-PROJECT_NAME = 'sim1_example'
+PROJECT_NAME = 'time_profiler'
 SEED = 192735
 BETA1 = np.array([0.2, 0.5, -0.4, -0.7, 0.2, 0.5, 0.2, 0.5, 0.3])
 L_MATRIX = np.array([[0.8, 0.2], [0.6, -0.5], [0.7, 0.1], [0.5, -0.6],
@@ -32,9 +33,15 @@ def runner(run, c_array, draws, estimator, folds):
     saver(run, folds, draws, len(c_array), time.time() - start_time, estimator)
 
 def saver(run, folds, draws, c_len, run_time, estimator):
-    pd.DataFrame([{'Run Number': run, 'Folds': folds, 'Draws': draws,
-                   'Length of c': c_len, 'Time Taken (s)': run_time
-    }]).to_csv(f'{PROJECT_NAME}_{estimator}_simulation_results.csv', index=False)
+    filename = f'{PROJECT_NAME}_{estimator}_results.csv'
+    write_header = not os.path.exists(filename)
+    pd.DataFrame([{
+        'Run Number': run,
+        'Folds': folds,
+        'Draws': draws,
+        'Length of c': c_len,
+        'Time Taken (s)': run_time
+    }]).to_csv(filename, mode='a', index=False, header=write_header)
 
 
 def generate_data():
@@ -59,5 +66,8 @@ def time_profiler(estimator):
             runner(run, c_array, draws, estimator, folds)
 
 if __name__ == "__main__":
-    time_profiler('OLS')
-    time_profiler('LR')
+    for estimator in ['OLS', 'LR']:
+        result_file = f'{PROJECT_NAME}_{estimator}_results.csv'
+        if os.path.exists(result_file):
+            os.remove(result_file)
+        time_profiler(estimator)
