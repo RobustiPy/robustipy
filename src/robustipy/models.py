@@ -918,8 +918,15 @@ class OLSRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-            x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
-                                                           self.data[self.y],
+            if group:
+                SHAP_comb = self.data[self.y + self.x + [group] + controls]
+                SHAP_comb = group_demean(SHAP_comb, group=group)
+            else:
+                SHAP_comb = self.data[self.y + self.x + controls]
+            SHAP_comb = SHAP_comb.dropna()
+            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
+            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls],
+                                                           SHAP_comb[self.y],
                                                            test_size=0.2,
                                                            random_state=seed
                                                            )
@@ -928,7 +935,7 @@ class OLSRobust(Protomodel):
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
-                if len(spec) == 0:
+                if 0 == len(spec):
                     comb = self.data[self.y + self.x]
                 else:
                     comb = self.data[self.y + self.x + list(spec)]
@@ -1380,14 +1387,21 @@ class LRobust(Protomodel):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
-            x_train, x_test, y_train, _ = train_test_split(self.data[self.x + controls],
-                                                       self.data[self.y],
-                                                       test_size=0.2,
-                                                       random_state=seed
-                                                       )
-            model = sklearn.linear_model.LinearRegression()
-            model.fit(x_train, y_train)
-            #explainer = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            if group:
+                SHAP_comb = self.data[self.y + self.x + [group] + controls]
+                SHAP_comb = group_demean(SHAP_comb, group=group)
+            else:
+                SHAP_comb = self.data[self.y + self.x + controls]
+            SHAP_comb = SHAP_comb.dropna()
+            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
+
+            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls],
+                                                           SHAP_comb[self.y],
+                                                           test_size=0.2,
+                                                           random_state=seed
+                                                           )
+            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            model.fit(x_train, y_train.squeeze())
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
