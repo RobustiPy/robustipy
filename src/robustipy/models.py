@@ -455,7 +455,7 @@ class OLSResult(Protoresult):
             print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
         print(f"Negative and Significant portion of beta (all bootstraps and specifications): {self.inference['neg_sig_prop']}")
 
-        if inference is True:
+        if inference is not False:
             print(f"Stouffer's Z-score test: {self.inference['Stouffers']}")
 
         print_separator()
