@@ -24,7 +24,18 @@ from sklearn.metrics import root_mean_squared_error
 from sklearn.metrics import log_loss
 from sklearn.metrics import r2_score
 from multiprocessing import cpu_count
+from scipy.stats import norm
 
+
+def stouffer_method(p_values, weights=None):
+    z_scores = norm.isf(p_values)  # Inverse survival function: Φ⁻¹(1 - p)
+    if weights is None:
+        Z = np.sum(z_scores) / np.sqrt(len(p_values))
+    else:
+        weights = np.asarray(weights)
+        Z = np.dot(weights, z_scores) / np.sqrt(np.sum(weights**2))
+    combined_p = norm.sf(Z)  # Survival function: 1 - Φ(Z)
+    return Z, combined_p
 
 class MergedResult(Protoresult):
     def __init__(self, *, y, specs, estimates, p_values, r2_values):
@@ -363,36 +374,21 @@ class OLSResult(Protoresult):
                                              ((df_model_result['negative_beta'] &
                                                df_model_result['significant'])).sum()).sum()) /
                                            self.estimates_ystar.shape[1])
-        if inference is False:
-            self.inference['Stouffers'] = np.nan
-        else:
-            ystar_stouffers = pd.DataFrame()
-            for col in self.p_values_ystar.columns:
-                ystar_stouffers['z_one_tailed_' +
-                                str(col)] = stats.norm.ppf(1 -
-                                                           self.p_values_ystar[col])
-            y_stouffers = pd.DataFrame()
-            for col in self.p_values.columns:
-                y_stouffers['z_one_tailed_' +
-                            str(col)] = stats.norm.ppf(1 -
-                                                       self.p_values[col])
-            self.inference['Stouffers'] = (((ystar_stouffers >
-                                             y_stouffers).sum().sum()) /
-                                           y_stouffers.shape[1])
+        self.inference['Stouffers'] = stouffer_method(df_model_result['p_values'])
+
+
     def summary(self):
         """
         Prints a summary of the model including basic configuration and robustness metrics.
         """
         # Helper function to print section headers
         def print_separator(title=None):
-
             if title:
-                print('============================================================================================================')
+                print('='*30)
                 print(title)
-                print('============================================================================================================')
-
+                print('='*30)
             else:
-                print('------------------------------------------------------------------------------------------------------------')
+                print('='*30)
 
         # Display basic model information
         print_separator("1. Model Summary")
@@ -455,8 +451,7 @@ class OLSResult(Protoresult):
             print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
         print(f"Negative and Significant portion of beta (all bootstraps and specifications): {self.inference['neg_sig_prop']}")
 
-        if inference is not False:
-            print(f"Stouffer's Z-score test: {self.inference['Stouffers']}")
+        print(f"Stouffer's Z-score test: {self.inference['Stouffers'][0]}, {self.inference['Stouffers'][1]}")
 
         print_separator()
         print(f'2.1 In-Sample Metrics (Full Sample)')
