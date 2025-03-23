@@ -835,7 +835,7 @@ class OLSRobust(Protomodel):
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                    seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
+                    seeds = np.random.randint(0, 2**31, size=draws)
                     b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
                     (delayed(self._strap_OLS)
                      (comb,

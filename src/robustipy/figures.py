@@ -332,7 +332,7 @@ def plot_curve(results_object,
         idxs = df.index[df['idx']].tolist()
         for idx, i in zip(idxs, range(len(specs))):
             control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
+            label = ', '.join(control_names)
             lines.append(ax.vlines(x=idx,
                                    ymin=df['min'].iloc[idx] if not loess else loess_min[idx, 1],
                                    ymax=df['max'].iloc[idx] if not loess else loess_max[idx, 1],
@@ -404,13 +404,16 @@ def plot_curve(results_object,
     ax.set_xlim(0, len(results_object.specs_names))
     ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10,
                 ax.get_ylim()[1] + (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10)
+    if results_object.inference['median_p'] != np.nan:
+        final_string = f"Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})"
+    else:
+        final_string = f"Median coef: {results_object.inference['median']:.3f})"
     ax.text(
         0.05, 0.95,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
          f'Number of bootstraps: {results_object.draws}\n' +
-         f'Number of folds: {results_object.kfold}\n'
-         f"Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})"
-
+         f'Number of folds: {results_object.kfold}\n' +
+         final_string
          ),
         transform=ax.transAxes,
         verticalalignment='top',
@@ -452,6 +455,7 @@ def plot_ic(results_object,
     df = df.sort_values(by='median')
     df = df.reset_index(drop=True)
     axis_formatter(ax, f'{ic.upper()} curve', 'Ordered Specifications', title)
+
     if specs:
         key = get_selection_key(specs)
         full_spec = list(results_object.specs_names.iloc[-1])
@@ -666,6 +670,7 @@ def plot_bdist(results_object,
                       )
                       )
     axis_formatter(ax, 'Density', 'Coefficient Estimate', title)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
     if despine_left is True:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
@@ -695,13 +700,13 @@ def plot_kfolds(results_object,
     ax.set_xlim(min_lim, max_lim)
     legend_elements = [
         Line2D([0], [0], color=get_colormap_colors(colormap, 100)[99], lw=2, linestyle='-',
-               label=r'Density', alpha=1),
+                   label=r'Density', alpha=1),
         Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
               label=r'Histogram')]
     ax.legend(handles=legend_elements,
               loc='upper left',
               frameon=True,
-              fontsize=10,
+              fontsize=9,
               #title='Out-of-Sample',
               title_fontsize=8,
               framealpha=1,
@@ -709,6 +714,8 @@ def plot_kfolds(results_object,
               edgecolor=(0, 0, 0, 1),
               ncols=1
               )
+    ax.set_xlim(ax.get_xlim()[0] - (np.abs(ax.get_xlim()[1]) - np.abs(ax.get_xlim()[0])) / 15,
+                ax.get_xlim()[1])
     ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
@@ -718,7 +725,8 @@ def plot_kfolds(results_object,
         metric = r'R$^2'
     else:
         metric = results_object.name_av_k_metric.title()
-    axis_formatter(ax, r'OOS Metric: ' + metric , 'Density', title)
+    axis_formatter(ax, 'Density', r'OOS Metric: ' + metric, title)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
     if despine_left is True:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
@@ -822,7 +830,7 @@ def plot_results(results_object,
     plot_kfolds(results_object, colormap, ax, despine_left=False)
     plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
-    fig, ax = plt.subplots(figsize=(12, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
     plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
