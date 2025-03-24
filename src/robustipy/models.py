@@ -754,11 +754,15 @@ class OLSRobust(Protomodel):
             raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
 
         if n_cpu is None:
-            n_cpu = cpu_count()
+            n_cpu = max(1, cpu_count()-1)
+        else:
+            if not isinstance(n_cpu, int):
+                raise TypeError("n_cpu must be an integer")
+            else:
+                if (n_cpu <= 0) or (n_cpu > cpu_count()):
+                    raise ValueError(f"n_cpu not in a valid range: pick between 0 and {cpu_count()}.")
 
-        if not isinstance(n_cpu, int):
-            raise TypeError("n_cpu must be an integer")
-
+        print(f'running with n_cpu: {n_cpu}')
         if seed is not None:
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
