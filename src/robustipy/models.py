@@ -27,15 +27,17 @@ from multiprocessing import cpu_count
 from scipy.stats import norm
 
 
-def stouffer_method(p_values, weights=None):
-    z_scores = norm.isf(p_values)  # Inverse survival function: Φ⁻¹(1 - p)
+def stouffer_method(p_values, weights=None, eps=1e-16):
+    p_values = np.clip(p_values, eps, 1 - eps)
+    z_scores = norm.isf(p_values)
     if weights is None:
         Z = np.sum(z_scores) / np.sqrt(len(p_values))
     else:
         weights = np.asarray(weights)
-        Z = np.dot(weights, z_scores) / np.sqrt(np.sum(weights**2))
-    combined_p = norm.sf(Z)  # Survival function: 1 - Φ(Z)
+        Z = np.dot(weights, z_scores) / np.sqrt(np.sum(weights ** 2))
+    combined_p = norm.sf(Z)  # combined p-value: 1 - Φ(Z)
     return Z, combined_p
+
 
 class MergedResult(Protoresult):
     def __init__(self, *, y, specs, estimates, p_values, r2_values):
@@ -411,72 +413,68 @@ class OLSResult(Protoresult):
         print('2.1 Inference Metrics')
         print_separator()
         if inference is False:
-            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']}")
+            print(f"Median beta (all specs, no resampling): {self.inference['median_ns']:.3f}")
         else:
-            print(f"Median beta (all specifications, no resampling): {self.inference['median_ns']} (p-value: {self.inference['median_p']})")
-        print(f"Median beta (all bootstraps and specifications): {self.inference['median']}")
+            print(f"Median beta (all specs, no resampling): {self.inference['median_ns']:.3f} (p-value: {self.inference['median_p']:.3f})")
+        print(f"Median beta (all specs, resampling): {self.inference['median']:.3f}")
 
-        print(f"Min beta (all specifications, no resampling): {self.inference['min_ns']}")
-        print(f"Min beta (all bootstraps and specifications): {self.inference['min']}")
-
-        print(f"Max beta (all specifications, no resampling): {self.inference['max_ns']}")
-        print(f"Max beta (all bootstraps and specifications): {self.inference['max']}")
+        print(f"Min beta (all specs, no resampling): {self.inference['min_ns']:.3f}")
+        print(f"Min beta (all secs, resampling): {self.inference['min']:.3f}")
+        print(f"Max beta (all specs, no resampling): {self.inference['max_ns']:.3f}")
+        print(f"Max beta (all specs, resampling): {self.inference['max']:.3f}")
+        if inference is False:
+            print(f"Sig. portion of beta (all specs, resampling): {self.inference['sig_prop_ns']:.3f}")
+        else:
+            print(f"Sig. portion of beta (all specs, no resampling): {self.inference['sig_prop_ns']:.3f} (p-value: {self.inference['sig_p']:.3f})")
+        print(f"Sig. portion of beta (all specs, resampling): {self.inference['sig_prop']:.3f}")
+        if inference is False:
+            print(f"Positive portion of beta (all specs, no resampling): {self.inference['pos_prop_ns']:.3f}")
+        else:
+            print(f"Positive portion of beta (all specs, no resampling): {self.inference['pos_prop_ns']:.3f} (p-value: {self.inference['pos_p']:.3f})")
+        print(f"Positive portion of beta (all specs, resampling): {self.inference['pos_prop']:.3f}")
 
         if inference is False:
-            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']}")
+            print(f"Negative portion of beta (all specs, no resampling): {self.inference['neg_prop_ns']:.3f}")
         else:
-            print(f"Significant portion of beta (all specifications, no resampling): {self.inference['sig_prop_ns']} (p-value: {self.inference['sig_p']})")
-        print(f"Significant portion of beta (all bootstraps and specifications): {self.inference['sig_prop']}")
-        if inference is False:
-            print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']}")
-        else:
-            print(f"Positive portion of beta (all specifications, no resampling): {self.inference['pos_prop_ns']} (p-value: {self.inference['pos_p']})")
-        print(f"Positive portion of beta (all bootstraps and specifications): {self.inference['pos_prop']}")
-
-        if inference is False:
-            print(f"Negative portion of beta (all specifications, no resampling): {self.inference['neg_prop_ns']}")
-        else:
-            print(f"Negative portion of beta (all specifications, no resampling): {self.inference['neg_prop_ns']} (p-value: {self.inference['neg_p']})")
-        print(f"Negative portion of beta (all bootstraps and specifications): {self.inference['neg_prop']}")
-
+            print(f"Negative portion of beta (all specs, no resampling): {self.inference['neg_prop_ns']:.3f} (p-value: {self.inference['neg_p']:.3f})")
+        print(f"Negative portion of beta (all specs, resampling): {self.inference['neg_prop']:.3f}")
         if inference is False:
             print(f"Positive and Significant portion of beta (all specifications, no resampling): {self.inference['pos_sig_prop_ns']}")
         else:
-            print(f"Positive and Significant portion of beta (all specifications, no resampling): {self.inference['pos_sig_prop_ns']} (p-value: {self.inference['pos_sig_p']})")
-        print(f"Positive and Significant portion of beta (all bootstraps and specifications): {self.inference['pos_sig_prop']}")
-
+            print(f"Positive and sig. portion of beta (all specs, no resampling): {self.inference['pos_sig_prop_ns']:.3f} (p-value: {self.inference['pos_sig_p']:.3f})")
+        print(f"Positive and sig. portion of beta (all specs, resampling): {self.inference['pos_sig_prop']:.3f}")
         if inference is False:
-            print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']}")
+            print(f"Negative and sig. portion of beta (all specs, no resampling): {self.inference['neg_sig_prop_ns']:.3f}")
         else:
-            print(f"Negative and Significant portion of beta (all specifications, no resampling): {self.inference['neg_sig_prop_ns']} (p-value: {self.inference['neg_sig_p']})")
-        print(f"Negative and Significant portion of beta (all bootstraps and specifications): {self.inference['neg_sig_prop']}")
+            print(f"Negative and sig portion of beta (all specs, no resampling): {self.inference['neg_sig_prop_ns']:.3f} (p-value: {self.inference['neg_sig_p']:.3f})")
+        print(f"Negative and sig portion of beta (all specs): {self.inference['neg_sig_prop']:.3f}")
 
-        print(f"Stouffer's Z-score test: {self.inference['Stouffers'][0]}, {self.inference['Stouffers'][1]}")
+        print(f"Stouffers Zscore test: {self.inference['Stouffers'][0]:.3f} ({self.inference['Stouffers'][1]:.3f})")
 
         print_separator()
         print(f'2.1 In-Sample Metrics (Full Sample)')
         print_separator()
-        print(f"Min AIC: {self.summary_df['aic'].min()},Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
-        print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
-        print(f"Min HQIC: {self.summary_df['hqic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
+        print(f"Min AIC: {self.summary_df['aic'].min():.2f},Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
+        print(f"Min BIC: {self.summary_df['bic'].min():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
+        print(f"Min HQIC: {self.summary_df['hqic'].min():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print(
-            f"Max Log Likelihood: {self.summary_df['ll'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
+            f"Max LL: {self.summary_df['ll'].max():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
         print(
-            f"Min Log Likelihood: {self.summary_df['ll'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
+            f"Min LL: {self.summary_df['ll'].min():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
         print(
-            f"Max R2: {self.summary_df['r2'].max()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
+            f"Max R2: {self.summary_df['r2'].max():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
         print(
-            f"Min R2: {self.summary_df['r2'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
+            f"Min R2: {self.summary_df['r2'].min():.2f}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
 
         print_separator()
         print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
         print_separator()
         oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
-        print(f'Max Average: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
+        print(f'Max Average: {oos_max_row["av_k_metric"]:.2f}, Specs: {list(oos_max_row["spec_name"])} ')
         oos_min_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmin(),]
-        print(f'Min Average: {oos_min_row["av_k_metric"]}, Specs: {list(oos_min_row["spec_name"])} ')
-        print(f"Mean Average: {self.summary_df['av_k_metric'].mean()}")
-        print(f"Median Average: {self.summary_df['av_k_metric'].median()}")
+        print(f'Min Average: {oos_min_row["av_k_metric"]:.2f}, Specs: {list(oos_min_row["spec_name"])} ')
+        print(f"Mean Average: {self.summary_df['av_k_metric'].mean():.2f}")
+        print(f"Median Average: {self.summary_df['av_k_metric'].median():.2f}")
 
 
     def plot(self,
@@ -761,8 +759,6 @@ class OLSRobust(Protomodel):
             else:
                 if (n_cpu <= 0) or (n_cpu > cpu_count()):
                     raise ValueError(f"n_cpu not in a valid range: pick between 1 and {cpu_count()}.")
-
-        print(f'running with n_cpu: {n_cpu}')
         if seed is not None:
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
@@ -1404,7 +1400,7 @@ class LRobust(Protomodel):
                                                            test_size=0.2,
                                                            random_state=seed
                                                            )
-            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1, max_iter=5000)
             model.fit(x_train, y_train.squeeze())
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]

@@ -404,10 +404,7 @@ def plot_curve(results_object,
     ax.set_xlim(0, len(results_object.specs_names))
     ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10,
                 ax.get_ylim()[1] + (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10)
-    if results_object.inference['median_p'] != np.nan:
-        final_string = f"Median coef: {results_object.inference['median']:.3f} ({results_object.inference['median_p']:.3f})"
-    else:
-        final_string = f"Median coef: {results_object.inference['median']:.3f})"
+    final_string = f"Median coef: {results_object.inference['median']:.3f} (Z: {results_object.inference['Stouffers'][0]:.3f})"
     ax.text(
         0.05, 0.95,
         (f'Number of specifications: {len(results_object.specs_names)}\n' +
