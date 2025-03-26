@@ -6,16 +6,10 @@ def sim2(project_name):
     np.random.seed(192735)
     beta_mean = [0.9, 0.4, -0.7, -0.1, 0.2, 0.3, -0.2, 0.5, 0.1]
     beta_std = 2
-    L_factor = np.array([
-        [0.8,  0.2],
-        [0.6, -0.5],
-        [0.7,  0.1],
-        [0.5, -0.6],
-        [0.4,  0.7],
-        [0.3, -0.4],
-        [0.2,  0.3],
-        [0.1, -0.2]
-    ])
+    L_factor = np.array([[0.8,  0.2], [0.6, -0.5],
+                         [0.7,  0.1], [0.5, -0.6],
+                         [0.4,  0.7], [0.3, -0.4],
+                         [0.2,  0.3], [0.1, -0.2]])
     D = np.diag([0.3] * 8)
     cov_matrix = L_factor.dot(L_factor.T) + D
     num_samples, num_groups = 10, 1000
@@ -26,7 +20,8 @@ def sim2(project_name):
         mi, ma, factor = np.argmin(beta), np.argmax(beta), 5
         beta[mi] = np.random.normal(beta[mi], beta_std * factor)
         beta[ma] = np.random.normal(beta[ma], beta_std * factor)
-        X = np.random.multivariate_normal(mean_vec, cov_matrix, num_samples) \
+        X = np.random.multivariate_normal(mean_vec,
+                                          cov_matrix, num_samples) \
             + np.random.normal(0, 5, (num_samples, 8))
         X_i = np.column_stack((np.ones(num_samples), X))
         errors = np.random.normal(0, 20, num_samples)

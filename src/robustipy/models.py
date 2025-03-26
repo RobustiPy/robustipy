@@ -760,7 +760,7 @@ class OLSRobust(Protomodel):
                 raise TypeError("n_cpu must be an integer")
             else:
                 if (n_cpu <= 0) or (n_cpu > cpu_count()):
-                    raise ValueError(f"n_cpu not in a valid range: pick between 0 and {cpu_count()}.")
+                    raise ValueError(f"n_cpu not in a valid range: pick between 1 and {cpu_count()}.")
 
         print(f'running with n_cpu: {n_cpu}')
         if seed is not None:
