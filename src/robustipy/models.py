@@ -46,17 +46,6 @@ def stouffer_method(p_values, weights=None):
     return Z, combined_p
 
 class MergedResult(Protoresult):
-    """MergedResult: A class for merged OLS results from multiple specifications.
-
-    Attributes:
-        y_name (str): Dependent variable name.
-        specs_names (pd.Series): Series of specification names.
-        estimates (pd.DataFrame): DataFrame of coefficient estimates.
-        p_values (pd.DataFrame): DataFrame of p-values.
-        r2_values (pd.DataFrame): DataFrame of R^2 values.
-        summary_df (pd.DataFrame): Summary statistics of estimates.
-    """
-
     def __init__(self, *, y, specs, estimates, p_values, r2_values):
         super().__init__()
         self.y_name = y
@@ -94,19 +83,12 @@ class MergedResult(Protoresult):
     def plot(self, loess=True, specs=None, colormap='Spectral_r', figsize=(16, 14),
              ext='pdf', project_name='no_project_name'):
         """
-        Plot the regression results.
+        Plots the regression results using specified options.
 
-        Args:
-            loess (bool, optional): Whether to apply LOESS smoothing. Defaults to True.
-            specs (list of lists, optional): Specifications to highlight. Defaults to None.
-            colormap (str, optional): Colormap for the plot. Defaults to 'Spectral_r'.
-            figsize (tuple, optional): Figure size. Defaults to (16, 14).
-            ext (str, optional): File extension for saving. Defaults to 'pdf'.
-            project_name (str, optional): Project name for plot. Defaults to 'no_project_name'.
-
-        Returns:
-            matplotlib.figure.Figure: 
-                Plot showing the regression results.
+        Returns
+        -------
+        matplotlib.figure.Figure:
+            Plot showing the regression results.
         """
         fig, ax = plt.subplots(figsize=figsize)
 
@@ -131,19 +113,17 @@ class MergedResult(Protoresult):
 
     def merge(self, result_obj, left_prefix, right_prefix):
         """
-        Merge two OLSResult objects into one.
+        Merges two OLSResult objects into one.
 
-        Args:
-            result_obj (OLSResult): The result object to merge with.
-            left_prefix (str): Prefix to tag specifications from the current object (i.e., `self`).
-            right_prefix (str): Prefix to tag specifications from the result being merged in (`result_obj`).
+        Parameters
+        -------
+            result_obj (OLSResult): OLSResult object to be merged.
+            left_prefix (str): Prefix for the orignal result object.
+            right_prefix (str): Prefix fort the new result object.
 
-        Raises:
-            TypeError: If result_obj is not an instance of OLSResult.
-            ValueError: If dependent variable names do not match.
-
-        Returns:
-            MergedResult: A new merged result object.
+        Raises
+        -------
+            TypeError: If the input object is not an instance of OLSResult.
         """
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
