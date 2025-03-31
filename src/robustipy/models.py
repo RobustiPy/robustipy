@@ -1,33 +1,41 @@
-from robustipy.prototypes import Protomodel
-from robustipy.prototypes import Protoresult
-import sklearn
-import scipy.stats as stats
-import shap
-import pandas as pd
+"""robustipy.models
+
+This module implements multivariate regression classes for Robust Inference.
+It includes classes for OLS (OLSRobust and OLSResult) and logistic regression (LRobust)
+analysis, along with utilities for model merging, plotting, and Bayesian model averaging.
+"""
+
+import warnings
+import _pickle
+from multiprocessing import cpu_count
+
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.stats import norm
+from scipy import stats
+import sklearn
+import shap
 from rich.progress import track
 from joblib import Parallel, delayed
-from robustipy.utils import simple_ols, logistic_regression_sm, logistic_regression_sm_stripped
-from robustipy.bootstrap_utils import stripped_ols
-from robustipy.utils import space_size
-from robustipy.utils import all_subsets
-from robustipy.figures import plot_results#, plot_curve
-from robustipy.utils import group_demean
-from robustipy.prototypes import MissingValueWarning
-import _pickle
-import warnings
 from statsmodels.tools.tools import add_constant
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold, GroupKFold
-from sklearn.metrics import root_mean_squared_error
-from sklearn.metrics import log_loss
-from sklearn.metrics import r2_score
-from multiprocessing import cpu_count
-from scipy.stats import norm
+from sklearn.model_selection import train_test_split, KFold, GroupKFold
+from sklearn.metrics import root_mean_squared_error, log_loss, r2_score
 
+from robustipy.prototypes import Protomodel, Protoresult, MissingValueWarning
+from robustipy.utils import (simple_ols, logistic_regression_sm, 
+                             logistic_regression_sm_stripped, space_size, all_subsets, group_demean)
+from robustipy.bootstrap_utils import stripped_ols
+from robustipy.figures import plot_results
+
+def _check_numeric_columns(data, cols):
+    """Check that all specified columns in the DataFrame are numeric."""
+    non_numeric = data[cols].select_dtypes(exclude=[np.number]).columns.tolist()
+    if non_numeric:
+        raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric}")
 
 def stouffer_method(p_values, weights=None):
+    """Combine p-values using Stouffer's method."""
     z_scores = norm.isf(p_values)  # Inverse survival function: Φ⁻¹(1 - p)
     if weights is None:
         Z = np.sum(z_scores) / np.sqrt(len(p_values))
@@ -38,6 +46,17 @@ def stouffer_method(p_values, weights=None):
     return Z, combined_p
 
 class MergedResult(Protoresult):
+    """MergedResult: A class for merged OLS results from multiple specifications.
+
+    Attributes:
+        y_name (str): Dependent variable name.
+        specs_names (pd.Series): Series of specification names.
+        estimates (pd.DataFrame): DataFrame of coefficient estimates.
+        p_values (pd.DataFrame): DataFrame of p-values.
+        r2_values (pd.DataFrame): DataFrame of R^2 values.
+        summary_df (pd.DataFrame): Summary statistics of estimates.
+    """
+
     def __init__(self, *, y, specs, estimates, p_values, r2_values):
         super().__init__()
         self.y_name = y
@@ -57,8 +76,9 @@ class MergedResult(Protoresult):
     def _compute_summary(self):
         """
         Computes summary statistics based on coefficient estimates.
+
         Returns:
-            pd.DataFrame: DataFrame containing summary statistics.
+            pd.DataFrame: DataFrame containing median, min, max, and quantiles.
         """
         data = self.estimates.copy()
         out = pd.DataFrame()
@@ -71,63 +91,64 @@ class MergedResult(Protoresult):
                                        interpolation='nearest')
         return out
 
-    def plot(self,
-             loess=True,
-             specs=None,
-             colormap='Spectral_r',
-             figsize=(16, 14),
-             ext='pdf',
-             project_name='no_project_name'):
+    def plot(self, loess=True, specs=None, colormap='Spectral_r', figsize=(16, 14),
+             ext='pdf', project_name='no_project_name'):
         """
-        Plots the regression results using specified options.
+        Plot the regression results.
 
-        Returns
-        -------
-        matplotlib.figure.Figure:
-            Plot showing the regression results.
+        Args:
+            loess (bool, optional): Whether to apply LOESS smoothing. Defaults to True.
+            specs (list of lists, optional): Specifications to highlight. Defaults to None.
+            colormap (str, optional): Colormap for the plot. Defaults to 'Spectral_r'.
+            figsize (tuple, optional): Figure size. Defaults to (16, 14).
+            ext (str, optional): File extension for saving. Defaults to 'pdf'.
+            project_name (str, optional): Project name for plot. Defaults to 'no_project_name'.
+
+        Returns:
+            matplotlib.figure.Figure: 
+                Plot showing the regression results.
         """
-
         fig, ax = plt.subplots(figsize=figsize)
 
         if specs is not None:
-            if not all(isinstance(l, list) for l in specs):
+            if not all(isinstance(spec, list) for spec in specs):
                 raise TypeError("'specs' must be a list of lists.")
-            
             if len(specs) > 3:
                 raise ValueError("The max number of specifications to highlight is 3")
-
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
-                raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
-
-        plot_results(results_object=self,
-                     loess=True,
-                     specs=specs,
-                     ax=ax,
-                     colormap='Spectral_r',
-                     ext=ext,
-                     project_name='no_project_name')
+                raise TypeError("All specifications in 'specs' must be in the valid computed specifications.")
+        
+        plot_results(
+            results_object=self,
+            loess=loess,
+            specs=specs,
+            ax=ax,
+            colormap=colormap,
+            ext=ext,
+            project_name=project_name
+        )
         return fig
 
     def merge(self, result_obj, left_prefix, right_prefix):
         """
-        Merges two OLSResult objects into one.
+        Merge two OLSResult objects into one.
 
-        Parameters
-        -------
-            result_obj (OLSResult): OLSResult object to be merged.
-            left_prefix (str): Prefix for the orignal result object.
-            right_prefix (str): Prefix fort the new result object.
+        Args:
+            result_obj (OLSResult): The result object to merge with.
+            left_prefix (str): Prefix to tag specifications from the current object (i.e., `self`).
+            right_prefix (str): Prefix to tag specifications from the result being merged in (`result_obj`).
 
-        Raises
-        -------
-            TypeError: If the input object is not an instance of OLSResult.
+        Raises:
+            TypeError: If result_obj is not an instance of OLSResult.
+            ValueError: If dependent variable names do not match.
+
+        Returns:
+            MergedResult: A new merged result object.
         """
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
-
         if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
-            raise TypeError("'prefixes' must be of type 'str.'")
-
+            raise TypeError("'prefixes' must be of type 'str'.")
         if self.y_name != result_obj.y_name:
             raise ValueError('Dependent variable names must match.')
 
@@ -203,31 +224,10 @@ class OLSResult(Protoresult):
         summary_bma (pd.DataFrame, optional): DataFrame containing Bayesian model averaging results.
     """
 
-    def __init__(self, *,
-                 y,
-                 x,
-                 data,
-                 specs,
-                 all_predictors,
-                 controls,
-                 draws,
-                 kfold,
-                 estimates,
-                 estimates_ystar,
-                 all_b,
-                 all_p,
-                 p_values,
-                 p_values_ystar,
-                 r2_values,
-                 r2i_array,
-                 ll_array,
-                 aic_array,
-                 bic_array,
-                 hqic_array,
-                 av_k_metric_array=None,
-                 model_name,
-                 name_av_k_metric=None,
-                 shap_return=None):
+    def __init__(self, *, y, x, data, specs, all_predictors, controls, draws, kfold,
+                 estimates, estimates_ystar, all_b, all_p, p_values, p_values_ystar,
+                 r2_values, r2i_array, ll_array, aic_array, bic_array, hqic_array,
+                 av_k_metric_array=None, model_name, name_av_k_metric=None, shap_return=None):
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -285,6 +285,9 @@ class OLSResult(Protoresult):
 
 
     def _compute_inference(self):
+        """
+        Compute various inference statistics and store in self.inference.
+        """
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
@@ -739,8 +742,10 @@ class OLSRobust(Protomodel):
             raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
 
         if group is not None:
-            if not isinstance(group, str) or not group in all_vars:
+            if group not in all_vars:
                 raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+            if not isinstance(group, str):
+                raise TypeError("'group' must be a string.")
 
         if kfold < 2:
             raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
@@ -764,21 +769,8 @@ class OLSRobust(Protomodel):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
         
-        if group is not None:
-            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
-            if non_numeric_columns:
-                raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
-        else:
-            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(exclude=[np.number]).columns.tolist()
-            if non_numeric_columns:
-                raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
-        if group is not None:
-            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(exclude=[np.number]).columns.tolist()
-        else:
-            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(
-                exclude=[np.number]).columns.tolist()
-        if non_numeric_columns:
-            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
+        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
+        _check_numeric_columns(self.data, cols_to_check)
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -1326,6 +1318,7 @@ class LRobust(Protomodel):
             oos_metric='r-squared',
             n_cpu=None,
             seed=None):
+        """Fit the logistic regression models over the specification space and bootstrap samples."""
         if not isinstance(controls, list):
             raise TypeError("'controls' must be a list.")
 
@@ -1355,15 +1348,12 @@ class LRobust(Protomodel):
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
-        if group is not None:
-            non_numeric_columns = self.data[self.y + self.x + [group] + controls].select_dtypes(
-                exclude=[np.number]).columns.tolist()
-        else:
-            non_numeric_columns = self.data[self.y + self.x + controls].select_dtypes(
-                exclude=[np.number]).columns.tolist()
-        if non_numeric_columns:
-            raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric_columns}")
 
+         # Check numeric columns
+        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
+        _check_numeric_columns(self.data, cols_to_check)
+
+        sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
 
         if sample_size is None:
@@ -1480,31 +1470,13 @@ class LRobust(Protomodel):
                                 )
             self.results = results
 
-    def _strap_regression(self,
-                          comb_var,
-                          group,
-                          sample_size,
-                          shuffle,
-                          seed,
-#                          y_star
-                          ):
+    def _strap_regression(self, comb_var, group, sample_size, seed):
+        """Run bootstrap logistic regression on a random sample of the data."""
         temp_data = comb_var.copy()
-
-#        if shuffle:
-#            y = temp_data.iloc[:, [0]]
-#            idx_y = np.random.permutation(y.index)
-#            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
-#            x = temp_data.drop(temp_data.columns[0], axis=1)
-#            temp_data = pd.concat([y, x], axis=1)
-
         if group is None:
             samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
             y = samp_df.iloc[:, [0]]
-#            y_star = samp_df.iloc[:, [-1]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
-#            x = x.drop('y_star', axis=1)
-            output = logistic_regression_sm_stripped(y, x)
-#            output_ystar = logistic_regression_sm_stripped(y_star, x)
         else:
             np.random.seed(seed)
             idx = np.random.choice(temp_data[group].unique(), sample_size)
@@ -1512,10 +1484,6 @@ class LRobust(Protomodel):
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
-#            y_star = no_singleton.iloc[:, [-1]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
-#            x = x.drop('y_star', axis=1)
-            output = logistic_regression_sm(y, x)
-#            output_ystar = logistic_regression_sm(y_star, x)
-
+        output = logistic_regression_sm(y, x)
         return output['b'][0][0], output['p'][0][0], output['r2']#, output_ystar['b'][0][0], output_ystar['p'][0][0]
