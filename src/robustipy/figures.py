@@ -766,9 +766,6 @@ def plot_results(results_object,
         colormap (str, optional): Colormap to use for highlighting specifications.
         colorset (list, optional): List of colors for specification highlighting.
         figsize (tuple, optional): Figure size (width, height) in inches.
-
-    Returns:
-        matplotlib.figure.Figure: Figure containing the plotted results.
     """
 
     figpath = os.path.join(os.getcwd(), 'figures', project_name)
