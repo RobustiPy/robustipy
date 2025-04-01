@@ -5,28 +5,33 @@ It includes classes for OLS (OLSRobust and OLSResult) and logistic regression (L
 analysis, along with utilities for model merging, plotting, and Bayesian model averaging.
 """
 
-import warnings
 import _pickle
+import warnings
 from multiprocessing import cpu_count
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-from scipy import stats
-import sklearn
 import shap
-from rich.progress import track
+import sklearn
 from joblib import Parallel, delayed
+from rich.progress import track
+from scipy.stats import norm
+from sklearn.metrics import log_loss, r2_score, root_mean_squared_error
+from sklearn.model_selection import GroupKFold, KFold, train_test_split
 from statsmodels.tools.tools import add_constant
-from sklearn.model_selection import train_test_split, KFold, GroupKFold
-from sklearn.metrics import root_mean_squared_error, log_loss, r2_score
 
-from robustipy.prototypes import Protomodel, Protoresult, MissingValueWarning
-from robustipy.utils import (simple_ols, logistic_regression_sm, 
-                             logistic_regression_sm_stripped, space_size, all_subsets, group_demean)
 from robustipy.bootstrap_utils import stripped_ols
 from robustipy.figures import plot_results
+from robustipy.prototypes import MissingValueWarning, Protomodel, Protoresult
+from robustipy.utils import (
+    all_subsets,
+    group_demean,
+    logistic_regression_sm,
+    simple_ols,
+    space_size,
+)
+
 
 def _check_numeric_columns(data, cols):
     """Check that all specified columns in the DataFrame are numeric."""
