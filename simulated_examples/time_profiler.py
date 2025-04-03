@@ -17,7 +17,7 @@ Y_VARS, X_VARS = ['y1'], ['x1']
 CONTROL_VARS = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7']
 FOLDS_LIST = [2, 5, 20, 25, 10]  # For default we use FOLDS_LIST[-1]
 
-NUM_RUNS = 5
+NUM_RUNS = 10
 START_VAL, END_VAL, NUM_POINTS = 10, 10000, 25
 log_sequence = sorted(set(map(int, np.logspace(np.log2(START_VAL),
                                                np.log2(END_VAL),
