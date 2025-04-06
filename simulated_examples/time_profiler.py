@@ -15,13 +15,13 @@ L_MATRIX = np.array([[0.8,  0.2], [0.6, -0.5], [0.7,  0.1], [0.5, -0.6],
 D_DIAG, MEAN_VECTOR, NUM_SAMPLES = np.diag([0.3] * 8), np.zeros(8), 10000
 Y_VARS, X_VARS = ['y1'], ['x1']
 CONTROL_VARS = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7']
-FOLDS_LIST = [2, 5, 20, 25, 10]  # For default we use FOLDS_LIST[-1]
+FOLDS_LIST = [2, 5, 15, 20, 25, 10]  # For default we use FOLDS_LIST[-1]
 
 NUM_RUNS = 10
 START_VAL, END_VAL, NUM_POINTS = 10, 10000, 25
-log_sequence = sorted(set(map(int, np.logspace(np.log2(START_VAL),
-                                               np.log2(END_VAL),
-                                               num=NUM_POINTS, base=2))))
+log_sequence = [int(START_VAL * ((END_VAL / START_VAL) ** (i / (NUM_POINTS - 1))))
+                for i in range(NUM_POINTS)]
+print(len(log_sequence))
 control_sets = [CONTROL_VARS[:k] for k in range(3, len(CONTROL_VARS) + 1)]
 
 
@@ -109,19 +109,17 @@ def time_profiler(estimator):
     result_file = f'{PROJECT_NAME}_{estimator}_results.csv'
     completed = load_completed(result_file)
     for control_index, c_array in enumerate(control_sets):
-        for draws in log_sequence:
-            # Run NUM_RUNS iterations with the default folds (last element)
-            for run in range(1, NUM_RUNS + 1):
+        for run in range(1, NUM_RUNS + 1):
+            for draws in log_sequence:
                 key = (control_index, draws, run, FOLDS_LIST[-1])
                 if key in completed:
                     continue
                 runner(control_index, run, c_array, draws, estimator, FOLDS_LIST[-1])
-            # Run a single iteration for each alternative fold value (using run=1)
             for folds in FOLDS_LIST[:-1]:
-                key = (control_index, draws, 1, folds)
+                key = (control_index, draws, run, folds)
                 if key in completed:
                     continue
-                runner(control_index, 1, c_array, draws, estimator, folds)
+                runner(control_index, run, c_array, draws, estimator, folds)
 
 
 def main():
