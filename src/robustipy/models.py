@@ -74,15 +74,14 @@ class MergedResult(Protoresult):
         Returns:
             pd.DataFrame: DataFrame containing median, min, max, and quantiles.
         """
+        # TODO: use pandas describe
         data = self.estimates.copy()
         out = pd.DataFrame()
         out['median'] = data.median(axis=1)
         out['max'] = data.max(axis=1)
         out['min'] = data.min(axis=1)
-        out['ci_up'] = data.quantile(q=0.975, axis=1,
-                                     interpolation='nearest')
-        out['ci_down'] = data.quantile(q=0.025, axis=1,
-                                       interpolation='nearest')
+        out['ci_up'] = data.quantile(q=0.975, axis=1, interpolation='nearest')
+        out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
         return out
 
     def plot(self, loess=True, specs=None, colormap='Spectral_r', figsize=(16, 14),
@@ -277,22 +276,17 @@ class OLSResult(Protoresult):
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
         })
-        if self.estimates_ystar.isna().all().all():
-            inference = False
-        else:
-            inference = True
+        inference = not self.estimates_ystar.isna().all().all()
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['negative_beta'] = df_model_result['betas'].apply(lambda x: 1 if x < 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
-        if inference is False:
-            self.inference['median_p'] = np.nan
-        else:
-            self.inference['median_p'] = (((self.estimates_ystar.median(axis=0) >
-                                            df_model_result['betas'].median()).sum())/
-                                          self.estimates_ystar.shape[1])
+        self.inference['median_p'] = (
+            np.nan if not inference else 
+            (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
+        )
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
         self.inference['max_ns'] = df_model_result['betas'].max()
@@ -302,33 +296,26 @@ class OLSResult(Protoresult):
         self.inference['pos_prop_ns'] = df_model_result['positive_beta'].mean()
         self.inference['pos'] = (self.estimates > 0.0).sum().sum()
         self.inference['pos_prop'] = (self.estimates > 0.0).mean().mean()
-        if inference is False:
-            self.inference['pos_p'] = np.nan
-        else:
-            self.inference['pos_p'] = ((((self.estimates_ystar > 0.0).sum(axis=0) >
-                                         df_model_result['positive_beta'].sum()).sum()) /
-                                       self.estimates_ystar.shape[1])
+        self.inference['pos_p'] = (
+            np.nan if not inference else
+            ((self.estimates_ystar.gt(0).sum(axis=0) > df_model_result['positive_beta'].sum()).mean())
+        )
         self.inference['neg_ns'] = df_model_result['negative_beta'].sum()
         self.inference['neg_prop_ns'] = df_model_result['negative_beta'].mean()
         self.inference['neg'] = (self.estimates < 0.0).sum().sum()
         self.inference['neg_prop'] = (self.estimates < 0.0).mean().mean()
-
-        if inference is False:
-            self.inference['neg_p'] = np.nan
-        else:
-            self.inference['neg_p'] = ((((self.estimates_ystar < 0.0).sum(axis=0) >
-                                         df_model_result['negative_beta'].sum()).sum()) /
-                                       self.estimates_ystar.shape[1])
+        self.inference['neg_p'] = (
+            np.nan if not inference else
+            (self.estimates_ystar.lt(0).sum(axis=0) > df_model_result['negative_beta'].sum()).mean()
+        )
         self.inference['sig_ns'] = df_model_result['significant'].sum()
         self.inference['sig_prop_ns'] = df_model_result['significant'].mean()
         self.inference['sig'] = (self.p_values.stack() < 0.05).sum().sum()
         self.inference['sig_prop'] = (self.p_values.stack() < 0.05).mean().mean()
-        if inference is False:
-            self.inference['sig_p'] = np.nan
-        else:
-            self.inference['sig_p'] = ((((self.p_values_ystar < 0.05).sum(axis=0) >
-                                         df_model_result['significant'].sum()).sum()) /
-                                       self.p_values_ystar.shape[1])
+        self.inference['sig_p'] = (
+            np.nan if not inference else
+            (self.p_values_ystar.lt(0.05).sum(axis=0) > df_model_result['significant'].sum()).mean()
+        )
         self.inference['pos_sig_ns'] = (df_model_result['positive_beta'] &
                                      df_model_result['significant']).sum()
         self.inference['pos_sig_prop_ns'] = (df_model_result['positive_beta'] &
@@ -337,15 +324,11 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['pos_sig_prop'] = ((self.estimates > 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        if inference is False:
-            self.inference['pos_sig_p'] = np.nan
-        else:
-            self.inference['pos_sig_p'] = (((((self.estimates_ystar > 0.0) &
-                                              (self.p_values_ystar < 0.05)).sum(axis=0) >
-                                             ((df_model_result['positive_beta'] &
-                                               df_model_result['significant'])).sum()).sum()) /
-                                           self.estimates_ystar.shape[1])
-
+        self.inference['pos_sig_p'] = (
+            np.nan if not inference else
+            ((self.estimates_ystar.gt(0) & self.p_values_ystar.lt(0.05)).sum(axis=0) >
+            (df_model_result['positive_beta'] & df_model_result['significant']).sum()).mean()
+        )
         self.inference['neg_sig_ns'] = (df_model_result['negative_beta'] &
                                         df_model_result['significant']).sum()
         self.inference['neg_sig_prop_ns'] = (df_model_result['negative_beta'] &
@@ -354,39 +337,27 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['neg_sig_prop'] = ((self.estimates < 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        if inference is False:
-            self.inference['neg_sig_p'] = np.nan
-        else:
-            self.inference['neg_sig_p'] = (((((self.estimates_ystar < 0.0) &
-                                              (self.p_values_ystar < 0.05)).sum(axis=0) >
-                                             ((df_model_result['negative_beta'] &
-                                               df_model_result['significant'])).sum()).sum()) /
-                                           self.estimates_ystar.shape[1])
+        self.inference['neg_sig_p'] = (
+            np.nan if not inference else
+            ((self.estimates_ystar.lt(0) & self.p_values_ystar.lt(0.05)).sum(axis=0) >
+            (df_model_result['negative_beta'] & df_model_result['significant']).sum()).mean()
+        )
         self.inference['Stouffers'] = stouffer_method(df_model_result['p_values'])
 
 
     def summary(self):
-        """
-        Prints a summary of the model including basic configuration and robustness metrics.
-        """
-        # Helper function to print section headers
+        """Prints a summary of the model including basic configuration and robustness metrics."""
         def print_separator(title=None):
+            print("=" * 30)
             if title:
-                print('='*30)
                 print(title)
-                print('='*30)
-            else:
-                print('='*30)
+                print("=" * 30)
 
+        inference = not self.estimates_ystar.isna().all().all()
         # Display basic model information
         print_separator("1. Model Summary")
         print(f"Model: {self.model_name}")
-        if self.estimates_ystar.isna().all().all():
-            inference = False
-            print('Inference Tests: No')
-        else:
-            inference = True
-            print('Inference Tests: Yes')
+        print("Inference Tests:", "Yes" if inference else "No")
         print(f"Dependent variable: {self.y_name}")
         print(f"Independent variable: {self.x_name}")
         print(f"Number of possible controls: {len(self.controls)}")
@@ -442,7 +413,7 @@ class OLSResult(Protoresult):
         print(f"Stouffer's Z-score test: {self.inference['Stouffers'][0]}, {self.inference['Stouffers'][1]}")
 
         print_separator()
-        print(f'2.1 In-Sample Metrics (Full Sample)')
+        print('2.2 In-Sample Metrics (Full Sample)')
         print_separator()
         print(f"Min AIC: {self.summary_df['aic'].min()},Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
         print(f"Min BIC: {self.summary_df['bic'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
@@ -457,7 +428,7 @@ class OLSResult(Protoresult):
             f"Min R2: {self.summary_df['r2'].min()}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
 
         print_separator()
-        print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
+        print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
         print_separator()
         oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
         print(f'Max Average: {oos_max_row["av_k_metric"]}, Specs: {list(oos_max_row["spec_name"])} ')
@@ -492,16 +463,12 @@ class OLSResult(Protoresult):
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
-            
             if len(specs) > 3:
                 raise ValueError("The max number of specifications to highlight is 3") 
-
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
-
         if ic not in valid_ic:
             raise ValueError(f"'ic' must be one of the following: {valid_ic}")
-
         return plot_results(results_object=self,
                             loess=loess,
                             specs=specs,
@@ -547,9 +514,7 @@ class OLSResult(Protoresult):
         var_names = [i for sl in self.all_predictors for i in sl]
         coefs_df = pd.DataFrame({'coef': coefs, 'var_name': var_names})
         for ele in self.controls:
-            idx = []
-            for spec in self.specs_names:
-                idx.append(ele in spec)
+            idx = [ele in spec for spec in self.specs_names]
             likelihood_per_var.append(np.nansum(models_likelihood[idx]))
             coefs = coefs_df[coefs_df.var_name == ele].coef.to_numpy()
             likelihood = models_likelihood[idx]
@@ -578,13 +543,10 @@ class OLSResult(Protoresult):
         """
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
-
         if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
             raise TypeError("'prefixes' must be of type 'str.'")
-
         if self.y_name != result_obj.y_name:
             raise ValueError('Dependent variable names must match.')
-
         specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
         specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
         y = self.y_name
@@ -596,13 +558,174 @@ class OLSResult(Protoresult):
         return MergedResult(y=y, specs=specs, estimates=estimates, p_values=p_values, r2_values=r2_values)
 
     def save_to_csv(self, path: str):
-        """
-        Function to save summary dataframe to a csv
-        """
+        """Function to save summary dataframe to a csv"""
         self.summary_df.to_csv(path)
 
 
-class OLSRobust(Protomodel):
+class BaseRobust(Protomodel):
+    """
+    A base class factoring out the repeated logic in OLSRobust and LRobust:
+      - Basic validation (controls, group, etc.)
+      - multiple_y support
+      - parallel bootstrapping loops
+      - SHAP logic
+    """
+
+    def __init__(self, *, y, x, data, model_name="BaseRobust"):
+        super().__init__()
+        # Basic validations
+        if not isinstance(y, list) or not isinstance(x, list):
+            raise TypeError("'y' and 'x' must be lists.")
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("'data' must be a pandas DataFrame.")
+        all_vars = set(data.columns)
+        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
+            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
+
+        # Warn if missing data found
+        if data.isnull().values.any():
+            warnings.warn(
+                "Missing values found in data. Listwise deletion will be applied.",
+                MissingValueWarning
+            )
+
+        self.y = y
+        self.x = x
+        self.data = data
+        self.model_name = model_name
+        self.results = None
+        self.parameters = {"y": self.y, "x": self.x}
+    def get_results(self):
+        raise NotImplementedError("This method should be implemented in subclasses.")
+    def multiple_y(self):
+        """
+        Computes composite y based on multiple indicators provided.
+        """
+        self.y_specs = []
+        self.y_composites = []
+        print("Calculating Composite Ys")
+        for spec, index in track(
+            zip(all_subsets(self.y), range(0, space_size(self.y))),
+            total=space_size(self.y)
+        ):
+            if len(spec) > 0:
+                subset = self.data[list(spec)]
+                subset = (subset - subset.mean()) / subset.std()  # standardize
+                self.y_composites.append(subset.mean(axis=1))    # composite average
+                self.y_specs.append(spec)
+                self.parameters['y_specs'] = self.y_specs
+                self.parameters['y_composites'] = self.y_composites
+    
+    def fit(self,
+            *,
+            controls,
+            group=None,
+            draws=500,
+            kfold=5,
+            oos_metric='r-squared',
+            n_cpu=None,
+            seed=None
+            ):
+        raise NotImplementedError("This method should be implemented in subclasses.")
+    
+    def _warn_if_large_draws(self, draws, controls, threshold=500):
+        """
+        Issues a warning if 'draws' * #specs is large.
+        """
+        est_specs = space_size(controls)
+        total_models = est_specs * draws
+        if draws > threshold:
+            warnings.warn(
+                f"You've requested {draws} bootstrap draws across {est_specs} specifications, "
+                f"which is roughly {total_models:,} total model runs.\n\n"
+                "This might lead to extended runtime or high memory usage.",
+                UserWarning,
+                stacklevel=2
+            )
+
+    def _check_numeric_columns_for_fit(self, controls, group):
+        """
+        Ensure columns are numeric.
+        """
+        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
+        _check_numeric_columns(self.data, cols_to_check)
+
+    def _validate_fit_args(self,
+                           controls,
+                           group,
+                           draws,
+                           kfold,
+                           oos_metric,
+                           n_cpu,
+                           seed,
+                           valid_oos_metrics):
+        """
+        A shared validation method for the 'fit()' arguments used by both OLSRobust & LRobust.
+        """
+        # 1. Check controls type
+        if not isinstance(controls, list):
+            raise TypeError("'controls' must be a list.")
+
+        # 2. Check that all controls exist in data
+        all_vars = set(self.data.columns)
+        if not all(var in all_vars for var in controls):
+            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
+
+        # 3. Group validation
+        if group is not None:
+            if group not in all_vars:
+                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+            if not isinstance(group, str):
+                raise TypeError("'group' must be a string.")
+
+        # 4. K-fold & draws
+        if kfold < 2:
+            raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
+        if draws < 1:
+            raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
+
+        # 5. OOS metric
+        if oos_metric not in valid_oos_metrics:
+            raise ValueError(f"OOS Metric must be one of {valid_oos_metrics}.")
+
+        # 6. n_cpu
+        if n_cpu is None:
+            n_cpu = max(1, cpu_count()-1)
+        else:
+            if not isinstance(n_cpu, int):
+                raise TypeError("n_cpu must be an integer")
+            else:
+                if (n_cpu <= 0) or (n_cpu > cpu_count()):
+                    raise ValueError(f"n_cpu not in a valid range: pick between 0 and {cpu_count()}.")
+
+        print(f'running with n_cpu: {n_cpu}')
+        if seed is not None:
+            if not isinstance(seed, int):
+                raise TypeError("seed must be an integer")
+            np.random.seed(seed)
+
+        # 8. numeric columns check
+        cols_to_check = self.y + self.x + ([group] if group else []) + controls
+        _check_numeric_columns(self.data, cols_to_check)
+
+        # 9. warn if large draws
+        self._warn_if_large_draws(draws, controls, threshold=500)
+
+        if len(self.x) == 0:
+            raise ValueError("No independent variables (x) provided.")
+        
+        if len(set(controls) & set(self.x)) > 0:
+            raise ValueError("Some control variables overlap with independent variables (x). Please ensure 'x' and 'controls' are disjoint sets.")
+
+        if any(var in self.y for var in self.x):
+            raise ValueError("Dependent variable(s) must not be included in the independent variables (x).")
+        
+        if len(self.x) == 0:
+            raise ValueError("No independent variables (x) provided.")
+        return n_cpu
+
+
+class OLSRobust(BaseRobust):
     """
     Class for multi-variate regression using OLS
 
@@ -622,78 +745,20 @@ class OLSRobust(Protomodel):
     """
 
     def __init__(self, *, y, x, data, model_name='OLS Robust'):
-        """
-        Initialize the OLSRobust object.
-
-        Parameters
-        ----------
-        y : list<str>
-            Name of the dependent variable.
-        x : list<str>
-            List of names of the independent variable(s).
-        data : DataFrame
-            DataFrame containing all the data to be used in the model.
-        """
-        super().__init__()
-        if not isinstance(y, list) or not isinstance(x, list):
-            raise TypeError("'y' and 'x' must be lists.")
-
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("'data' must be a pandas DataFrame.")
-
-        all_vars = set(data.columns)
-        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
-            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
-
-        if data.isnull().values.any():
-            warnings.warn('Missing values found in data. Listwise deletion will be applied',
-                          MissingValueWarning)
-        self.y = y
-        self.x = x
-        self.data = data
-        self.results = None
-        self.model_name = model_name
-        self.parameters = {}
-        self.parameters['y'] = self.y
-        self.parameters['x'] = self.x
-
+        super().__init__(y=y, x=x, data=data, model_name=model_name)
 
     def get_results(self):
         """
-        Get the results of the OLS regression.
-
-        Returns
-        -------
-        results : OLSResult
-            Object containing the regression results.
+        Return the OLSResult object once .fit() has been called.
         """
         return self.results
-
-
-    def multiple_y(self):
-        """
-        Computes composite y based on multiple indicators provided.
-        """
-        self.y_specs = []
-        self.y_composites = []
-        print("Calculating Composite Ys")
-        for spec, index in track(zip(all_subsets(self.y),
-                                     range(0, space_size(self.y))), total=space_size(self.y)):
-            if len(spec) > 0:
-                subset = self.data[list(spec)]
-                subset = (subset - subset.mean()) / subset.std()
-                self.y_composites.append(subset.mean(axis=1))
-                self.y_specs.append(spec)
-                self.parameters['y_specs'] = self.y_specs
-                self.parameters['y_composites'] = self.y_composites
-
+    
     def fit(self,
             *,
             controls,
             group=None,
             draws=500,
             kfold=5,
-            shuffle=False,
             oos_metric='r-squared',
             n_cpu=None,
             seed=None
@@ -711,55 +776,23 @@ class OLSRobust(Protomodel):
             Number of draws for bootstrapping. Default is 500.
         kfold : int, optional
             Number of folds for k-fold cross-validation. Default is None.
-        shuffle : bool, optional
-            Whether to shuffle y variable to estimate joint significance test. Default is False.
 
         Returns
         -------
         self : Object
             Object class OLSRobust containing the fitted estimators.
         """
-        if not isinstance(controls, list):
-            raise TypeError("'controls' must be a list.")
-
-        all_vars = set(self.data.columns)
-        if not all(var in all_vars for var in controls):
-            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
-
-        if group is not None:
-            if group not in all_vars:
-                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-            if not isinstance(group, str):
-                raise TypeError("'group' must be a string.")
-
-        if kfold < 2:
-            raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
-
-        if draws < 1:
-            raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
-
-        valid_oos_metric = ['r-squared', 'rmse']
-
-        if oos_metric not in valid_oos_metric:
-            raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
-
-        if n_cpu is None:
-            n_cpu = max(1, cpu_count()-1)
-        else:
-            if not isinstance(n_cpu, int):
-                raise TypeError("n_cpu must be an integer")
-            else:
-                if (n_cpu <= 0) or (n_cpu > cpu_count()):
-                    raise ValueError(f"n_cpu not in a valid range: pick between 0 and {cpu_count()}.")
-
-        print(f'running with n_cpu: {n_cpu}')
-        if seed is not None:
-            if not isinstance(seed, int):
-                raise TypeError("seed must be an integer")
-            np.random.seed(seed)
-        
-        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
-        _check_numeric_columns(self.data, cols_to_check)
+        n_cpu = self._validate_fit_args(
+            controls=controls,
+            group=group,
+            draws=draws,
+            kfold=kfold,
+            oos_metric=oos_metric,
+            n_cpu=n_cpu,
+            seed=seed,
+            valid_oos_metrics=['r-squared','rmse']
+        )
+        print(f'[OLSRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -824,7 +857,6 @@ class OLSRobust(Protomodel):
                      (comb,
                       group,
                       sample_size,
-                      shuffle,
                       seed,
                       y_star
                       )
@@ -945,7 +977,6 @@ class OLSRobust(Protomodel):
                  (comb,
                   group,
                   sample_size,
-                  shuffle,
                   seed,
                   y_star)
                  for seed in seeds))
@@ -1098,7 +1129,6 @@ class OLSRobust(Protomodel):
                    comb_var,
                    group,
                    sample_size,
-                   shuffle,
                    seed,
                    y_star):
         """
@@ -1112,8 +1142,6 @@ class OLSRobust(Protomodel):
             Grouping variable. If provided, sampling is performed over the group variable.
         sample_size : int
             Sample size to use in the bootstrap.
-        shuffle : bool
-            Whether to shuffle y var to estimate joint significant test.
 
         Returns
         -------
@@ -1124,13 +1152,6 @@ class OLSRobust(Protomodel):
         """
         temp_data = comb_var.copy()
         temp_data['y_star'] = y_star
-
-#        if shuffle:
-#            y = temp_data.iloc[:, [0]]
-#            idx_y = np.random.permutation(y.index)
-#            y = pd.DataFrame(y.iloc[idx_y]).reset_index(drop=True)
-#            x = temp_data.drop(temp_data.columns[0], axis=1)
-#            temp_data = pd.concat([y, x], axis=1)
 
         if group is None:
             samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
@@ -1144,6 +1165,12 @@ class OLSRobust(Protomodel):
             idx = np.random.choice(temp_data[group].unique(), sample_size)
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
+            if len(no_singleton) < 5:
+            warnings.warn(
+                f"Bootstrap sample size is only {len(no_singleton)} after removing singleton groups "
+                f"(groups with a single observation). This may lead to unstable or unreliable estimates.",
+                UserWarning
+            )
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')]
@@ -1159,7 +1186,7 @@ class OLSRobust(Protomodel):
         p_ystar = output_ystar['p']
         return b[0][0], p[0][0], r2, b_ystar[0][0], p_ystar[0][0]
 
-class LRobust(Protomodel):
+class LRobust(BaseRobust):
     """
     A class to perform logistic regression analysis, underlying lr package = statsmodel
 
@@ -1187,37 +1214,7 @@ class LRobust(Protomodel):
     """
 
     def __init__(self, *, y, x, data, model_name='Logistic Regression Robust'):
-        """
-        Initialize the LRobust object.
-
-        Parameters
-        ----------
-        y : str
-            Name of the dependent variable.
-        x : str or list<str>
-            List of names of the independent variable(s).
-        data : DataFrame
-            DataFrame containing all the data to be used in the model.
-        """
-        super().__init__()
-        if not isinstance(y, list) or not isinstance(x, list):
-            raise TypeError("'y' and 'x' must be lists.")
-
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("'data' must be a pandas DataFrame.")
-
-        all_vars = set(data.columns)
-        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
-            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
-
-        if data.isnull().values.any():
-            warnings.warn('Missing values found in data. Listwise deletion will be applied',
-                          MissingValueWarning)
-        self.y = y
-        self.x = x
-        self.data = data
-        self.results = None
-        self.model_name = model_name
+        super().__init__(y=y, x=x, data=data, model_name=model_name)
 
     def get_results(self):
         """
@@ -1307,46 +1304,23 @@ class LRobust(Protomodel):
             draws=500,
             sample_size=None,
             kfold=5,
-            shuffle=False,
             oos_metric='r-squared',
             n_cpu=None,
             seed=None):
         """Fit the logistic regression models over the specification space and bootstrap samples."""
-        if not isinstance(controls, list):
-            raise TypeError("'controls' must be a list.")
+        n_cpu = self._validate_fit_args(
+            controls=controls,
+            group=group,
+            draws=draws,
+            kfold=kfold,
+            oos_metric=oos_metric,
+            n_cpu=n_cpu,
+            seed=seed,
+            valid_oos_metrics=['r-squared','rmse','cross-entropy']
+        )
+        print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
-        all_vars = set(self.data.columns)
-        if not all(var in all_vars for var in controls):
-            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
 
-        if group is not None:
-            if not group in all_vars:
-                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-
-        if kfold < 2:
-            raise ValueError(f"kfold values mustbe 2 or above, current value is {kfold}.")
-
-        valid_oos_metric = ['r-squared', 'rmse', 'cross-entropy']
-
-        if oos_metric not in valid_oos_metric:
-            raise ValueError(f"OOS Metric must be one of {valid_oos_metric}.")
-
-        if n_cpu is None:
-            n_cpu = cpu_count()
-
-        if not isinstance(n_cpu, int):
-            raise TypeError("n_cpu must be an integer")
-
-        if seed is not None:
-            if not isinstance(seed, int):
-                raise TypeError("seed must be an integer")
-            np.random.seed(seed)
-
-         # Check numeric columns
-        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
-        _check_numeric_columns(self.data, cols_to_check)
-
-        sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
 
         if sample_size is None:
@@ -1405,18 +1379,14 @@ class LRobust(Protomodel):
                 (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
-#                y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                 seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
                 (b_list, p_list, r2_list,
-                 #b_list_ystar, p_list_ystar
                  )= zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_regression)
                  (comb,
                   group,
                   sample_size,
-                  shuffle,
-                  seed,
-#                  y_star
+                  seed
                   )
                  for seed in seeds))
 
@@ -1436,7 +1406,7 @@ class LRobust(Protomodel):
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
 
-            results = OLSResult(y=self.y[0],
+            self.results = OLSResult(y=self.y[0],
                                 x=self.x,
                                 data=self.data,
                                 specs=specs,
@@ -1461,7 +1431,6 @@ class LRobust(Protomodel):
                                 name_av_k_metric=self.oos_metric_name,
                                 shap_return = shap_return
                                 )
-            self.results = results
 
     def _strap_regression(self, comb_var, group, sample_size, seed):
         """Run bootstrap logistic regression on a random sample of the data."""
@@ -1479,4 +1448,4 @@ class LRobust(Protomodel):
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
         output = logistic_regression_sm(y, x)
-        return output['b'][0][0], output['p'][0][0], output['r2']#, output_ystar['b'][0][0], output_ystar['p'][0][0]
+        return output['b'][0][0], output['p'][0][0], output['r2']
