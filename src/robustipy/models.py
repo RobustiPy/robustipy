@@ -1165,11 +1165,11 @@ class OLSRobust(BaseRobust):
             select = temp_data[temp_data[group].isin(idx)]
             no_singleton = select[select.groupby(group).transform('size') > 1]
             if len(no_singleton) < 5:
-            warnings.warn(
-                f"Bootstrap sample size is only {len(no_singleton)} after removing singleton groups "
-                f"(groups with a single observation). This may lead to unstable or unreliable estimates.",
-                UserWarning
-            )
+                warnings.warn(
+                    f"Bootstrap sample size is only {len(no_singleton)} after removing singleton groups "
+                    f"(groups with a single observation). This may lead to unstable or unreliable estimates.",
+                    UserWarning
+                )
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')]
