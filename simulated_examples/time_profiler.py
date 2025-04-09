@@ -21,7 +21,6 @@ NUM_RUNS = 10
 START_VAL, END_VAL, NUM_POINTS = 10, 10000, 25
 log_sequence = [int(START_VAL * ((END_VAL / START_VAL) ** (i / (NUM_POINTS - 1))))
                 for i in range(NUM_POINTS)]
-print(len(log_sequence))
 control_sets = [CONTROL_VARS[:k] for k in range(3, len(CONTROL_VARS) + 1)]
 
 
