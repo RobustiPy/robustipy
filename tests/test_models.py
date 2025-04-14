@@ -14,7 +14,7 @@ from robustipy.models import (
     OLSRobust, LRobust, OLSResult,
     stouffer_method, MergedResult
 )
-from robustipy.prototypes import MissingValueWarning
+from robustipy.prototypes import MissingValueWarning, BaseRobust
 
 # ----------------------------------------------------------------------------
 #                              Test Fixtures
