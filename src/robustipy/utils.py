@@ -463,3 +463,19 @@ def reservoir_sampling(generator, k):
             if j < k:
                 reservoir[j] = item  # Replace element at the chosen index with new item
     return reservoir
+
+
+def mcfadden_r2(y_true, y_prob):
+    """
+    Compute McFadden's pseudo R-squared for logistic regression.
+    """
+    # Compute log-likelihood for the fitted model
+    eps = 1e-15  # to avoid log(0)
+    y_prob = np.clip(y_prob, eps, 1 - eps)
+    log_l_model = np.sum(y_true * np.log(y_prob) + (1 - y_true) * np.log(1 - y_prob))
+
+    # Compute log-likelihood for the null model
+    p_null = np.mean(y_true)
+    log_l_null = np.sum(y_true * np.log(p_null) + (1 - y_true) * np.log(1 - p_null))
+
+    return 1 - (log_l_model / log_l_null)

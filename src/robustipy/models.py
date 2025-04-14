@@ -30,6 +30,7 @@ from robustipy.utils import (
     logistic_regression_sm,
     simple_ols,
     space_size,
+    mcfadden_r2,
 )
 
 
@@ -1272,7 +1273,7 @@ class LRobust(BaseRobust):
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
                 elif oos_metric_name == 'r-squared':
-                    k_r2 = r2_score(y_true, y_pred)
+                    k_r2 = mcfadden_r2(y_true, y_pred)
                     metric.append(k_r2)
                 elif oos_metric_name == 'cross-entropy':
                     k_cross_entropy = log_loss(y_true, y_pred)
@@ -1447,4 +1448,3 @@ class LRobust(BaseRobust):
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
         output = logistic_regression_sm(y, x)
-        return output['b'][0][0], output['p'][0][0], output['r2']
