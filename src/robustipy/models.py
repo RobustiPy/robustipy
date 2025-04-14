@@ -31,6 +31,7 @@ from robustipy.utils import (
     simple_ols,
     space_size,
     mcfadden_r2,
+    valid_oos_metrics
 )
 
 
@@ -1278,6 +1279,9 @@ class LRobust(BaseRobust):
                 elif oos_metric_name == 'cross-entropy':
                     k_cross_entropy = log_loss(y_true, y_pred)
                     metric.append(k_cross_entropy)
+                elif oos_metric_name == 'imv':
+                    imv = calculate_imv_score(y_true, y_pred)
+                    metric.append(imv)
                 else:
                     raise ValueError('No valid OOS metric provided.')
             av_k_metric = np.mean(metric)
@@ -1316,7 +1320,7 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse','cross-entropy']
+            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv']
         )
         print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
@@ -1448,3 +1452,4 @@ class LRobust(BaseRobust):
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
         output = logistic_regression_sm(y, x)
+        return output['b'][0][0], output['p'][0][0], output['r2']

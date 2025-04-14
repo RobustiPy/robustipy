@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 
 def space_size(iterable) -> int:
     """
@@ -479,3 +480,45 @@ def mcfadden_r2(y_true, y_prob):
     log_l_null = np.sum(y_true * np.log(p_null) + (1 - y_true) * np.log(1 - p_null))
 
     return 1 - (log_l_model / log_l_null)
+
+
+def calculate_imv_score(y_true, y_enhanced):
+    """
+    Calculates the IMV (Information Metric Value) score.
+
+    Parameters:
+    - y_true: array-like of binary true labels (0 or 1)
+    - y_enhanced: array-like of predicted probabilities from an enhanced model
+
+    Returns:
+    - IMV score: relative improvement of enhanced model over the null model
+    """
+
+    def ll(x, p):
+        epsilon = 1e-4  # avoid log(0)
+        z = (np.log(p + epsilon) * x) + (np.log(1 - p + epsilon) * (1 - x))
+        return np.exp(np.sum(z) / len(z))
+
+    def minimize_me(p, a):
+        return abs((p * np.log(p)) + ((1 - p) * np.log(1 - p)) - np.log(a))
+
+    def get_w(a, guess=0.5, bounds=[(0.5, 0.999)]):
+        res = minimize(minimize_me, guess, args=(a,),
+                       options={'ftol': 0, 'gtol': 1e-9},
+                       method='L-BFGS-B', bounds=bounds)
+        return res.x[0]
+
+    # Null model: always predict mean(y_true)
+    y_null = np.full_like(y_true, fill_value=np.mean(y_true), dtype=float)
+
+    # Compute likelihoods
+    ll_null = ll(y_true, y_null)
+    ll_enhanced = ll(y_true, y_enhanced)
+
+    # Transform to entropy space via get_w
+    w_null = get_w(ll_null)
+    w_enhanced = get_w(ll_enhanced)
+
+    # Compute IMV
+    imv = (w_enhanced - w_null) / w_null
+    return imv
