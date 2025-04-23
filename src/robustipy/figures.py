@@ -12,41 +12,219 @@ import matplotlib.ticker as mticker
 from robustipy.utils import get_selection_key
 from robustipy.utils import get_colormap_colors
 from matplotlib.gridspec import GridSpec
-from matplotlib.patches import FancyArrowPatch
-from matplotlib.patches import Patch
+from matplotlib.patches import FancyArrowPatch, Patch,  Rectangle
 from matplotlib.lines import Line2D
 plt.rcParams['axes.unicode_minus'] = False
 
 
-def axis_formatter(ax, ylabel, xlabel, title):
+def _legend_side_from_hist(ax, *, tau: float = 0.6) -> str:
+    """
+    Decide whether 'upper left' or 'upper right' is safer, given the
+    rectangular patches in *ax* produced by seaborn.histplot.
+
+    Parameters
+    ----------
+    ax   : matplotlib Axes containing the histogram
+    tau  : safety factor (0 < tau < 1).  A bar taller than tau*ylim[1]
+           is considered to 'reach the legend altitude'.
+
+    Returns
+    -------
+    str   : 'upper left' or 'upper right'
+    """
+    bars      = [p for p in ax.patches if isinstance(p, Rectangle) and p.get_height() > 0]
+    if not bars:                      # fall-back if no histogram rendered
+        return 'upper left'
+    # Split bars at the sample median
+    median_x  = np.median([p.get_x() + p.get_width()/2 for p in bars])
+    left_max  = max((p.get_height() for p in bars if (p.get_x() + p.get_width()/2) < median_x), default=0.0)
+    right_max = max((p.get_height() for p in bars if (p.get_x() + p.get_width()/2) >= median_x), default=0.0)
+    f_max     = max(left_max, right_max)
+    ylim_top  = ax.get_ylim()[1]
+
+    # ‘Legend altitude’ test
+    left_hits  = left_max  > tau * ylim_top
+    right_hits = right_max > tau * ylim_top
+
+    if left_hits and (left_max >= right_max):
+        return 'upper right'
+    if right_hits and (right_max > left_max):
+        return 'upper left'
+    return 'upper left'               # default / tie
+
+
+def axis_formatter(ax, ylabel, xlabel, title, side='left'):
     ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
     ax.set_ylabel(ylabel, fontsize=13)
-    title_setter(ax, title)
+    title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
 
-def plot_hexbin_r2(results_object, ax, fig, colormap, title=''):
-    image = ax.hexbin(results_object.estimates.stack(),
-                      results_object.r2_values.stack(),
-                      cmap=colormap, gridsize=20,
-                      mincnt=1,
-                      edgecolor='k')
-    cb = fig.colorbar(image, ax=ax, spacing='uniform', pad=0.05, extend='max')
-    data = image.get_array()
+
+import numpy as np
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+
+import numpy as np
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+
+import numpy as np
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+
+def plot_hexbin_r2(
+    results_object,
+    ax,
+    fig,
+    colormap,
+    title: str = "",
+    side: str = "left"          # "left" (default) or "right"
+) -> None:
+    r"""
+    Hex-bin density plot of boot-strapped coefficient estimates versus in-sample
+    :math:`R^2`, together with a marginal colour-bar of observation counts.
+
+    Parameters
+    ----------
+    results_object : Any
+        Must expose ``results_object.estimates`` and ``results_object.r2_values``,
+        each supporting ``.stack()`` to obtain 1-d views.
+    ax : matplotlib.axes.Axes
+        Target axes.
+    fig : matplotlib.figure.Figure
+        Parent figure, needed for colour-bar geometry.
+    colormap : str | matplotlib.colors.Colormap
+        Matplotlib-compatible colormap.
+    title : str, optional
+        Axes title.
+    side : {'left', 'right'}, optional
+        * ``'left'``  – conventional layout: y-axis on the left, colour-bar on the
+          right.
+        * ``'right'`` – mirror layout: y-axis (ticks, label, spine) on the right,
+          colour-bar on the left; the left spine is removed.
+
+    Notes
+    -----
+    Only the presentation layer is mirrored; the data are not transformed.
+    """
+    # ------------------------------------------------------------------ #
+    # 1.  Hex-bin and colour-bar                                         #
+    # ------------------------------------------------------------------ #
+    image = ax.hexbin(
+        results_object.estimates.stack(),
+        results_object.r2_values.stack(),
+        cmap=colormap,
+        gridsize=20,
+        mincnt=1,
+        edgecolor="k",
+    )
+
+    # Place the colour-bar opposite the y-axis
+    cb_location = "right" if side == "left" else "left"
+    cb = fig.colorbar(
+        image,
+        ax=ax,
+        spacing="uniform",
+        pad=0.05,
+        extend="max",
+        location=cb_location,       # Matplotlib ≥ 3.3
+    )
+
+    # ------------------------------------------------------------------ #
+    # 2.  Colour-bar tick formatting                                     #
+    # ------------------------------------------------------------------ #
+    data  = image.get_array()
     ticks = np.linspace(data.min(), data.max(), num=6)
     cb.set_ticks(ticks)
-    if (data.max() >= 1000) and (data.max() < 10000):
-        cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
-    elif data.max() >= 10000:
-        cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
+
+    if 1_000 <= data.max() < 10_000:
+        cb.set_ticklabels([f"{t/1_000:.1f}k" for t in ticks])
+    elif data.max() >= 10_000:
+        cb.set_ticklabels([f"{t/1_000:.0f}k" for t in ticks])
     else:
-        cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
-    cb.ax.set_title('Count')
-    axis_formatter(ax, r'In-Sample R$^2$', r'Bootstrapped $\mathrm{\hat{\beta}}$ Coefficient Estimate', title)
+        cb.set_ticklabels([f"{t:.0f}"        for t in ticks])
+
+    cb.ax.set_ylabel('Count', rotation=90, va='center', labelpad=10)
+
+    # ------------------------------------------------------------------ #
+    # 2a.  Optional trimming & baseline alignment (only when on the left)#
+    # ------------------------------------------------------------------ #
+    if cb_location == "left":          # i.e. side == "right"
+        frac = 0.1                    # fraction to trim (from the top)
+        ax_box = ax.get_position()     # main axes box (for baseline)
+        cb_box = cb.ax.get_position()
+
+        new_height = cb_box.height * (1 - frac)
+        cb.ax.set_position([
+            cb_box.x0,                 # keep x-position
+            ax_box.y0,                 # align bottom with axes baseline
+            cb_box.width,
+            new_height                 # shorten from the top only
+        ])
+
+    # ------------------------------------------------------------------ #
+    # 3.  Axes labels, title, tick locators                              #
+    # ------------------------------------------------------------------ #
+    axis_formatter(
+        ax,
+        r"In-Sample R$^2$",
+        r"Bootstrapped $\hat{\beta}$ Estimate",
+        title,
+        side,
+    )
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
-    sns.despine(ax=ax)
+
+    # ------------------------------------------------------------------ #
+    # 4.  Side-dependent spines, ticks, labels                           #
+    # ------------------------------------------------------------------ #
+    if side == "right":
+        # shift ticks and label to the right
+        ax.yaxis.set_ticks_position("right")
+        ax.yaxis.tick_right()
+        ax.yaxis.set_label_position("right")
+
+        # ensure both marks *and* labels appear on the right
+        ax.tick_params(axis="y",
+                       which="both",
+                       right=True,   labelright=True,
+                       left=False,   labelleft=False)
+
+        # keep right spine, hide left spine
+        ax.spines["right"].set_visible(True)
+        ax.spines["left"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["bottom"].set_visible(True)
+
+    elif side == "left":
+        ax.yaxis.set_ticks_position("left")
+        ax.yaxis.tick_left()
+        ax.yaxis.set_label_position("left")
+
+        ax.tick_params(axis="y",
+                       which="both",
+                       right=False,  labelright=False,
+                       left=True,    labelleft=True)
+
+        ax.spines["left"].set_visible(True)
+        ax.spines["right"].set_visible(False)
+        sns.despine(ax=ax, left=False, right=True)
+
+    else:
+        raise ValueError("`side` must be 'left' or 'right'.")
+
+    # ------------------------------------------------------------------ #
+    # 5.  Void function – all graphics modified in-place                 #
+    # ------------------------------------------------------------------ #
+    return None
+
+
+
 
 
 def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
@@ -675,61 +853,75 @@ def plot_bdist(results_object,
         sns.despine(ax=ax)
     return ax
 
-def plot_kfolds(results_object,
-                colormap,
-                ax=None,
-                title='',
-                despine_left=True
-                ):
-    """
 
-    Args:
-        ax (object):
+def plot_kfolds(
+    results_object,
+    colormap,
+    ax=None,
+    title: str = '',
+    despine_left: bool = True,
+    tau: float = 0.6        # expose safety factor
+):
     """
-    sns.kdeplot(results_object.summary_df['av_k_metric'], ax=ax, alpha=1,
-                color=get_colormap_colors(colormap, 100)[99])
-    sns.histplot(results_object.summary_df['av_k_metric'], ax=ax, alpha=1,
-                 color=get_colormap_colors(colormap, 100)[0],
-                 bins=30, stat='density')
-    val_range = max(results_object.summary_df['av_k_metric']) - min(results_object.summary_df['av_k_metric'])
-    min_lim = min(results_object.summary_df['av_k_metric']) - val_range *.1
-    max_lim = max(results_object.summary_df['av_k_metric']) + val_range *.1
-    ax.set_xlim(min_lim, max_lim)
+    Plot the cross-validated metric distribution with an adaptive legend.
+
+    Parameters
+    ----------
+    results_object : object with attributes
+        - summary_df            : pandas.DataFrame containing column 'av_k_metric'
+        - name_av_k_metric      : str, the metric name
+    colormap        : matplotlib colormap or name understood by get_colormap_colors
+    ax              : matplotlib Axes (created if None)
+    title           : str, axes title
+    despine_left    : bool, whether to move y-axis ticks to the right
+    tau             : float ∈ (0,1), see _legend_side_from_hist
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(4, 3))
+
+    # KDE & histogram
+    data  = results_object.summary_df['av_k_metric']
+    colors = get_colormap_colors(colormap, 100)
+    sns.kdeplot(data, ax=ax, alpha=1, color=colors[99])
+    sns.histplot(data, ax=ax, alpha=1, color=colors[0], bins=30, stat='density')
+
+    # Symmetric x-padding
+    val_range = data.max() - data.min()
+    ax.set_xlim(data.min() - 0.1 * val_range, data.max() + 0.1 * val_range)
+    ax.set_xlim(ax.get_xlim()[0] - 0.066 * val_range, ax.get_xlim()[1])  # original tweak
+
+    # Adaptive legend location
+    legend_loc = _legend_side_from_hist(ax, tau=tau)
+
     legend_elements = [
-        Line2D([0], [0], color=get_colormap_colors(colormap, 100)[99], lw=2, linestyle='-',
-                   label=r'Density', alpha=1),
-        Patch(facecolor=get_colormap_colors(colormap, 100)[0], edgecolor=(0, 0, 0, 1),
-              label=r'Histogram')]
+        Line2D([0], [0], color=colors[99], lw=2, label='Density'),
+        Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1), label='Histogram')
+    ]
     ax.legend(handles=legend_elements,
-              loc='upper left',
+              loc=legend_loc,
               frameon=True,
               fontsize=9,
-              #title='Out-of-Sample',
-              title_fontsize=8,
+              title='Out-of-Sample',
+              title_fontsize=10,
               framealpha=1,
               facecolor='w',
-              edgecolor=(0, 0, 0, 1),
-              ncols=1
-              )
-    ax.set_xlim(ax.get_xlim()[0] - (np.abs(ax.get_xlim()[1]) - np.abs(ax.get_xlim()[0])) / 15,
-                ax.get_xlim()[1])
+              edgecolor=(0, 0, 0, 1))
+
+    # Cosmetic axes work
     ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
-    if results_object.name_av_k_metric=='rmse':
-        metric = results_object.name_av_k_metric.upper()
-    elif results_object.name_av_k_metric.upper=='R-SQUARED':
-        metric = r'R$^2'
-    else:
-        metric = results_object.name_av_k_metric.title()
-    axis_formatter(ax, 'Density', r'OOS Metric: ' + metric, title)
+
+    name = results_object.name_av_k_metric
+    metric = r'R$^2$' if name.lower() == 'r-squared' else (name.upper() if name == 'rmse' else name.title())
+    axis_formatter(ax, 'Density', f'OOS Metric: {metric}', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
-    if despine_left is True:
+
+    if despine_left:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
     else:
         sns.despine(ax=ax)
-
 
 def plot_bma(results_object, colormap, ax, feature_order, title=''):
     """
@@ -748,8 +940,11 @@ def plot_bma(results_object, colormap, ax, feature_order, title=''):
     sns.despine(ax=ax)
 
 
-def title_setter(ax, title):
-    return ax.set_title(title, loc='left', fontsize=16, y=1)
+def title_setter(ax, title, side='left'):
+    if side is 'right':
+        return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26)
+    else:
+        return ax.set_title(title, loc='left', fontsize=16, y=1)
 
 
 def plot_results(results_object,
@@ -772,53 +967,49 @@ def plot_results(results_object,
         colorset (list, optional): List of colors for specification highlighting.
         figsize (tuple, optional): Figure size (width, height) in inches.
     """
-
     figpath = os.path.join(os.getcwd(), 'figures', project_name)
     if not os.path.exists(figpath):
         os.makedirs(figpath)
 
-    fig = plt.figure(figsize=figsize)
-    gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
-    ax1 = fig.add_subplot(gs[0:3, 0:12])
-    ax2 = fig.add_subplot(gs[0:3, 13:24])
-    ax4 = fig.add_subplot(gs[3:5, 6:14])
-    ax3 = fig.add_subplot(gs[3:5, 0:6])
-    ax5 = fig.add_subplot(gs[3:5, 14:23])
-    ax6 = fig.add_subplot(gs[5:9, 0:13])
-    ax7 = fig.add_subplot(gs[5:7, 13:23])
-    ax8 = fig.add_subplot(gs[7:9, 13:23])
+    if max(len(t) for t in results_object.y_name) == 1:
+        fig = plt.figure(figsize=figsize)
+        gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
+        ax1 = fig.add_subplot(gs[0:3, 0:12])
+        ax2 = fig.add_subplot(gs[0:3, 13:24])
+        ax4 = fig.add_subplot(gs[3:5, 6:14])
+        ax3 = fig.add_subplot(gs[3:5, 0:6])
+        ax5 = fig.add_subplot(gs[3:5, 14:23])
+        ax6 = fig.add_subplot(gs[5:9, 0:13])
+        ax7 = fig.add_subplot(gs[5:7, 13:23])
+        ax8 = fig.add_subplot(gs[7:9, 13:23])
 
-    shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
-    shap_x = results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy()
-    shap_cols = results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
-
-
-    plot_hexbin_r2(results_object, ax1, fig, colormap, title='a.')
-    plot_hexbin_log(results_object, ax2, fig, colormap, title='b.')
-    feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
-    plot_bma(results_object, colormap, ax3, feature_order, title='c.')
-    plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
-    plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax6, colormap=colormap, title='f.')
-    plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
-    plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
-    plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
+        shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
+        shap_x = results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy()
+        shap_cols = results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
+        plot_hexbin_r2(results_object, ax1, fig, colormap, title='a.')
+        plot_hexbin_log(results_object, ax2, fig, colormap, title='b.')
+        feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
+        plot_bma(results_object, colormap, ax3, feature_order, title='c.')
+        plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
+        plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax6, colormap=colormap, title='f.')
+        plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
+        plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
+    else:
+        fig = plt.figure(figsize=figsize)
+        gs = GridSpec(6, 24, wspace=-.25, hspace=5)
+        ax1 = fig.add_subplot(gs[0:6, 0:16])
+        ax2 = fig.add_subplot(gs[0:3, 17:24])
+        ax3 = fig.add_subplot(gs[3:6, 17:24])
+        plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax1, colormap=colormap, title='a.')
+        plot_hexbin_r2(results_object, ax2, fig, colormap, title='b.', side='right')
+        plot_kfolds(results_object, colormap, ax3, title='c.', despine_left=True)
+        plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
 
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_r2(results_object, ax, fig, colormap)
     plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
-    plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_hexbin_log(results_object, ax, fig, colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.'+ext), bbox_inches='tight')
-    plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
-    feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
-    plt.savefig(os.path.join(figpath, project_name + '_SHAP.'+ext), bbox_inches='tight')
-    plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_bma(results_object, colormap, ax, feature_order)
-    plt.savefig(os.path.join(figpath, project_name + '_BMA.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_kfolds(results_object, colormap, ax, despine_left=False)
@@ -828,11 +1019,25 @@ def plot_results(results_object,
     plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
     plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.', despine_left=False)
-    plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
-    plt.close(fig)
-    fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
-    plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
-    plt.close(fig)
+
+    if max(len(t) for t in results_object.y_name) == 1:
+        fig, ax = plt.subplots(figsize=(8.5, 5))
+        plot_hexbin_log(results_object, ax, fig, colormap)
+        plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.'+ext), bbox_inches='tight')
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(8.5, 5))
+        feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
+        plt.savefig(os.path.join(figpath, project_name + '_SHAP.'+ext), bbox_inches='tight')
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(8.5, 5))
+        plot_bma(results_object, colormap, ax, feature_order)
+        plt.savefig(os.path.join(figpath, project_name + '_BMA.'+ext), bbox_inches='tight')
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(8.5, 5))
+        plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.', despine_left=False)
+        plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
+        plt.close(fig)
+        fig, ax = plt.subplots(figsize=(8.5, 5))
+        plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
+        plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
+        plt.close(fig)
