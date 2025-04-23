@@ -100,7 +100,7 @@ class BaseRobust(Protomodel):
     def get_results(self):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-    def multiple_y(self, progress: bool = True):
+    def multiple_y(self, progress: bool = False):
         """
         Computes composite y variables from the indicators in self.y.
         Use progress=True to enable progress tracking.
