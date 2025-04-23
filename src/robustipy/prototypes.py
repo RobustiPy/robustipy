@@ -64,12 +64,26 @@ class BaseRobust(Protomodel):
     def __init__(self, *, y, x, data, model_name="BaseRobust"):
         super().__init__()
         if not isinstance(y, list) or not isinstance(x, list):
-            raise TypeError("'y' and 'x' must be lists.")
+            raise TypeError(
+                "parameters 'y' and 'x' must each be a list of strings "
+                "corresponding to DataFrame column names. "
+                f"Received types: y={type(y).__name__}, x={type(x).__name__}. "
+                "Hint: Try wrapping your variable names in square brackets, like y=['target'] and x=['treatment', 'covariate1']"
+            )
+        if not all(isinstance(col, str) for col in y + x):
+            raise TypeError(
+                "All elements in 'y' and 'x' must be strings corresponding to DataFrame columns."
+            )
         if not isinstance(data, pd.DataFrame):
-            raise TypeError("'data' must be a pandas DataFrame.")
-        all_vars = set(data.columns)
-        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
-            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
+            raise TypeError(
+                f"'data' must be a pandas DataFrame. Received type: {type(data).__name__}."
+            )
+        missing_vars = [col for col in (y + x) if col not in data.columns]
+        if missing_vars:
+            raise ValueError(
+                "the following specified columns were not found in the DataFrame: "
+                f"{missing_vars}. Ensure exact name matches (including case sensitivity)."
+            )
         if data.isnull().values.any():
             warnings.warn(
                 "Missing values found in data. Listwise deletion will be applied.",
@@ -110,14 +124,16 @@ class BaseRobust(Protomodel):
     
     def _warn_if_large_draws(self, draws, controls, threshold=500):
         """
-        Issues a warning if 'draws' * #specs is large.
+        Issues a warning if 'draws' × #specs × #y_composites is large.
         """
         est_specs = space_size(controls)
-        total_models = est_specs * draws
-        if draws > threshold:
+        y_space = len(getattr(self, "y_specs", [None]))  
+        total_models = est_specs * y_space * draws
+
+        if total_models > threshold:
             warnings.warn(
-                f"You've requested {draws} bootstrap draws across {est_specs} specifications, "
-                f"which is roughly {total_models:,} total model runs.\n\n"
+                f"You've requested {draws} bootstrap draws across {est_specs} control specs "
+                f"and {y_space} y-composites, which is roughly {total_models:,} total model runs.\n\n"
                 "This might lead to extended runtime or high memory usage.",
                 UserWarning,
                 stacklevel=2
@@ -142,33 +158,39 @@ class BaseRobust(Protomodel):
         """
         A shared validation method for the 'fit()' arguments used by both OLSRobust & LRobust.
         """
-        # 1. Check controls type
-        if not isinstance(controls, list):
-            raise TypeError("'controls' must be a list.")
-
-        # 2. Check that all controls exist in data
         all_vars = set(self.data.columns)
-        if not all(var in all_vars for var in controls):
-            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
+        # Check controls type
+        if not isinstance(controls, list):
+            raise TypeError(f"'controls' must be a list. Received types: {type(controls).__name__}.")
+        if not all(isinstance(col, str) for col in controls):
+            raise TypeError("All elements in 'controls' must be strings.")
+        
+        missing_ctrl = [var for var in controls if var not in all_vars]
+        if missing_ctrl:
+            raise ValueError(
+                "Variable names in 'controls' must exist in the provided DataFrame 'data'.\n"
+                f"The following controls were not found in the DataFrame: "
+                f"{missing_ctrl}."
+            )
 
-        # 3. Group validation
+        # Group validation
         if group is not None:
             if group not in all_vars:
-                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
+                raise ValueError(f"Grouping variable '{group}' not found in your DataFrame.")
             if not isinstance(group, str):
-                raise TypeError("'group' must be a string.")
+                raise TypeError(f"'group' must be a string. Received types: {type(group).__name__}.")
 
-        # 4. K-fold & draws
+        # K-fold & draws
         if kfold < 2:
             raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
         if draws < 1:
             raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
 
-        # 5. OOS metric
+        # OOS metric
         if oos_metric not in valid_oos_metrics:
             raise ValueError(f"OOS Metric must be one of {valid_oos_metrics}.")
 
-        # 6. n_cpu
+        # n_cpu
         if n_cpu is None:
             n_cpu = max(1, cpu_count()-1)
         else:
@@ -183,19 +205,28 @@ class BaseRobust(Protomodel):
                 raise TypeError("seed must be an integer")
             np.random.seed(seed)
 
-        # 8. numeric columns check
+        # numeric columns check
         cols_to_check = self.y + self.x + ([group] if group else []) + controls
         _check_numeric_columns(self.data, cols_to_check)
 
         # 9. warn if large draws
         self._warn_if_large_draws(draws, controls, threshold=500)
         
-        if len(set(controls) & set(self.x)) > 0:
-            raise ValueError("Some control variables overlap with independent variables (x). Please ensure 'x' and 'controls' are disjoint sets.")
+        # Disallow overlap between x and controls
+        overlap = set(self.x).intersection(controls)
+        if overlap:
+            raise ValueError(
+                "Configuration conflict: the following variables appear in both 'x' and 'controls': "
+                f"{sorted(overlap)}. Please ensure treatment (x) and control sets are disjoint."
+            )
+        # Disallow y appearing in x
+        if any(col in self.y for col in self.x):
+            raise ValueError(
+                "Invalid configuration: dependent variable(s) in 'y' must not also appear in 'x'."
+            )
 
-        if any(var in self.y for var in self.x):
-            raise ValueError("Dependent variable(s) must not be included in the independent variables (x).")
-        
+        # check for empty x
         if len(self.x) == 0:
             raise ValueError("No independent variables (x) provided.")
+
         return n_cpu
