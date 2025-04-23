@@ -31,16 +31,39 @@ from robustipy.utils import (
     space_size,
 )
 
-def stouffer_method(p_values, weights=None):
-    """Combine p-values using Stouffer's method."""
-    z_scores = norm.isf(p_values)  # Inverse survival function: Φ⁻¹(1 - p)
+def stouffer_method(p_values, weights=None, eps=None):
+    """
+    Combine p-values using Stouffer's Z-method, guarding against ±∞.
+
+    Parameters
+    ----------
+    p_values : array_like
+        Iterable of individual p-values.
+    weights : array_like, optional
+        Stouffer weights.  If None, unweighted Z is returned.
+    eps : float, optional
+        Positive clipping constant.  Default is the smallest positive
+        normal IEEE-754 double (≈2.22e-308).
+    """
+    p = np.asarray(p_values, dtype=float)
+
+    if eps is None:
+        eps = np.finfo(float).eps  # 2**-52 ≈ 2.22e-16, big enough for safety
+    p = np.clip(p, eps, 1.0 - eps)
+
+    z = norm.isf(p)
+
     if weights is None:
-        Z = np.sum(z_scores) / np.sqrt(len(p_values))
+        Z = z.sum() / np.sqrt(len(z))
     else:
-        weights = np.asarray(weights)
-        Z = np.dot(weights, z_scores) / np.sqrt(np.sum(weights**2))
-    combined_p = norm.sf(Z)  # Survival function: 1 - Φ(Z)
-    return Z, combined_p
+        w = np.asarray(weights, dtype=float)
+        if w.shape != z.shape:
+            raise ValueError("weights and p_values must have same length")
+        Z = np.dot(w, z) / np.linalg.norm(w)
+
+    p_combined = norm.sf(Z)
+    return Z, p_combined
+
 
 class MergedResult(Protoresult):
     def __init__(self, *, y, specs, estimates, p_values, r2_values):
@@ -95,7 +118,7 @@ class MergedResult(Protoresult):
                 raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'specs' must be in the valid computed specifications.")
-        
+
         plot_results(
             results_object=self,
             loess=loess,
@@ -276,7 +299,7 @@ class OLSResult(Protoresult):
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
         self.inference['median_p'] = (
-            np.nan if not inference else 
+            np.nan if not inference else
             (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
         )
         self.inference['min_ns'] = df_model_result['betas'].min()
@@ -462,7 +485,7 @@ class OLSResult(Protoresult):
             if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
             if len(specs) > 3:
-                raise ValueError("The max number of specifications to highlight is 3") 
+                raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
         if ic not in valid_ic:
@@ -587,7 +610,7 @@ class OLSRobust(BaseRobust):
         Return the OLSResult object once .fit() has been called.
         """
         return self.results
-    
+
     def fit(self,
             *,
             controls,
