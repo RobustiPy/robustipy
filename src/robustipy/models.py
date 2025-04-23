@@ -451,6 +451,12 @@ class OLSResult(Protoresult):
             matplotlib.figure.Figure: Plot showing the regression results.
         """
         valid_ic = ['bic', 'aic', 'hqic']
+        if ic not in valid_ic:
+            raise ValueError(
+                f"Unsupported information criterion: expected one of {valid_ic}, "
+                f"received: '{ic}'."
+            )
+
 
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
@@ -611,6 +617,8 @@ class OLSRobust(BaseRobust):
         self : Object
             Object class OLSRobust containing the fitted estimators.
         """
+        if len(self.y) > 1:
+            self.multiple_y()
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
@@ -627,7 +635,6 @@ class OLSRobust(BaseRobust):
         self.oos_metric_name = oos_metric
 
         if len(self.y) > 1:
-            self.multiple_y()
             list_all_predictors = []
             list_b_array = []
             list_p_array = []
