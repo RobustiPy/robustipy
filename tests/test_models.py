@@ -14,7 +14,7 @@ from robustipy.models import (
     OLSRobust, LRobust, OLSResult,
     stouffer_method, MergedResult
 )
-from robustipy.prototypes import MissingValueWarning
+from robustipy.prototypes import MissingValueWarning, BaseRobust
 
 # ----------------------------------------------------------------------------
 #                              Test Fixtures
@@ -373,6 +373,59 @@ def test_fit_invalid_group_column(simple_data):
     with pytest.raises(ValueError):
         model.fit(controls=['control1'], group='nonexistent', kfold=2, draws=10, n_cpu=1)
 
+
+
+
+def test_data_is_numpy_array_not_dataframe():
+    """
+    OLSRobust should raise an error when data is a NumPy array, even if it has shape like a DataFrame.
+    """
+    data = np.random.rand(100, 5)
+    with pytest.raises(TypeError, match="must be a pandas DataFrame"):
+        OLSRobust(y=['y'], x=['x1'], data=data)
+
+def test_data_without_column_names_raises():
+    """
+    Test that passing a DataFrame without column names raises a ValueError during model initialization.
+    """
+    data = pd.DataFrame(np.random.rand(100, 3))
+    data.columns = [None, None, None]  # This means the DataFrame does not have proper column names.
+    with pytest.raises(ValueError):
+        OLSRobust(y=['y'], x=['x1'], data=data)
+
+def test_data_with_non_string_column_names_raises():
+    """
+    Test that passing a DataFrame with non-string column names raises a ValueError during model initialization.
+    """
+    # Build a DataFrame whose columns are numbers.
+    df = pd.DataFrame({
+        0: np.random.rand(100),
+        1: np.random.rand(100),
+        2: np.random.rand(100)
+    })
+    # The model will check if the variables in y and x exist in df.columns.
+    # Since the error message is the same, we adjust our match string accordingly.
+    with pytest.raises(ValueError):
+        OLSRobust(y=['0'], x=['1'], data=df)
+
+def test_controls_passed_as_dataframe_raises(simple_data):
+    """
+    Even if controls is a valid DataFrame, the model requires a list of column names.
+    """
+    controls_df = simple_data[['control1', 'control2']]
+    model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
+    with pytest.raises(TypeError, match="'controls' must be a list"):
+        model.fit(controls=controls_df, kfold=2, draws=10, n_cpu=1)        
+
+def test_controls_passed_as_numpy_array_raises(simple_data):
+    """
+    Even if the array is shape (n,2), controls must be a list of strings,
+    not a NumPy array.
+    """
+    controls_np = simple_data[['control1','control2']].values
+    model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
+    with pytest.raises(TypeError, match="'controls' must be a list"):
+        model.fit(controls=controls_np, kfold=2, draws=10, n_cpu=1)
 
 
 # ----------------------------------------------------------------------------

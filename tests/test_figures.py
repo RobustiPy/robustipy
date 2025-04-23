@@ -22,7 +22,6 @@ from robustipy.figures import (
     plot_bma,
     plot_results
 )
-
 # -----------------------------------------------------------------------------
 #                            FIXTURES / UTILITIES
 # -----------------------------------------------------------------------------
@@ -60,7 +59,7 @@ def mock_results_object():
             })
             
             # 3) .inference used for the text inside plot_curve
-            self.inference = {'median': 0.123, 'median_p': 0.456}
+            self.inference = {'median': 0.123, 'median_p': 0.456, 'Stouffers': (0.0, 1.0)}
             
             # 4) draws, kfold => used in plot_curve text
             self.draws = 50
@@ -270,4 +269,3 @@ def test_plot_results_creates_files(tmp_path, mock_results_object, ic):
         )
         main_plot_path = out_dir / f"{test_proj_name}_all.png"
         assert main_plot_path.exists(), f"Expected {main_plot_path} to be created."
-
