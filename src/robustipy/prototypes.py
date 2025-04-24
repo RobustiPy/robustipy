@@ -109,7 +109,7 @@ class BaseRobust(Protomodel):
         self.y_composites = []
         print("Calculating Composite Ys")
         subsets = list(all_subsets(self.y))
-        iterator = track(subsets, total=len(subsets)) if progress else subsets
+        iterator = subsets 
         for spec in iterator:
             if len(spec) > 0:
                 subset = self.data[list(spec)]
