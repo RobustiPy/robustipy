@@ -4,12 +4,9 @@ import numpy as np
 import random
 import scipy
 import matplotlib
-from matplotlib.colors import ListedColormap
 import pandas as pd
 from itertools import chain, combinations
 import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
