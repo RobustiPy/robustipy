@@ -623,6 +623,14 @@ def plot_ic(results_object,
     Returns:
         matplotlib.lines.Line2D: IC curve plot.
     """
+    # Validate that the requested IC column exists in summary_df
+    if ic not in results_object.summary_df.columns:
+        available_ics = [col for col in results_object.summary_df.columns if col.lower() in {'aic', 'bic', 'hqic'}]
+        raise ValueError(
+            f"[plot_ic] Requested information criterion '{ic}' not found in results.\n"
+            f"Available options in this results object: {available_ics}\n"
+            f"Did you fit the model using a different IC or forget to specify '{ic}' during fitting?"
+        )
     if ax is None:
         ax = plt.gca()
     colorset = get_colormap_colors(colormap, len(specs))

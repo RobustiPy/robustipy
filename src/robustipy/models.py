@@ -619,7 +619,8 @@ class OLSRobust(BaseRobust):
             kfold=5,
             oos_metric='r-squared',
             n_cpu=None,
-            seed=None
+            seed=None,
+            threshold=10_000,
             ):
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
@@ -634,7 +635,16 @@ class OLSRobust(BaseRobust):
             Number of draws for bootstrapping. Default is 500.
         kfold : int, optional
             Number of folds for k-fold cross-validation. Default is None.
-
+        oos_metric : str, optional
+            Out-of-sample metric to be used. Default is 'r-squared'.
+        n_cpu : int, optional
+            Number of CPU cores to use for parallel processing. Default is None.
+        seed : int, optional
+            Random seed for reproducibility. Default is None.
+        threshold : int, optional
+            Maximum total model runs (draws × #specs × #y_composites) *before* issuing
+            a warning about potentially long runtime / high memory usage.
+            Defaults to 10,000.
         Returns
         -------
         self : Object
@@ -650,7 +660,8 @@ class OLSRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse']
+            valid_oos_metrics=['r-squared','rmse'],
+            threshold=threshold
         )
         print(f'[OLSRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
@@ -1165,8 +1176,41 @@ class LRobust(BaseRobust):
             kfold=5,
             oos_metric='r-squared',
             n_cpu=None,
-            seed=None):
-        """Fit the logistic regression models over the specification space and bootstrap samples."""
+            seed=None,
+            threshold=10_000):
+        """
+        Fit the logistic regression models over the specification space and bootstrap samples.
+
+        Parameters
+        ----------
+        controls : list<str>
+            List containing all the names of the possible control variables of the model.
+        group : str, optional
+            Grouping variable. If provided, a Fixed Effects (demeaned) model is estimated.
+        draws : int, optional
+            Number of draws for bootstrapping. Default is 500.
+        sample_size : int, optional
+            Number of observations to sample in each bootstrap draw.
+            If None, defaults to the full dataset size.
+        kfold : int, optional
+            Number of folds for k-fold cross-validation. Default is 5.
+        oos_metric : str, optional
+            Out-of-sample metric to be used. Can be one of {'r-squared', 'rmse', 'cross-entropy'}.
+            Default is 'r-squared'.
+        n_cpu : int, optional
+            Number of CPU cores to use for parallel processing. If None, uses all but one core.
+        seed : int, optional
+            Random seed for reproducibility. Default is None.
+        threshold : int, optional
+            Maximum total model runs (draws × #specs × #y_composites) *before* issuing
+            a warning about potentially long runtime / high memory usage.
+            Defaults to 10,000.
+
+        Returns
+        -------
+        self : Object
+            Object class LRobust containing the fitted estimators.
+        """
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
@@ -1175,7 +1219,8 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse','cross-entropy']
+            valid_oos_metrics=['r-squared','rmse','cross-entropy'],
+            threshold = threshold
         )
         print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
 

@@ -122,7 +122,7 @@ class BaseRobust(Protomodel):
     def fit(self, *, controls, group=None, draws=500, kfold=5, oos_metric='r-squared', n_cpu=None, seed=None):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-    def _warn_if_large_draws(self, draws, controls, threshold=500):
+    def _warn_if_large_draws(self, draws, controls, threshold=10_000):
         """
         Issues a warning if 'draws' × #specs × #y_composites is large.
         """
@@ -154,7 +154,8 @@ class BaseRobust(Protomodel):
                            oos_metric,
                            n_cpu,
                            seed,
-                           valid_oos_metrics):
+                           valid_oos_metrics,
+                           threshold = 10_000):
         """
         A shared validation method for the 'fit()' arguments used by both OLSRobust & LRobust.
         """
@@ -210,7 +211,7 @@ class BaseRobust(Protomodel):
         _check_numeric_columns(self.data, cols_to_check)
 
         # 9. warn if large draws
-        self._warn_if_large_draws(draws, controls, threshold=500)
+        self._warn_if_large_draws(draws, controls, threshold)
         
         # Disallow overlap between x and controls
         overlap = set(self.x).intersection(controls)
