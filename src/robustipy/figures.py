@@ -1123,7 +1123,7 @@ def title_setter(
         - 'left': standard positioning.
         - 'right': shifts the title so it doesn’t overlap a right-side y-axis.
     """
-    if side is 'right':
+    if side == 'right':
         return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26)
     else:
         return ax.set_title(title, loc='left', fontsize=16, y=1)
