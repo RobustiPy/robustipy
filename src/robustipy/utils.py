@@ -467,6 +467,9 @@ def mcfadden_r2(y_true, y_prob):
     """
     Compute McFadden's pseudo R-squared for logistic regression.
     """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+
     # Compute log-likelihood for the fitted model
     eps = 1e-15  # to avoid log(0)
     y_prob = np.clip(y_prob, eps, 1 - eps)
@@ -490,6 +493,7 @@ def calculate_imv_score(y_true, y_enhanced):
     Returns:
     - IMV score: relative improvement of enhanced model over the null model
     """
+    y_true,y_enhanced = np.asarray(y_true),np.asarray(y_enhanced)
 
     def ll(x, p):
         epsilon = 1e-4  # avoid log(0)
