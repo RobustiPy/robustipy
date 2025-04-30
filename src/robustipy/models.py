@@ -185,6 +185,8 @@ class MergedResult(Protoresult):
         """
         fig, ax = plt.subplots(figsize=figsize)
 
+        if specs is not None and len(specs) == 0:
+            specs = None
         if specs is not None:
             if not all(isinstance(spec, list) for spec in specs):
                 raise TypeError("'specs' must be a list of lists.")
