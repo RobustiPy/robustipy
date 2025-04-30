@@ -1,19 +1,26 @@
 from __future__ import annotations
+
 import os
-import matplotlib.cm as cm
-from scipy.stats import gaussian_kde
-from shap.plots._labels import labels
+from typing import Union, Optional, List, Sequence, Tuple
+
+import matplotlib
 import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-import statsmodels.api as sm
-import pandas as pd
+import matplotlib.cm as cm
 import matplotlib.ticker as mticker
-from robustipy.utils import get_selection_key
-from robustipy.utils import get_colormap_colors
 from matplotlib.gridspec import GridSpec
-from matplotlib.patches import FancyArrowPatch, Patch,  Rectangle
 from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrowPatch, Patch, Rectangle
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.api as sm
+from scipy.stats import gaussian_kde
+
+from shap import Explanation
+from shap.plots._labels import labels
+
+from robustipy.utils import get_selection_key, get_colormap_colors
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -24,13 +31,16 @@ def _legend_side_from_hist(ax, *, tau: float = 0.6) -> str:
 
     Parameters
     ----------
-    ax   : matplotlib Axes containing the histogram
-    tau  : safety factor (0 < tau < 1).  A bar taller than tau*ylim[1]
-           is considered to 'reach the legend altitude'.
+    ax : matplotlib.axes.Axes
+        Axes containing seaborn.histplot patches.
+    tau : float, default=0.6
+        Safety threshold in (0,1). A bar exceeding `tau * ylim_max` on one side
+        forces the legend to the opposite.
 
     Returns
     -------
-    str   : 'upper left' or 'upper right'
+    str
+        Either 'upper left' or 'upper right'.
     """
     bars      = [p for p in ax.patches if isinstance(p, Rectangle) and p.get_height() > 0]
     if not bars:                      # fall-back if no histogram rendered
@@ -53,7 +63,36 @@ def _legend_side_from_hist(ax, *, tau: float = 0.6) -> str:
     return 'upper left'               # default / tie
 
 
-def axis_formatter(ax, ylabel, xlabel, title, side='left'):
+def axis_formatter(
+    ax: plt.Axes,
+    ylabel: str,
+    xlabel: str,
+    title: str,
+    side: str = 'left'
+) -> None:
+    """
+    Apply consistent styling to a Matplotlib Axes: grids, fonts, labels, and title placement.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes object to format.
+    ylabel : str
+        Label text for the y-axis.
+    xlabel : str
+        Label text for the x-axis.
+    title : str
+        Title text for the plot.
+    side : {'left', 'right'}, default='left'
+        Side on which to draw the y-axis label and title.  
+        - 'left': y-label on left, title aligned slightly left.  
+        - 'right': y-label on right, title aligned to the right side of the axes.
+
+    Returns
+    -------
+    None
+        This function modifies `ax` in place and does not return anything.
+    """
     ax.tick_params(axis='both', which='major', labelsize=11)
     ax.grid(linestyle='--', color='k', alpha=0.1, zorder=-1)
     ax.set_axisbelow(True)
@@ -61,31 +100,16 @@ def axis_formatter(ax, ylabel, xlabel, title, side='left'):
     title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
 
-
-import numpy as np
-import matplotlib.ticker as mticker
-import seaborn as sns
-
-
-import numpy as np
-import matplotlib.ticker as mticker
-import seaborn as sns
-
-
-import numpy as np
-import matplotlib.ticker as mticker
-import seaborn as sns
-
-
 def plot_hexbin_r2(
     results_object,
-    ax,
-    fig,
-    colormap,
+    ax: plt.Axes,
+    fig: plt.Figure,
+    colormap: Union[str, cm.Colormap],
     title: str = "",
-    side: str = "left"          # "left" (default) or "right"
-) -> None:
-    r"""
+    side: str = "left"
+) -> None:    
+
+    """
     Hex-bin density plot of boot-strapped coefficient estimates versus in-sample
     :math:`R^2`, together with a marginal colour-bar of observation counts.
 
@@ -107,6 +131,16 @@ def plot_hexbin_r2(
           right.
         * ``'right'`` – mirror layout: y-axis (ticks, label, spine) on the right,
           colour-bar on the left; the left spine is removed.
+
+    Returns
+    -------
+    None
+        Draws in place on `ax`.
+
+    Raises
+    ------
+    ValueError
+        If `side` is not 'left' or 'right'.
 
     Notes
     -----
@@ -227,7 +261,35 @@ def plot_hexbin_r2(
 
 
 
-def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
+def plot_hexbin_log(
+    results_object,
+    ax: plt.Axes,
+    fig: plt.Figure,
+    colormap: Union[str, cm.Colormap],
+    title: str = ''
+) -> None:
+    """
+    Plot a hex-bin density of full-sample coefficient estimates vs. log-likelihood.
+
+    Parameters
+    ----------
+    results_object : object
+        Must expose:
+          - `all_b`: list/array of full-sample coefficient arrays
+          - `summary_df['ll']`: corresponding log-likelihood values
+    ax : matplotlib.axes.Axes
+        The axes on which to draw the hex-bin.
+    fig : matplotlib.figure.Figure
+        Parent figure (needed to place the colorbar).
+    colormap : str or Colormap
+        Name or object of a Matplotlib colormap.
+    title : str, optional
+        Title displayed above the plot (default: '').
+
+    Returns
+    -------
+    None
+    """
     image = ax.hexbin([arr[0][0] for arr in results_object.all_b],
                       results_object.summary_df['ll'],
                       cmap=colormap,
@@ -252,34 +314,51 @@ def plot_hexbin_log(results_object, ax, fig, colormap, title=''):
     sns.despine(ax=ax)
 
 def shap_violin(
-        ax,
-        shap_values,
-        features=None,
-        feature_names=None,
-        max_display=10,
-        color=None,
-        alpha=1,
-        cmap='Spectral_r',
-        use_log_scale=False,
-        title='',
-        clear_yticklabels=False
-):
+    ax: plt.Axes,
+    shap_values: Union[np.ndarray, List[np.ndarray], Explanation],
+    features: Optional[Union[np.ndarray, pd.DataFrame, List[str]]] = None,
+    feature_names: Optional[List[str]] = None,
+    max_display: int = 10,
+    color: Optional[Union[str, Sequence]] = None,
+    alpha: float = 1.0,
+    cmap: str = 'Spectral_r',
+    use_log_scale: bool = False,
+    title: str = '',
+    clear_yticklabels: bool = False
+) -> List[str]:
     """Create a SHAP beeswarm plot, colored by feature values when they are provided.
 
     Parameters
     ----------
-    shap_values : numpy.array
-        For single output explanations this is a matrix of SHAP values (# samples x # features).
-        For multi-output explanations this is a list of such matrices of SHAP values.
+    ax : matplotlib.axes.Axes
+        Axes on which to draw the plot.
+    shap_values : array-like or Explanation
+        SHAP value matrix (#samples×#features), or a list thereof for multiclass,
+        or a SHAP Explanation object.
+    features : array-like, DataFrame, or list of str, optional
+        Feature value matrix (#samples×#features), or just a feature_names list.
+        Default: None (no coloring).
+    feature_names : list of str, optional
+        Names of each feature. Default: None (will infer or auto‐label).
+    max_display : int, default=10
+        Maximum number of top features (by mean(|SHAP|)) to show.
+    color : str or sequence, optional
+        Single color for all points when no feature values given.
+    alpha : float, default=1.0
+        Opacity for scatter points.
+    cmap : str, default='Spectral_r'
+        Colormap for coloring points.
+    use_log_scale : bool, default=False
+        If True, use symlog x-axis scaling.
+    title : str, optional
+        Title text for the axes.
+    clear_yticklabels : bool, default=False
+        If True, hide the y-tick labels.
 
-    features : numpy.array or pandas.DataFrame or list
-        Matrix of feature values (# samples x # features) or a feature_names list as shorthand
-
-    feature_names : list
-        Names of the features (length # features)
-
-    max_display : int
-        How many top features to include in the plot (default is 20, or 7 for interaction plots)
+    Returns
+    -------
+    List[str]
+        Ordered list of feature names actually plotted.
     """
     if str(type(shap_values)).endswith("Explanation'>"):
         shap_exp = shap_values
@@ -441,25 +520,36 @@ def shap_violin(
     return feature_name_order
 
 
-def plot_curve(results_object,
-               loess=True,
-               specs=None,
-               ax=None,
-               colormap='Spectral_r',
-               title=''):
+def plot_curve(
+    results_object,
+    loess: bool = True,
+    specs: Optional[List[List[str]]] = None,
+    ax: Optional[plt.Axes] = None,
+    colormap: str = 'Spectral_r',
+    title: str = ''
+) -> plt.Axes:
     """
-    Plots the curve of median, confidence intervals, minimum, and maximum
-    coefficient estimates for a given results object.
+    Plot the specification‐curve of median and CI for coefficient estimates.
 
-    Parameters:
-        results_object (object): Object containing the results data.
-        loess (bool, optional): Whether to apply LOESS smoothing to the curve. Default is True.
-        specs (list, optional): List of specification names to be highlighted.
-        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-        colormap (str, optional): Colormap to use for highlighting specifications.
+    Parameters
+    ----------
+    results_object : object
+        Must expose `summary_df` (with columns 'median','min','max'), `specs_names`, etc.
+    loess : bool, default=True
+        Whether to smooth the min/max curves with LOESS.
+    specs : list of control‐lists, optional
+        Up to three specs to highlight. Default: None (no highlights).
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. Default: current axes.
+    colormap : str, default='Spectral_r'
+        Colormap for the main curve.
+    title : str, optional
+        Title text for the axes.
 
-    Returns:
-        matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted curve.
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes containing the plot.
     """
     colorset = get_colormap_colors(colormap, len(specs))
     if ax is None:
@@ -602,26 +692,39 @@ def plot_curve(results_object,
     sns.despine(ax=ax)
     return ax
 
-def plot_ic(results_object,
-            ic,
-            specs=None,
-            ax=None,
-            colormap='Spectral_r',
-            title='',
-            despine_left=True):
+def plot_ic(
+    results_object,
+    ic: str,
+    specs: Optional[List[List[str]]] = None,
+    ax: Optional[plt.Axes] = None,
+    colormap: str = 'Spectral_r',
+    title: str = '',
+    despine_left: bool = True
+) -> plt.Axes:
     """
     Plots the information criterion (IC) curve for the given results object.
 
-    Parameters:
-        results_object (object): Object containing the results data.
-        ic (str): Information criterion to plot ('aic', 'bic', etc.).
-        specs (list, optional): List of specification names to be highlighted.
-        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-        colormap (str, optional): Colormap to use for highlighting specifications.
-        colorset (list, optional): List of colors for specification highlighting.
+    Parameters
+    ----------
+    results_object : object
+        Must expose `summary_df` (with `ic` column) and `specs_names`.
+    ic : str
+        Which criterion to plot: 'aic', 'bic', or 'hqic'.
+    specs : list of control‐lists, optional
+        Specs to highlight. Default: None.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. Default: current axes.
+    colormap : str, default='Spectral_r'
+        Colormap for highlights.
+    title : str, optional
+        Title text for the axes.
+    despine_left : bool, default=True
+        If True, move the y‐axis ticks & spine to the right.
 
-    Returns:
-        matplotlib.lines.Line2D: IC curve plot.
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes containing the plot.
     """
     # Validate that the requested IC column exists in summary_df
     if ic not in results_object.summary_df.columns:
@@ -757,26 +860,39 @@ def plot_ic(results_object,
             sns.despine(ax=ax)
 
 
-def plot_bdist(results_object,
-               specs=None,
-               ax=None,
-               colormap='Spectral_r',
-               title='',
-               despine_left=True,
-               legend_bool=False
-               ):
+def plot_bdist(
+    results_object,
+    specs: Optional[List[List[str]]] = None,
+    ax: Optional[plt.Axes] = None,
+    colormap: str = 'Spectral_r',
+    title: str = '',
+    despine_left: bool = True,
+    legend_bool: bool = False
+) -> plt.Axes:
     """
-    Plots the distribution of coefficient estimates for the specified specifications.
+    Plot kernel‐density distributions of coefficient estimates for select specs.
 
-    Parameters:
-        results_object (object): Object containing the results data.
-        specs (list, optional): List of specification names to be highlighted.
-        ax (matplotlib.axes._subplots.AxesSubplot, optional): Axes to plot on.
-        colormap (str, optional): Colormap to use for highlighting specifications.
-        colorset (list, optional): List of colors for specification highlighting.
+    Parameters
+    ----------
+    results_object : object
+        Must expose `estimates` (DataFrame) and `specs_names`.
+    specs : list of control‐lists, optional
+        Which specs to overlay. Default: None.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. Default: current axes.
+    colormap : str, default='Spectral_r'
+        Colormap for the highlighted densities.
+    title : str, optional
+        Title text for the axes.
+    despine_left : bool, default=True
+        If True, move the y‐axis to the right.
+    legend_bool : bool, default=False
+        If True, draw a legend of the highlighted specs.
 
-    Returns:
-        matplotlib.axes._subplots.AxesSubplot: Axes containing the plotted distribution.
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes containing the density plot.
     """
 
     def make_leg(results_object):
@@ -864,26 +980,40 @@ def plot_bdist(results_object,
 
 def plot_kfolds(
     results_object,
-    colormap,
-    ax=None,
+    colormap: Union[str, matplotlib.colors.Colormap],
+    ax: Optional[plt.Axes] = None,
     title: str = '',
     despine_left: bool = True,
-    tau: float = 0.6        # expose safety factor
-):
+    tau: float = 0.6
+) -> plt.Axes:
     """
-    Plot the cross-validated metric distribution with an adaptive legend.
+    Plot the cross-validation metric distribution (density + histogram),
+    with an adaptive legend positioned safely around the tallest bars.
 
     Parameters
     ----------
-    results_object : object with attributes
-        - summary_df            : pandas.DataFrame containing column 'av_k_metric'
-        - name_av_k_metric      : str, the metric name
-    colormap        : matplotlib colormap or name understood by get_colormap_colors
-    ax              : matplotlib Axes (created if None)
-    title           : str, axes title
-    despine_left    : bool, whether to move y-axis ticks to the right
-    tau             : float ∈ (0,1), see _legend_side_from_hist
+    results_object : object
+        Must expose:
+          - summary_df : pandas.DataFrame containing column 'av_k_metric'
+          - name_av_k_metric : str, the metric name (e.g. 'r-squared', 'rmse')
+    colormap : str or Colormap
+        Matplotlib colormap name or object used for plotting.
+    ax : matplotlib.axes.Axes, optional
+        Axes on which to draw; if None a new (4×3) figure and axes are created.
+    title : str, default=''
+        Title to display above the plot.
+    despine_left : bool, default=True
+        If True, move y-axis ticks & label to the right spine; otherwise keep on the left.
+    tau : float in (0,1), default=0.6
+        Safety factor for legend placement: bars taller than tau*ylim are
+        considered “in the way” and flip the legend to the opposite side.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The axes containing the completed plot.
     """
+    
     if ax is None:
         _, ax = plt.subplots(figsize=(4, 3))
 
@@ -931,9 +1061,35 @@ def plot_kfolds(
     else:
         sns.despine(ax=ax)
 
-def plot_bma(results_object, colormap, ax, feature_order, title=''):
+def plot_bma(
+    results_object,
+    colormap: Union[str, matplotlib.colors.Colormap],
+    ax: plt.Axes,
+    feature_order: Sequence[str],
+    title: str = ''
+) -> plt.Axes:
     """
-    Plots the Bayesian Model Averaging (BMA)
+    Plot Bayesian Model Averaging (BMA) inclusion probabilities as a horizontal bar chart.
+
+    Parameters
+    ----------
+    results_object : object
+        Must implement `compute_bma()` returning a DataFrame with columns:
+          - 'control_var'
+          - 'probs'
+    colormap : str or Colormap
+        Matplotlib colormap name or object used to pick the bar color.
+    ax : matplotlib.axes.Axes
+        Axes on which to draw the horizontal bar chart.
+    feature_order : sequence of str
+        Ordered list of control variable names to display on the y-axis.
+    title : str, default=''
+        Title to display above the plot.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The axes containing the completed BMA plot.
     """
     bma = results_object.compute_bma()
     bma = bma.set_index('control_var')
@@ -948,32 +1104,69 @@ def plot_bma(results_object, colormap, ax, feature_order, title=''):
     sns.despine(ax=ax)
 
 
-def title_setter(ax, title, side='left'):
-    if side is 'right':
+def title_setter(
+    ax: plt.Axes,
+    title: str,
+    side: str = 'left'
+) -> None:
+    """
+    Set a title on `ax`, aligned on the left but positioned differently
+    depending on whether the y-axis is on the left or right.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes whose title you wish to set.
+    title : str
+        The title text.
+    side : {'left', 'right'}, default='left'
+        - 'left': standard positioning.
+        - 'right': shifts the title so it doesn’t overlap a right-side y-axis.
+    """
+    if side == 'right':
         return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26)
     else:
         return ax.set_title(title, loc='left', fontsize=16, y=1)
 
 
-def plot_results(results_object,
-                 loess=True,
-                 specs=None,
-                 ic=None,
-                 colormap='Spectral_r',
-                 figsize=(16, 16),
-                 ext='pdf',
-                 project_name='no_project_name'
-                 ):
+def plot_results(
+    results_object,
+    loess: bool = True,
+    specs: Optional[List[List[str]]] = None,
+    ic: Optional[str] = None,
+    colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
+    figsize: Tuple[int, int] = (16, 16),
+    ext: str = 'pdf',
+    project_name: str = 'no_project_name'
+) -> None:
     """
     Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
 
-    Parameters:
-        results_object (object): Object containing the results data.
-        specs (list, optional): List of specification names to be highlighted.
-        ic (str, optional): Information criterion to plot ('aic', 'bic', etc.).
-        colormap (str, optional): Colormap to use for highlighting specifications.
-        colorset (list, optional): List of colors for specification highlighting.
-        figsize (tuple, optional): Figure size (width, height) in inches.
+    Parameters
+    ----------
+    results_object : object
+        An OLSResult-like object (must expose attributes `y_name`, `x_name`,
+        `shap_return`, `summary_df`, `specs_names`, etc.).
+    loess : bool, default=True
+        Whether to apply LOESS smoothing to the coefficient–specification curve.
+    specs : list of list of str, optional
+        Up to three specs (lists of control names) to highlight in the curve, IC, and distribution panels.
+    ic : str, optional
+        Information criterion name to plot (one of 'aic','bic','hqic').
+    colormap : str or Colormap, default='Spectral_r'
+        Colormap used consistently for all panels.
+    figsize : (width, height), default=(16,16)
+        Size of the full figure in inches.
+    ext : str, default='pdf'
+        File extension to save each panel (e.g. 'png','pdf').
+    project_name : str, default='no_project_name'
+        Directory and filename prefix under `./figures/`.
+
+    Notes
+    -----
+    - Automatically creates `./figures/{project_name}/` if it does not exist.
+    - Saves a combined “_all” figure plus individual panels named:
+      `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
     """
     figpath = os.path.join(os.getcwd(), 'figures', project_name)
     if not os.path.exists(figpath):

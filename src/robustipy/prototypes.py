@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import warnings
+from typing import Optional, List
 from multiprocessing import cpu_count
 import numpy as np
 import pandas as pd
-from rich.progress import track
 
 from robustipy.utils import all_subsets, space_size
 
@@ -54,14 +54,54 @@ def _check_numeric_columns(data, cols):
 
 class BaseRobust(Protomodel):
     """
-    A base class factoring out the repeated logic in OLSRobust and LRobust:
-      - Basic validation (controls, group, etc.)
-      - multiple_y support
-      - parallel bootstrapping loops
-      - SHAP logic
+    Base class for robust model estimation, including OLS and logistic.
+
+    Provides shared validation, bootstrapping, cross-validation,
+    and composite outcome support.
+
+    Attributes
+    ----------
+    y : list of str
+        Dependent variable column names.
+    x : list of str
+        Independent variable column names.
+    data : pandas.DataFrame
+        Input dataset containing variables in y, x, controls.
+    model_name : str
+        Custom label for the model run.
+    results : object
+        Fitted result object populated after fit().
+    parameters : dict
+        Stores initialization parameters and any derived settings.
     """
 
-    def __init__(self, *, y, x, data, model_name="BaseRobust"):
+    def __init__(
+        self,
+        *,
+        y: list[str],
+        x: list[str],
+        data: pd.DataFrame,
+        model_name: str = "BaseRobust"
+    ) -> None:
+        """
+        Initialize the base robust model, validating inputs.
+
+        Parameters
+        ----------
+        y : list of str
+            Names of the dependent variable columns.
+        x : list of str
+            Names of the independent variable columns.
+        data : pandas.DataFrame
+            Dataset containing all necessary columns.
+        model_name : str, default "BaseRobust"
+            Label for this model, used in outputs.
+
+        Raises
+        ------
+        TypeError, ValueError
+            If inputs fail type or membership checks.
+        """
         super().__init__()
         if not isinstance(y, list) or not isinstance(x, list):
             raise TypeError(
@@ -100,10 +140,9 @@ class BaseRobust(Protomodel):
     def get_results(self):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-    def multiple_y(self, progress: bool = False):
+    def multiple_y(self) -> None:
         """
-        Computes composite y variables from the indicators in self.y.
-        Use progress=True to enable progress tracking.
+        Compute composite outcomes when multiple y indicators are provided.
         """
         self.y_specs = []
         self.y_composites = []
@@ -119,12 +158,48 @@ class BaseRobust(Protomodel):
         self.parameters['y_specs'] = self.y_specs
         self.parameters['y_composites'] = self.y_composites
     
-    def fit(self, *, controls, group=None, draws=500, kfold=5, oos_metric='r-squared', n_cpu=None, seed=None):
+    def fit(self, *, controls: List[str], group: Optional[str] = None, draws: int = 500,
+            kfold: int = 5, oos_metric: str = 'r-squared', n_cpu: Optional[int] = None,
+            seed: Optional[int] = None) -> None:
+        """
+        Abstract fit method; must be overridden by subclasses.
+
+        Parameters
+        ----------
+        controls : List[str]
+            Optional control variable names to include in specifications.
+        group : str, optional
+            Column name for grouping (fixed effects) variable.
+        draws : int, default=500
+            Number of bootstrap draws.
+        kfold : int, default=5
+            Number of cross-validation folds.
+        oos_metric : str, default='r-squared'
+            Out-of-sample metric ('r-squared', 'rmse', etc.).
+        n_cpu : int, optional
+            Number of CPU cores for parallel computation.
+        seed : int, optional
+            Random seed for reproducibility.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, since this method must be implemented by subclasses.
+        """
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-    def _warn_if_large_draws(self, draws, controls, threshold=10_000):
+    def _warn_if_large_draws(self, draws: int, controls: List[str], threshold: int = 10_000) -> None:
         """
-        Issues a warning if 'draws' × #specs × #y_composites is large.
+        Warn if the total number of bootstrap models exceeds a threshold.
+
+        Parameters
+        ----------
+        draws : int
+            Number of draws per specification.
+        controls : List[str]
+            Control variable names to define specification space.
+        threshold : int, default=10000
+            Maximum safe number of total model runs.
         """
         est_specs = space_size(controls)
         y_space = len(getattr(self, "y_specs", [None]))  
@@ -139,25 +214,65 @@ class BaseRobust(Protomodel):
                 stacklevel=2
             )
 
-    def _check_numeric_columns_for_fit(self, controls, group):
+    def _check_numeric_columns_for_fit(self, controls: List[str], group: Optional[str]) -> None:
         """
-        Ensure columns are numeric.
+        Validate that all required columns are numeric before fitting.
+
+        Parameters
+        ----------
+        controls : List[str]
+            Control variable names.
+        group : str or None
+            Grouping variable name, if any.
         """
         cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
         _check_numeric_columns(self.data, cols_to_check)
 
-    def _validate_fit_args(self,
-                           controls,
-                           group,
-                           draws,
-                           kfold,
-                           oos_metric,
-                           n_cpu,
-                           seed,
-                           valid_oos_metrics,
-                           threshold = 10_000):
+    def _validate_fit_args(
+        self,
+        controls: List[str],
+        group: Optional[str],
+        draws: int,
+        kfold: int,
+        oos_metric: str,
+        n_cpu: Optional[int],
+        seed: Optional[int],
+        valid_oos_metrics: List[str],
+        threshold: int = 10_000
+    ) -> int:
         """
-        A shared validation method for the 'fit()' arguments used by both OLSRobust & LRobust.
+        Shared validation for `fit` arguments across model subclasses.
+
+        Parameters
+        ----------
+        controls : List[str]
+            Control variable names.
+        group : str or None
+            Grouping variable name.
+        draws : int
+            Number of bootstrap draws.
+        kfold : int
+            Number of cross-validation folds; must be ≥2.
+        oos_metric : str
+            Must be one of `valid_oos_metrics`.
+        n_cpu : int or None
+            Number of CPU cores to use; if None, defaults to max(1, cpu_count()-1).
+        seed : int or None
+            Random seed for reproducibility.
+        valid_oos_metrics : List[str]
+            Permitted out-of-sample metrics.
+        threshold : int, default=10000
+            Threshold for total model runs warning.
+
+        Returns
+        -------
+        int
+            Validated `n_cpu` value to use.
+
+        Raises
+        ------
+        TypeError, ValueError
+            If any argument is of wrong type or out of allowed range.
         """
         all_vars = set(self.data.columns)
         # Check controls type
