@@ -5,9 +5,10 @@ It includes classes for OLS (OLSRobust and OLSResult) and logistic regression (L
 analysis, along with utilities for model merging, plotting, and Bayesian model averaging.
 """
 
+from __future__ import annotations
 import _pickle
 import warnings
-from multiprocessing import cpu_count
+from typing import Any, Optional, Sequence, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,7 +24,7 @@ from statsmodels.tools.tools import add_constant
 
 from robustipy.bootstrap_utils import stripped_ols
 from robustipy.figures import plot_results
-from robustipy.prototypes import MissingValueWarning, Protomodel, Protoresult
+from robustipy.prototypes import Protoresult, BaseRobust
 from robustipy.utils import (
     all_subsets,
     group_demean,
@@ -33,27 +34,93 @@ from robustipy.utils import (
     mcfadden_r2,
     calculate_imv_score
 )
+def stouffer_method(
+    p_values: Sequence[float],
+    weights: Optional[Sequence[float]] = None,
+    eps: Optional[float] = None,
+) -> Tuple[float, float]:
+    """
+    Combine p-values using Stouffer's Z-method, guarding against ±∞.
 
+    Parameters
+    ----------
+    p_values : sequence of float
+        Iterable of individual p-values.
+    weights : sequence of float, optional
+        Stouffer weights. If None, performs unweighted combination.
+    eps : float, optional
+        Positive clipping constant.  Default is the smallest positive
+        normal IEEE-754 double (≈2.22e-308).
 
-def _check_numeric_columns(data, cols):
-    """Check that all specified columns in the DataFrame are numeric."""
-    non_numeric = data[cols].select_dtypes(exclude=[np.number]).columns.tolist()
-    if non_numeric:
-        raise ValueError(f"The following columns are not numeric and must be converted before fitting: {non_numeric}")
+    Returns
+    -------
+    Z : float
+        Combined Z-score.
+    p_combined : float
+        Combined p-value.
+    """
+    p = np.asarray(p_values, dtype=float)
 
-def stouffer_method(p_values, weights=None):
-    """Combine p-values using Stouffer's method."""
-    z_scores = norm.isf(p_values)  # Inverse survival function: Φ⁻¹(1 - p)
+    if eps is None:
+        eps = np.finfo(float).eps  # 2**-52 ≈ 2.22e-16, big enough for safety
+    p = np.clip(p, eps, 1.0 - eps)
+
+    z = norm.isf(p)
+
     if weights is None:
-        Z = np.sum(z_scores) / np.sqrt(len(p_values))
+        Z = z.sum() / np.sqrt(len(z))
     else:
-        weights = np.asarray(weights)
-        Z = np.dot(weights, z_scores) / np.sqrt(np.sum(weights**2))
-    combined_p = norm.sf(Z)  # Survival function: 1 - Φ(Z)
-    return Z, combined_p
+        w = np.asarray(weights, dtype=float)
+        if w.shape != z.shape:
+            raise ValueError("weights and p_values must have same length")
+        Z = np.dot(w, z) / np.linalg.norm(w)
+
+    p_combined = norm.sf(Z)
+    return Z, p_combined
+
 
 class MergedResult(Protoresult):
-    def __init__(self, *, y, specs, estimates, p_values, r2_values):
+
+    """
+    Combine and summarize results exclusively from one or more OLSResult runs.
+
+    Parameters
+    ----------
+    y : str
+        Dependent variable name shared by all merged results.
+    specs : Sequence[Sequence[str]]
+        List of specifications; each inner sequence names the controls defining one spec.
+    estimates : array-like or pandas.DataFrame
+        Coefficient estimates for each spec (rows) and bootstrap draw (columns).
+    p_values : array-like or pandas.DataFrame
+        Corresponding p-values for each estimate.
+    r2_values : array-like or pandas.DataFrame
+        R² values for each spec and draw.
+
+    Attributes
+    ----------
+    y_name : str
+        Name of the dependent variable.
+    specs_names : pandas.Series[frozenset]
+        Each entry is the set of control variables defining a spec.
+    estimates : pandas.DataFrame
+        Coefficient estimates by spec and draw.
+    p_values : pandas.DataFrame
+        P-values by spec and draw.
+    r2_values : pandas.DataFrame
+        R² values by spec and draw.
+    summary_df : pandas.DataFrame
+        Per-spec summary with median, min, max, and 95% confidence intervals.
+    """
+    def __init__(
+        self,
+        *,
+        y: str,
+        specs: Sequence[Sequence[str]],
+        estimates: Union[np.ndarray, pd.DataFrame],
+        p_values: Union[np.ndarray, pd.DataFrame],
+        r2_values: Union[np.ndarray, pd.DataFrame],
+    ) -> None:
         super().__init__()
         self.y_name = y
         self.specs_names = pd.Series(specs)
@@ -63,13 +130,13 @@ class MergedResult(Protoresult):
         self.summary_df = self._compute_summary()
         self.summary_df['spec_name'] = self.specs_names
 
-    def summary(self):
+    def summary(self) -> None:
         """
         Generates a summary of the regression results (not implemented).
         """
         pass
 
-    def _compute_summary(self):
+    def _compute_summary(self) -> pd.DataFrame:
         """
         Computes summary statistics based on coefficient estimates.
 
@@ -86,10 +153,32 @@ class MergedResult(Protoresult):
         out['ci_down'] = data.quantile(q=0.025, axis=1, interpolation='nearest')
         return out
 
-    def plot(self, loess=True, specs=None, colormap='Spectral_r', figsize=(16, 14),
-             ext='pdf', project_name='no_project_name'):
+    def plot(
+        self,
+        loess: bool = True,
+        specs: Optional[List[List[str]]] = None,
+        colormap: str = 'Spectral_r',
+        figsize: Tuple[int, int] = (16, 14),
+        ext: str = 'pdf',
+        project_name: str = 'no_project_name',
+    ) -> plt.Figure:
         """
-        Plots the regression results using specified options.
+        Plot specification results highlighting up to three specs.
+
+        Parameters
+        ----------
+        loess : bool
+            Whether to apply LOESS smoothing to confidence intervals.
+        specs : list of list of str, optional
+            Specifications to highlight.
+        colormap : str
+            Matplotlib colormap name.
+        figsize : tuple
+            Figure size (width, height).
+        ext : str
+            File extension for saving.
+        project_name : str
+            Prefix for saved figure.
 
         Returns
         -------
@@ -98,6 +187,8 @@ class MergedResult(Protoresult):
         """
         fig, ax = plt.subplots(figsize=figsize)
 
+        if specs is not None and len(specs) == 0:
+            specs = None
         if specs is not None:
             if not all(isinstance(spec, list) for spec in specs):
                 raise TypeError("'specs' must be a list of lists.")
@@ -105,7 +196,7 @@ class MergedResult(Protoresult):
                 raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'specs' must be in the valid computed specifications.")
-        
+
         plot_results(
             results_object=self,
             loess=loess,
@@ -117,19 +208,36 @@ class MergedResult(Protoresult):
         )
         return fig
 
-    def merge(self, result_obj, left_prefix, right_prefix):
+    def merge(
+        self,
+        result_obj: OLSResult,
+        left_prefix: str,
+        right_prefix: str,
+    ) -> MergedResult:
         """
-        Merges two OLSResult objects into one.
+        Merge the current OLSResult object with another, tagging each specification
+        with a prefix to indicate origin.
 
         Parameters
+        ----------
+        result_obj : OLSResult
+            Another OLSResult object to merge.
+        left_prefix : str
+            Prefix to tag the specifications from the current object.
+        right_prefix : str
+            Prefix to tag the specifications from the result_obj object.
+
+        Returns
         -------
-            result_obj (OLSResult): OLSResult object to be merged.
-            left_prefix (str): Prefix for the orignal result object.
-            right_prefix (str): Prefix fort the new result object.
+        MergedResult
+            A new MergedResult object containing combined estimates and metadata.
 
         Raises
-        -------
-            TypeError: If the input object is not an instance of OLSResult.
+        ------
+        TypeError
+            If result_obj is not an instance of OLSResult or prefixes are not strings.
+        ValueError
+            If the dependent variable names do not match between the two objects.
         """
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
@@ -157,63 +265,122 @@ class MergedResult(Protoresult):
 
 class OLSResult(Protoresult):
     """
-    Result class containing the output of the OLSRobust class.
+    Encapsulates the results of an OLSRobust run
 
-    Parameters:
-        y (str): The name of the dependent variable.
-        specs (list of str): List of specification names.
-        all_predictors (list of lists of str): List of predictor variable names for each specification.
-        controls (list of str): List of control variable names.
-        draws (int): Number of draws in the analysis.
-        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.
-        all_b (list of lists): List of coefficient estimates for each specification and draw.
-        all_p (list of lists): List of p-values for each specification and draw.
-        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.
-        r2_values (pd.DataFrame): DataFrame containing r2 for each specification and draw.
-        r2i_array (pd.DataFrame): DataFrame containing r2 for each specification (no straps).
-        ll_array (list): List of log-likelihood values for each specification.
-        aic_array (list): List of AIC values for each specification.
-        bic_array (list): List of BIC values for each specification.
-        hqic_array (list): List of HQIC values for each specification.
-        av_k_metric_array (list, optional): List of average metrics.
-
-    Methods:
-        save(filename):
-            Save the OLSResult object to a file using pickle.
-
-        load(filename):
-            Load an OLSResult object from a file using pickle.
-
-        summary():
-            Placeholder for a method to generate a summary of the results.
-
-        plot(specs=None, ic=None, colormap=None, figsize=(12, 6)):
-            Generate plots of the OLS results.
-
-        compute_bma():
-            Perform Bayesian model averaging using BIC implied priors and return the results.
-
-        merge(result_obj, prefix):
-            Merge two OLSResult objects into one.
-
-    Attributes:
-        y_name (str): The name of the dependent variable.
-        specs_names (pd.Series): Series containing specification names.
-        all_predictors (list of lists of str): List of predictor variable names for each specification.
-        controls (list of str): List of control variable names.
-        draws (int): Number of draws in the analysis.
-        estimates (pd.DataFrame): DataFrame containing regression coefficient estimates.
-        p_values (pd.DataFrame): DataFrame containing p-values for coefficient estimates.
-        all_b (list of lists): List of coefficient estimates for each specification and draw.
-        all_p (list of lists): List of p-values for each specification and draw.
-        summary_df (pd.DataFrame): DataFrame containing summary statistics of coefficient estimates.
-        summary_bma (pd.DataFrame, optional): DataFrame containing Bayesian model averaging results.
+    Attributes
+    ----------
+    y_name : str
+        Dependent variable name.
+    x_name : str
+        Main predictor name.
+    data : pd.DataFrame
+        Original DataFrame used for all fits.
+    specs_names : pd.Series[frozenset[str]]
+        Specification sets (which controls are included, etc.).
+    all_predictors : list[list[str]]
+        List of predictor+control sets for each specification.
+    controls : list[str]
+        Pool of all control variables considered.
+    draws : int
+        Number of bootstrap draws.
+    kfold : int
+        Number of folds for out-of-sample evaluation.
+    estimates : pd.DataFrame
+        Shape (n_specs, draws), bootstrap estimates of β₁.
+    p_values : pd.DataFrame
+        Same shape, bootstrap p-values for β₁.
+    estimates_ystar : pd.DataFrame
+        Bootstrap estimates under the null (for joint inference).
+    p_values_ystar : pd.DataFrame
+        Bootstrap p-values under the null.
+    r2_values : pd.DataFrame
+        Shape (n_specs, draws), bootstrapped R².
+    summary_df : pd.DataFrame
+        Per-spec summary (median, CI, info criteria, cross-val metric).
+    inference : dict[str, Any]
+        Aggregated inference statistics (proportions, Stouffer’s Z, etc.).
+    shap_return : tuple[np.ndarray, pd.DataFrame] | None
+        Optional SHAP values and the matrix they came from.
     """
 
-    def __init__(self, *, y, x, data, specs, all_predictors, controls, draws, kfold,
-                 estimates, estimates_ystar, all_b, all_p, p_values, p_values_ystar,
-                 r2_values, r2i_array, ll_array, aic_array, bic_array, hqic_array,
-                 av_k_metric_array=None, model_name, name_av_k_metric=None, shap_return=None):
+    def __init__(
+        self,
+        *,
+        y: str,
+        x: str,
+        data: pd.DataFrame,
+        specs: list[frozenset[str]],
+        all_predictors: list[list[str]],
+        controls: list[str],
+        draws: int,
+        kfold: int,
+        estimates: np.ndarray | pd.DataFrame,
+        estimates_ystar: np.ndarray | pd.DataFrame,
+        all_b: list[np.ndarray],
+        all_p: list[np.ndarray],
+        p_values: np.ndarray | pd.DataFrame,
+        p_values_ystar: np.ndarray | pd.DataFrame,
+        r2_values: np.ndarray | pd.DataFrame,
+        r2i_array: list[float],
+        ll_array: list[float],
+        aic_array: list[float],
+        bic_array: list[float],
+        hqic_array: list[float],
+        av_k_metric_array: list[float] | None = None,
+        model_name: str,
+        name_av_k_metric: str | None = None,
+        shap_return: Any = None,
+    ) -> None:
+        """
+        Initialize an OLSResult container.
+
+        Parameters
+        ----------
+        y
+            Dependent variable name.
+        x
+            Main predictor name.
+        data
+            Original DataFrame for all model fits.
+        specs
+            A list of frozensets indicating which controls each spec includes.
+        all_predictors
+            For each spec, the full list of predictors (x + controls).
+        controls
+            Pool of all candidate controls.
+        draws
+            Number of bootstrap draws.
+        kfold
+            Number of folds for cross-validation.
+        estimates
+            Bootstrap coefficient estimates (shape: n_specs × draws).
+        estimates_ystar
+            Bootstrap estimates under null (same shape).
+        all_b
+            Raw (non-resampled) β₁, one per spec.
+        all_p
+            Raw (non-resampled) p-values, one per spec.
+        p_values
+            Bootstrap p-values for β₁.
+        p_values_ystar
+            Bootstrap p-values under null.
+        r2_values
+            Bootstrapped R² (n_specs × draws).
+        r2i_array
+            In-sample R² for each spec.
+        ll_array
+            Log-likelihood for each spec.
+        aic_array, bic_array, hqic_array
+            Information criteria per spec.
+        av_k_metric_array
+            Out-of-sample metric (e.g. CV R²) per spec.
+        model_name
+            Human-readable name of the model (“OLS Robust”).
+        name_av_k_metric
+            Label for the CV metric (e.g. “r-squared”).
+        shap_return
+            Optional return of (shap_values, input_matrix).
+        """
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -245,34 +412,59 @@ class OLSResult(Protoresult):
         self.shap_return = shap_return
 
 
-    def save(self, filename):
+    def save(self, filename: str) -> None:
         """
-        Saves the OLSResult object to a binary file.
+        Pickle this OLSResult to disk.
 
-        Args:
-            filename (str): Name of the file to which the object will be saved.
+        Parameters
+        ----------
+        filename
+            Destination path for the pickle file.
         """
         with open(filename, 'wb') as f:
             _pickle.dump(self, f, -1)
 
     @classmethod
-    def load(cls, filename):
+    def load(cls, filename: str) -> OLSResult:
         """
-        Loads an OLSResult object from a binary file.
+        Loads an OLSResult object from a pickle file.
 
-        Args:
-            filename (str): Name of the file from which the object will be loaded.
+        Parameters
+        ----------
+        filename
+            Path to the pickle file.
 
-        Returns:
-            OLSResult: Loaded OLSResult object.
+        Returns
+        -------
+        OLSResult
         """
         with open(filename, 'rb') as f:
             return _pickle.load(f)
 
 
-    def _compute_inference(self):
+    def _compute_summary(self) -> pd.DataFrame:
         """
-        Compute various inference statistics and store in self.inference.
+        Compute summary statistics of the bootstrap coefficient distribution.
+
+        For each model specification, returns the median, minimum, maximum,
+        and the 2.5%/97.5% quantile bounds of the estimated coefficient
+        across all bootstrap draws.
+
+        Returns
+        -------
+        summary_df : pandas.DataFrame
+            A DataFrame indexed by specification, with columns:
+
+            - median : float
+                Median coefficient across bootstrap draws.
+            - min : float
+                Minimum coefficient across bootstrap draws.
+            - max : float
+                Maximum coefficient across bootstrap draws.
+            - ci_down : float
+                2.5th percentile coefficient (lower 95% bound).
+            - ci_up : float
+                97.5th percentile coefficient (upper 95% bound).
         """
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
@@ -286,7 +478,7 @@ class OLSResult(Protoresult):
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
         self.inference['median_p'] = (
-            np.nan if not inference else 
+            np.nan if not inference else
             (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
         )
         self.inference['min_ns'] = df_model_result['betas'].min()
@@ -346,8 +538,11 @@ class OLSResult(Protoresult):
         )
         self.inference['Stouffers'] = stouffer_method(df_model_result['p_values'])
 
-    def summary(self, digits=3):
-        """Prints a summary of the model including basic configuration and robustness metrics."""
+
+    def summary(self, digits=3) -> None:
+        """
+        Print a comprehensive textual summary of the fitted model.
+        """
 
         def print_separator(title=None):
             print("=" * 30)
@@ -438,32 +633,62 @@ class OLSResult(Protoresult):
 
 
     def plot(self,
-             loess=True,
-             specs=None,
-             ic='aic',
-             colormap='Spectral_r',
-             figsize=(12, 6),
-             ext='pdf',
-             project_name='no_project_name'):
+             loess: bool = True,
+             specs: Optional[List[List[str]]] = None,
+             ic: str = 'aic',
+             colormap: str = 'Spectral_r',
+             figsize: Tuple[int, int] = (12, 6),
+             ext: str = 'pdf',
+             project_name: str = 'no_project_name'
+             ) -> plt.Figure:
         """
         Plots the regression results using specified options.
 
-        Args:
-            specs (list, optional): List of list of specification names to include in the plot.
-            ic (str, optional): Information criterion to use for model selection (e.g., 'bic', 'aic').
-            colormap (str, optional): Colormap to use for the plot.
-            figsize (tuple, optional): Size of the figure (width, height) in inches.
+        Parameters
+        ----------
+        loess : bool, default=True
+            Whether to add a LOESS smoothed trend line.
+        specs : list of list of str, optional
+            Up to three specific model specifications to highlight.
+        ic : {'bic', 'aic', 'hqic'}, default='aic'
+            Which information criterion to display.
+        colormap : str, default='Spectral_r'
+            Name of the matplotlib colormap for the plot.
+        figsize : tuple of int, default=(12, 6)
+            Figure width and height in inches.
+        ext : str, default='pdf'
+            File extension if saving the figure (unused if not saving).
+        project_name : str, default='no_project_name'
+            Project identifier used in saved filename (unused if not saving).
 
-        Returns:
-            matplotlib.figure.Figure: Plot showing the regression results.
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plot.
+
+        Raises
+        ------
+        ValueError
+            If `ic` is not one of {'bic', 'aic', 'hqic'}.
+        TypeError
+            If `specs` is provided but is not a list of lists of str,
+            or if more than three specs are given,
+            or any spec is not in the computed specifications.
         """
+
         valid_ic = ['bic', 'aic', 'hqic']
+        if ic not in valid_ic:
+            raise ValueError(
+                f"Unsupported information criterion: expected one of {valid_ic}, "
+                f"received: '{ic}'."
+            )
+
 
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
                 raise TypeError("'specs' must be a list of lists.")
             if len(specs) > 3:
-                raise ValueError("The max number of specifications to highlight is 3") 
+                raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
         if ic not in valid_ic:
@@ -495,11 +720,12 @@ class OLSResult(Protoresult):
                                        interpolation='nearest')
         return out
 
-    def compute_bma(self):
+    def compute_bma(self) -> pd.DataFrame:
         """
-        Performs Bayesian Model Averaging (BMA) using BIC implied priors.
+        Performs Bayesian Model Averaging (BMA) using BIC-implied priors.
 
         Returns:
+        -------
             pd.DataFrame: DataFrame containing BMA results.
         """
         likelihood_per_var = []
@@ -528,17 +754,35 @@ class OLSResult(Protoresult):
         })
         return summary_bma
 
-    def merge(self, result_obj, left_prefix, right_prefix) -> MergedResult:
+    def merge(self,
+              result_obj: "OLSResult",
+              left_prefix: str,
+              right_prefix: str
+              ) -> MergedResult:
         """
-        Merges two OLSResult objects into one.
+        Merge this OLSResult with another, tagging each spec by prefix.
 
-        Args:
-            result_obj (OLSResult): OLSResult object to be merged.
-            left_prefix (str): Prefix for the orignal result object.
-            right_prefix (str): Prefix fort the new result object.
+        Parameters
+        ----------
+        result_obj : OLSResult
+            Another result object with the same dependent variable.
+        left_prefix : str
+            Tag to append to this object's specifications.
+        right_prefix : str
+            Tag to append to the other object's specifications.
 
-        Raises:
-            TypeError: If the input object is not an instance of OLSResult.
+        Returns
+        -------
+        merged : MergedResult
+            A new MergedResult containing all specs, estimates,
+            p_values, and r2_values from both.
+
+        Raises
+        ------
+        TypeError
+            If `result_obj` is not an OLSResult, or prefixes are not strings.
+        ValueError
+            If the dependent variable names do not match.
         """
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
@@ -556,171 +800,9 @@ class OLSResult(Protoresult):
 
         return MergedResult(y=y, specs=specs, estimates=estimates, p_values=p_values, r2_values=r2_values)
 
-    def save_to_csv(self, path: str):
+    def save_to_csv(self, path: str) -> None:
         """Function to save summary dataframe to a csv"""
         self.summary_df.to_csv(path)
-
-
-class BaseRobust(Protomodel):
-    """
-    A base class factoring out the repeated logic in OLSRobust and LRobust:
-      - Basic validation (controls, group, etc.)
-      - multiple_y support
-      - parallel bootstrapping loops
-      - SHAP logic
-    """
-
-    def __init__(self, *, y, x, data, model_name="BaseRobust"):
-        super().__init__()
-        # Basic validations
-        if not isinstance(y, list) or not isinstance(x, list):
-            raise TypeError("'y' and 'x' must be lists.")
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("'data' must be a pandas DataFrame.")
-        all_vars = set(data.columns)
-        if not all(var in all_vars for var in y) or not all(var in all_vars for var in x):
-            raise ValueError("Variable names in 'y' and 'x' must exist in the provided DataFrame 'data'.")
-
-        # Warn if missing data found
-        if data.isnull().values.any():
-            warnings.warn(
-                "Missing values found in data. Listwise deletion will be applied.",
-                MissingValueWarning
-            )
-
-        self.y = y
-        self.x = x
-        self.data = data
-        self.model_name = model_name
-        self.results = None
-        self.parameters = {"y": self.y, "x": self.x}
-    def get_results(self):
-        raise NotImplementedError("This method should be implemented in subclasses.")
-    def multiple_y(self):
-        """
-        Computes composite y based on multiple indicators provided.
-        """
-        self.y_specs = []
-        self.y_composites = []
-        print("Calculating Composite Ys")
-        for spec, index in track(
-            zip(all_subsets(self.y), range(0, space_size(self.y))),
-            total=space_size(self.y)
-        ):
-            if len(spec) > 0:
-                subset = self.data[list(spec)]
-                subset = (subset - subset.mean()) / subset.std()  # standardize
-                self.y_composites.append(subset.mean(axis=1))    # composite average
-                self.y_specs.append(spec)
-                self.parameters['y_specs'] = self.y_specs
-                self.parameters['y_composites'] = self.y_composites
-    
-    def fit(self,
-            *,
-            controls,
-            group=None,
-            draws=500,
-            kfold=5,
-            oos_metric='r-squared',
-            n_cpu=None,
-            seed=None
-            ):
-        raise NotImplementedError("This method should be implemented in subclasses.")
-    
-    def _warn_if_large_draws(self, draws, controls, threshold=500):
-        """
-        Issues a warning if 'draws' * #specs is large.
-        """
-        est_specs = space_size(controls)
-        total_models = est_specs * draws
-        if draws > threshold:
-            warnings.warn(
-                f"You've requested {draws} bootstrap draws across {est_specs} specifications, "
-                f"which is roughly {total_models:,} total model runs.\n\n"
-                "This might lead to extended runtime or high memory usage.",
-                UserWarning,
-                stacklevel=2
-            )
-
-    def _check_numeric_columns_for_fit(self, controls, group):
-        """
-        Ensure columns are numeric.
-        """
-        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
-        _check_numeric_columns(self.data, cols_to_check)
-
-    def _validate_fit_args(self,
-                           controls,
-                           group,
-                           draws,
-                           kfold,
-                           oos_metric,
-                           n_cpu,
-                           seed,
-                           valid_oos_metrics):
-        """
-        A shared validation method for the 'fit()' arguments used by both OLSRobust & LRobust.
-        """
-        # 1. Check controls type
-        if not isinstance(controls, list):
-            raise TypeError("'controls' must be a list.")
-
-        # 2. Check that all controls exist in data
-        all_vars = set(self.data.columns)
-        if not all(var in all_vars for var in controls):
-            raise ValueError("Variable names in 'controls' must exist in the provided DataFrame 'data'.")
-
-        # 3. Group validation
-        if group is not None:
-            if group not in all_vars:
-                raise ValueError("'group' variable must exist in the provided DataFrame 'data'.")
-            if not isinstance(group, str):
-                raise TypeError("'group' must be a string.")
-
-        # 4. K-fold & draws
-        if kfold < 2:
-            raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
-        if draws < 1:
-            raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
-
-        # 5. OOS metric
-        if oos_metric not in valid_oos_metrics:
-            raise ValueError(f"OOS Metric must be one of {valid_oos_metrics}.")
-
-        # 6. n_cpu
-        if n_cpu is None:
-            n_cpu = max(1, cpu_count()-1)
-        else:
-            if not isinstance(n_cpu, int):
-                raise TypeError("n_cpu must be an integer")
-            else:
-                if (n_cpu <= 0) or (n_cpu > cpu_count()):
-                    raise ValueError(f"n_cpu not in a valid range: pick between 0 and {cpu_count()}.")
-
-        if seed is not None:
-            if not isinstance(seed, int):
-                raise TypeError("seed must be an integer")
-            np.random.seed(seed)
-
-        # 8. numeric columns check
-        cols_to_check = self.y + self.x + ([group] if group else []) + controls
-        _check_numeric_columns(self.data, cols_to_check)
-
-        # 9. warn if large draws
-        self._warn_if_large_draws(draws, controls, threshold=500)
-
-        if len(self.x) == 0:
-            raise ValueError("No independent variables (x) provided.")
-        
-        if len(set(controls) & set(self.x)) > 0:
-            raise ValueError("Some control variables overlap with independent variables (x). Please ensure 'x' and 'controls' are disjoint sets.")
-
-        if any(var in self.y for var in self.x):
-            raise ValueError("Dependent variable(s) must not be included in the independent variables (x).")
-        
-        if len(self.x) == 0:
-            raise ValueError("No independent variables (x) provided.")
-        return n_cpu
 
 
 class OLSRobust(BaseRobust):
@@ -729,57 +811,83 @@ class OLSRobust(BaseRobust):
 
     Parameters
     ----------
-    y : str
-     Name of the dependent variable.
-    x : str or list<str>
-     List of names of the independent variable(s).
-    data : DataFrame
-     DataFrame contaning all the data to be used in the model.
+    y : str or list of str
+        Name(s) of the dependent variable(s). If multiple, runs separate analyses.
+    x : str or list of str
+        Name(s) of the primary predictor(s) of interest.
+    data : pandas.DataFrame
+        The full dataset containing `y`, `x`, and any controls.
+    model_name : str, default='OLS Robust'
+        A custom label for this model run, used in outputs and plots
 
-    Returns
-    -------
-    self : Object
-        An object containing the key metrics.
+    Attributes
+    ----------
+    results : OLSResult
+        Populated after calling `.fit()`, contains all estimates and diagnostics.
     """
 
-    def __init__(self, *, y, x, data, model_name='OLS Robust'):
+    def __init__(
+        self,
+        *,
+        y: Union[str, List[str]],
+        x: Union[str, List[str]],
+        data: pd.DataFrame,
+        model_name: str = 'OLS Robust'
+    ) -> None:
         super().__init__(y=y, x=x, data=data, model_name=model_name)
 
-    def get_results(self):
+    def get_results(self) -> 'OLSResult':
         """
         Return the OLSResult object once .fit() has been called.
+
+        Returns
+        -------
+        OLSResult
+            The result object encapsulating all analysis outputs.
         """
         return self.results
-    
-    def fit(self,
-            *,
-            controls,
-            group=None,
-            draws=500,
-            kfold=5,
-            oos_metric='r-squared',
-            n_cpu=None,
-            seed=None
-            ):
+
+    def fit(
+        self,
+        *,
+        controls: List[str],
+        group: Optional[str] = None,
+        draws: int = 500,
+        kfold: int = 5,
+        oos_metric: str = 'r-squared',
+        n_cpu: Optional[int] = None,
+        seed: Optional[int] = None,
+        threshold: int = 10_000
+    ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
         Parameters
         ----------
-        controls : list<str>
-            List containing all the names of the possible control variables of the model.
-        group : str
-            Grouping variable. If provided, a Fixed Effects model is estimated.
-        draws : int, optional
-            Number of draws for bootstrapping. Default is 500.
-        kfold : int, optional
-            Number of folds for k-fold cross-validation. Default is None.
+        controls : list of str
+            Candidate control variables to include in model specifications.
+        group : str, optional
+            Column name for grouping fixed effects; de-meaned if provided.
+        draws : int, default=500
+            Number of bootstrap resamples per specification.
+        kfold : int, default=5
+            Number of folds for out-of-sample evaluation; requires `oos_metric`.
+        oos_metric : {'r-squared','rmse'}, default='r-squared'
+            Metric for cross-validated performance.
+        n_cpu : int, optional
+            Number of parallel jobs; defaults to all available cores minus one.
+        seed : int, optional
+            Random seed for reproducibility.
+        threshold : int, default=10000
+            Warn if total model runs exceed this number.
 
         Returns
         -------
-        self : Object
-            Object class OLSRobust containing the fitted estimators.
+        self : OLSRobust
+            The fitted model instance, with `.results` attached.
         """
+        if len(self.y) > 1:
+            self.multiple_y()
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
@@ -788,7 +896,8 @@ class OLSRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse']
+            valid_oos_metrics=['r-squared','rmse'],
+            threshold=threshold
         )
         print(f'[OLSRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
@@ -796,7 +905,6 @@ class OLSRobust(BaseRobust):
         self.oos_metric_name = oos_metric
 
         if len(self.y) > 1:
-            self.multiple_y()
             list_all_predictors = []
             list_b_array = []
             list_p_array = []
@@ -1021,16 +1129,20 @@ class OLSRobust(BaseRobust):
             self.results = results
 
 
-    def _predict(self, x_test, betas):
+    def _predict(
+        self,
+        x_test: np.ndarray,
+        betas: np.ndarray
+    ) -> np.ndarray:
         """
         Predict the dependent variable based on the test data and coefficients.
 
         Parameters
         ----------
-        x_test : array-like
-            Test data for independent variables.
-        betas : array-like
-            Coefficients obtained from the regression.
+        x_test : array-like, shape=(n_obs, n_features)
+            Independent variables.
+        betas : array-like, shape=(n_features,)
+            Regression coefficients.
 
         Returns
         -------
@@ -1050,25 +1162,33 @@ class OLSRobust(BaseRobust):
 
         Parameters
         ----------
-        comb_var : Array
-            ND array-like object containing the data for y, x, and controls.
-        kfold : Boolean
-            Whether or not to calculate k-fold cross-validation.
+        comb_var : pd.DataFrame
+            Combined y, x, and controls dataset (cleaned).
+        kfold : int
+            Number of CV folds; if 0 or None, skips CV.
+        group : str or None
+            Grouping column for fixed effects (dropped before fit).
+        oos_metric_name : str
+            Out-of-sample metric ('r-squared' or 'rmse')..
 
         Returns
         -------
-        beta : float
-            Estimate for x.
-        p : float
-            P value for x.
-        r2: float
-            R2 value for the model
-        AIC : float
-            Akaike information criteria value for the model.
-        BIC : float
-            Bayesian information criteria value for the model.
-        HQIC : float
-            Hannan-Quinn information criteria value for the model.
+        b : np.ndarray
+            Full-sample coefficient estimates.
+        p : np.ndarray
+            Full-sample p-values.
+        r2 : float
+            In-sample R².
+        ll : float
+            Log-likelihood.
+        aic : float
+            Akaike Information Criterion.
+        bic : float
+            Bayesian Information Criterion.
+        hqic : float
+            Hannan-Quinn Information Criterion.
+        av_k_metric : float
+            Average out-of-sample metric across folds.
         """
         y = comb_var.iloc[:, [0]]
         x_temp = comb_var.drop(comb_var.columns[0], axis=1)
@@ -1123,30 +1243,38 @@ class OLSRobust(BaseRobust):
                 out['hqic'][0][0],
                 av_k_metric)
 
-    def _strap_OLS(self,
-                   comb_var,
-                   group,
-                   sample_size,
-                   seed,
-                   y_star):
+    def _strap_OLS(
+        self,
+        comb_var: pd.DataFrame,
+        group: Optional[str],
+        sample_size: int,
+        seed: int,
+        y_star: np.ndarray
+    ) -> tuple:
         """
         Call stripped_ols() over a random sample of the data containing y, x, and controls.
 
         Parameters
         ----------
-        comb_var : Array
-            ND array-like object containing the data for y, x, and controls.
-        group : str
-            Grouping variable. If provided, sampling is performed over the group variable.
+        comb_var : pd.DataFrame
+            Combined y, x, and controls dataset.
+        group : str or None
+            Grouping column for fixed effects; sampling respects groups if provided.
         sample_size : int
-            Sample size to use in the bootstrap.
+            Number of observations in bootstrap sample.
+        seed : int
+            Random seed for resampling.
+        y_star : array-like
+            Pseudo-outcome residuals for stratified bootstrap.
 
         Returns
         -------
         beta : float
-            Estimate for x.
+            Bootstrap coefficient estimate for focal predictor.
         p : float
-            P value for x.
+            Associated p-value.
+        r2 : float
+            In-sample R² for the bootstrap sample.
         """
         temp_data = comb_var.copy()
         temp_data['y_star'] = y_star
@@ -1190,31 +1318,48 @@ class LRobust(BaseRobust):
 
     Parameters
     ----------
-    y : array-like
-        Dependent variable values.
-    x : array-like
-        Independent variable values. The matrix should be shaped as
-        (number of observations, number of independent variables).
-    data : DataFrame
-        A pandas DataFrame containing the variables in the model.
+    y : str or List[str]
+        Name(s) of the dependent binary variable(s). If multiple,
+        runs separate analyses for each.
+    x : str or List[str]
+        Name(s) of the primary predictor(s) of interest.
+    data : pandas.DataFrame
+        The dataset containing `y`, `x`, and any optional controls.
+    model_name : str, default='Logistic Regression Robust'
+        Custom label for this model, used in outputs and plots.
 
     Attributes
     ----------
-    y : array-like
-        Dependent variable values.
-    x : array-like
-        Independent variable values.
-    data : DataFrame
-        A pandas DataFrame containing the variables in the model.
-    results : dict
-        A dictionary containing regression coefficients ('b') and corresponding
-        p-values ('p') for each independent variable.
+    results : OLSResult
+        Populated after calling `.fit()`. Contains all coefficient,
+        p-value, and metric outputs.
     """
 
-    def __init__(self, *, y, x, data, model_name='Logistic Regression Robust'):
+    def __init__(
+        self,
+        *,
+        y: Union[str, List[str]],
+        x: Union[str, List[str]],
+        data: pd.DataFrame,
+        model_name: str = 'Logistic Regression Robust'
+    ) -> None:
+        """
+        Initialize the logistic robust analysis.
+
+        Parameters
+        ----------
+        y : str or list of str
+            Dependent variable name(s).
+        x : str or list of str
+            Predictor variable name(s).
+        data : pandas.DataFrame
+            Input dataset.
+        model_name : str, optional
+            Descriptive name for the model. Default 'Logistic Regression Robust'.
+        """
         super().__init__(y=y, x=x, data=data, model_name=model_name)
 
-    def get_results(self):
+    def get_results(self) -> Any:
         """
         Get the results of the OLS regression.
 
@@ -1225,34 +1370,49 @@ class LRobust(BaseRobust):
         """
         return self.results
 
-    def multiple_y(self):
+    def multiple_y(self) -> None:
         raise NotImplementedError("Not implemented yet")
 
-    def _full_sample(self, comb_var, kfold, group, oos_metric_name):
+    def _full_sample(
+        self,
+        comb_var: pd.DataFrame,
+        kfold: int,
+        group: Optional[str],
+        oos_metric_name: str
+    ) -> Tuple[np.ndarray, np.ndarray, float, float, float, float, float, Optional[float]]:
         """
         Call logistic_regression_sm_stripped() over the full data containing y, x, and controls.
 
         Parameters
         ----------
-        comb_var : Array
-            ND array-like object containing the data for y, x, and controls.
-        kfold : Boolean
-            Whether or not to calculate k-fold cross-validation.
+        comb_var : pandas.DataFrame
+            DataFrame with columns [y, x, controls...].
+        kfold : int
+            Number of folds for cross-validation.
+        group : str or None
+            Grouping variable name (for future FE support).
+        oos_metric_name : str
+            Out-of-sample metric: 'r-squared', 'rmse', or 'cross-entropy'.
+
 
         Returns
         -------
-        beta : float
-            Estimate for x.
-        p : float
-            P value for x.
-        r2: float
-            r2 value for the full model
-        AIC : float
-            Akaike information criteria value for the model.
-        BIC : float
-            Bayesian information criteria value for the model.
-        HQIC : float
-            Hannan-Quinn information criteria value for the model.
+        beta : ndarray
+            Coefficient estimates.
+        p : ndarray
+            P-value estimates.
+        r2 : float
+            In-sample pseudo-R².
+        ll : float
+            Log-likelihood.
+        aic : float
+            Akaike Information Criterion.
+        bic : float
+            Bayesian Information Criterion.
+        hqic : float
+            Hannan-Quinn Information Criterion.
+        av_k_metric : float or None
+            Average cross-validation metric, if `kfold>1`, else None.
         """
         # TODO Fixed effects Logistic Regression?
         y = comb_var.iloc[:, [0]]
@@ -1291,24 +1451,70 @@ class LRobust(BaseRobust):
                 out['hqic'],
                 av_k_metric)
 
-    def _predict_LR(self, x_test, betas):
+    def _predict_LR(
+        self,
+        x_test: pd.DataFrame,
+        betas: np.ndarray
+    ) -> np.ndarray:
         """
         Predict the dependent variable using the estimated coefficients.
+
+        Parameters
+        ----------
+        x_test : pandas.DataFrame
+            Test set covariates (no constant column).
+        betas : ndarray
+            Fitted coefficients (including intercept at end).
+
+        Returns
+        -------
+        ndarray
+            Predicted probabilities for the positive class.
         """
         x_test = add_constant(x_test, prepend=False)
         return 1 / (1 + np.exp(-x_test.dot(betas)))
+    def fit(
+        self,
+        *,
+        controls: List[str],
+        group: Optional[str] = None,
+        draws: int = 500,
+        sample_size: Optional[int] = None,
+        kfold: int = 5,
+        oos_metric: str = 'r-squared',
+        n_cpu: Optional[int] = None,
+        seed: Optional[int] = None,
+        threshold: int = 10_000
+    ) -> 'LRobust':
+        """
+        Fit the logistic regression models over the specification space and bootstrap samples.
 
-    def fit(self,
-            *,
-            controls,
-            group=None,
-            draws=500,
-            sample_size=None,
-            kfold=5,
-            oos_metric='r-squared',
-            n_cpu=None,
-            seed=None):
-        """Fit the logistic regression models over the specification space and bootstrap samples."""
+        Parameters
+        ----------
+        controls : list of str
+            Names of optional control variables to include in every spec.
+        group : str, optional
+            *Currently ignored.* Placeholder for future fixed-effect demeaning.
+        draws : int, default=500
+            Number of bootstrap resamples per specification.
+        sample_size : int, optional
+            Number of observations per bootstrap draw; defaults to full dataset.
+        kfold : int, default=5
+            Folds for out-of-sample CV; set to 0 to disable.
+        oos_metric : {'r-squared','rmse','cross-entropy'}, default='r-squared'
+            Metric to compute on held-out folds.
+        n_cpu : int, optional
+            Number of parallel jobs; defaults to all available.
+        seed : int, optional
+            Random seed for reproducibility.
+        threshold : int, default=10000
+            Warn if `draws * n_specs` exceeds this.
+
+        Returns
+        -------
+        self : LRobust
+            Self, with `.results` populated as an `OLSResult`.
+        """
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
@@ -1433,8 +1639,36 @@ class LRobust(BaseRobust):
                                 shap_return = shap_return
                                 )
 
-    def _strap_regression(self, comb_var, group, sample_size, seed):
-        """Run bootstrap logistic regression on a random sample of the data."""
+    def _strap_regression(
+        self,
+        comb_var: pd.DataFrame,
+        group: Optional[str],
+        sample_size: int,
+        seed: int
+    ) -> Tuple[float, float, float]:
+        """
+        Perform one bootstrap draw of logistic regression.
+
+        Parameters
+        ----------
+        comb_var : pandas.DataFrame
+            DataFrame with `y` in first column and features in remaining columns.
+        group : str, optional
+            *Ignored.* Placeholder for future grouping logic.
+        sample_size : int
+            Number of rows to sample with replacement.
+        seed : int
+            Random seed for sampling.
+
+        Returns
+        -------
+        beta : float
+            Estimated coefficient for the primary predictor.
+        p : float
+            Corresponding p-value.
+        r2 : float
+            In-sample pseudo-R² of this bootstrap sample.
+        """
         temp_data = comb_var.copy()
         if group is None:
             samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
@@ -1450,3 +1684,4 @@ class LRobust(BaseRobust):
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
         output = logistic_regression_sm(y, x)
         return output['b'][0][0], output['p'][0][0], output['r2']
+
