@@ -1,5 +1,5 @@
 # Module containing utility functions for the library
-
+from typing import Union, Optional, List, Tuple, Iterable
 import numpy as np
 import random
 import scipy
@@ -45,15 +45,13 @@ def all_subsets(ss):
                       range(0, len(ss) + 1)))
 
 
-def make_aic(ll, n):
+def make_aic(ll: float, n: int) -> float:
     return (-2.0 * ll) + (2 * n)
 
-
-def make_bic(ll, n, k):
+def make_bic(ll: float, n: int, k: int) -> float:
     return (-2.0 * ll) + (k * np.log(n))
 
-
-def make_hqic(ll, n, k):
+def make_hqic(ll: float, n: int, k: int) -> float:
     return -2 * ll + 2 * k * np.log(np.log(n))
 
 
@@ -182,7 +180,7 @@ def simple_ols(y, x) -> dict:
             }
 
 
-def group_demean(x, group=None):
+def group_demean(x: pd.DataFrame, group: Optional[str] = None) -> pd.DataFrame:
     """
     Demean the input data within groups.
 
@@ -205,18 +203,19 @@ def group_demean(x, group=None):
     return pd.concat([out, data[group]], axis=1)
 
 
-def decorator_timer(some_function):
+def decorator_timer(func: callable) -> callable:
     """
-    Decorator function to measure the execution time of a function.
+    Decorator to time function execution.
 
     Parameters
     ----------
-    some_function : function
-        Input function to be timed.
+    func : callable
+        Function to wrap.
 
     Returns
-    ----------
-    function: Wrapped function with timing functionality.
+    -------
+    callable
+        Wrapped function returning (result, elapsed_seconds).
     """
     from time import time
 
@@ -228,18 +227,24 @@ def decorator_timer(some_function):
     return wrapper
 
 
-def get_selection_key(specs):
+def get_selection_key(specs: List[List[str]]) -> List[frozenset]:
     """
-    Generate selection keys for specifications.
+    Convert list of spec lists into list of frozensets.
 
     Parameters
     ----------
-    specs: list
-        List of lists containing specifications.
+    specs : list of list of str
+        Each inner list is one specification.
 
     Returns
-    ----------
-    list: List of frozen sets representing selection keys.
+    -------
+    list of frozenset
+        Immutable keys for each specification.
+
+    Raises
+    ------
+    ValueError
+        If `specs` is not list of lists.
     """
     if all(isinstance(ele, list) for ele in specs):
         target = [frozenset(x) for x in specs]
@@ -248,8 +253,28 @@ def get_selection_key(specs):
         raise ValueError('Argument `specs` must be a list of list.')
 
 
-def get_colormap_colors(colormap_name, num_colors=3, brightness_threshold=0.7):
-    # Get the colormap by name
+def get_colormap_colors(
+    colormap_name: str,
+    num_colors: int = 3,
+    brightness_threshold: float = 0.7
+) -> List[Tuple[float, float, float, float]]:
+    """
+    Extract a set of colors from a Matplotlib colormap, adjusting for brightness.
+
+    Parameters
+    ----------
+    colormap_name : str
+        Name of the Matplotlib colormap to sample from.
+    num_colors : int, default 3
+        Number of distinct colors to return.
+    brightness_threshold : float, default 0.7
+        Maximum allowed average brightness; colors brighter than this are darkened.
+
+    Returns
+    -------
+    List[Tuple[float, float, float, float]]
+        A list of RGBA tuples representing the selected colors.
+    """
     colormap = plt.get_cmap(colormap_name)
 
     # Generate evenly spaced intervals between 0 and 1
@@ -274,19 +299,26 @@ def get_colormap_colors(colormap_name, num_colors=3, brightness_threshold=0.7):
     return colors
 
 
-def get_colors(specs, color_set_name=None):
+def get_colors(specs: List[List[str]], color_set_name: Optional[str] = 'Set1') -> List[Tuple[float, float, float, float]]:
     """
-    Generate colors for visualizing specifications.
+    Generate a palette of colors for a list of specifications using a categorical colormap.
 
     Parameters
     ----------
-    specs: list
-        List of lists containing specifications.
-    color_set_name (str, optional): Name of the colormap. Default is 'Set1'.
+    specs : list of list of str
+        Each inner list represents one specification (set of variable names).
+    color_set_name : str, optional
+        Name of a Matplotlib qualitative colormap (default 'Set1').
 
     Returns
-    ----------
-    list: List of colors based on the specified colormap.
+    -------
+    List[Tuple[float, float, float, float]]
+        A list of RGBA tuples, one per specification.
+
+    Raises
+    ------
+    ValueError
+        If `specs` is not a list of lists.
     """
     if color_set_name is None:
         color_set_name = 'Set1'
@@ -319,7 +351,8 @@ def join_sig_test(*,
 
     Returns
     ----------
-    float: Estimated p-value for the joint significance test.
+    float: 
+        Estimated p-value for the joint significance test.
     """
     if positive:
         target_sig_n = sum(results_target.summary_df.ci_down > 0)
@@ -341,28 +374,27 @@ def join_sig_test(*,
         return shuffle_sig_n/results_shuffled.estimates.shape[1]
 
 
-def prepare_union(path_to_union):
+def prepare_union(path_to_union: str) -> Tuple[str, List[str], str, pd.DataFrame]:
     """
-    Prepare data for union example.
-
-    Reads a Stata file from the given path, processes the data, and prepares it for
-    regression analysis. The function creates binary indicators for categorical variables,
-    augments the input data with a log-transformed wage variable, and handles missing
-    values.
+    Load and preprocess the classic union dataset for example analyses.
 
     Parameters
     ----------
     path_to_union : str
-        File path to the Stata file containing union data.
+        Path to the Stata (.dta) file containing union data.
 
     Returns
-    ----------
-    tuple: A tuple containing the dependent variable ('y'), list of control variables ('c'),
-           independent variable ('x'), and the prepared DataFrame ('final_data').
+    -------
+    tuple
+        y (str): Dependent variable name ('log_wage').
+        c (List[str]): Control variable names.
+        x (str): Treatment variable name ('union').
+        final_data (pd.DataFrame): Cleaned DataFrame ready for modeling.
 
     Raises
-    ----------
-    FileNotFoundError: If the file specified in 'path_to_union' does not exist.
+    ------
+    FileNotFoundError
+        If the specified file does not exist.
     """
     union_df = pd.read_stata(path_to_union)
     union_df[['smsa','collgrad','married','union']]= union_df[['smsa','collgrad','married','union']].astype('str')
@@ -402,23 +434,23 @@ def prepare_union(path_to_union):
     return y, c, x, final_data
 
 
-def prepare_asc(asc_path):
+def prepare_asc(asc_path: str) -> Tuple[str, List[str], List[str], str, pd.DataFrame]:
     """
-    Prepare data for ASC example.
+    Load and preprocess the ASC example dataset for illustration.
 
-    Reads a Stata file from the given path, processes the data, creates binary indicators
-    for categorical variables, and handles missing values. One-hot encodes the 'year' column
-    and computes interaction terms for specific columns.
+    Parameters
+    ----------
+    asc_path : str
+        Path to the Stata (.dta) file containing ASC data.
 
-    Parameters:
-    asc_path (str): File path to the Stata file containing ASC data.
-
-    Returns:
-    tuple: A tuple containing the dependent variable ('y'), list of continuous variables ('x'),
-           list of control variables ('c'), grouping variable ('group'), and the prepared DataFrame.
-
-    Raises:
-    FileNotFoundError: If the file specified in 'asc_path' does not exist.
+    Returns
+    -------
+    tuple
+        y (str): Dependent variable name.
+        x (List[str]): Continuous predictor names.
+        c (List[str]): Control variable names.
+        group (str): Grouping variable name ('pidp').
+        ASC_df (pd.DataFrame): Cleaned DataFrame.
     """
     ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
     one_hot = pd.get_dummies(ASC_df['year'])
@@ -450,7 +482,22 @@ def prepare_asc(asc_path):
     return y, c, x, group, ASC_df
 
 
-def reservoir_sampling(generator, k):
+def reservoir_sampling(generator: Iterable, k: int) -> List:
+    """
+    Uniformly sample k items from a streaming generator (reservoir sampling).
+
+    Parameters
+    ----------
+    generator : Iterable
+        An iterator or generator yielding items.
+    k : int
+        Number of samples to retain.
+
+    Returns
+    -------
+    List
+        A list of k sampled items.
+    """
     reservoir = []
     for i, item in enumerate(generator):
         if i < k:
