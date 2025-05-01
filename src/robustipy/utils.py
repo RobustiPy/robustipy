@@ -1,5 +1,5 @@
 # Module containing utility functions for the library
-from typing import Union, Optional, List, Tuple, Iterable
+from typing import Optional, List, Tuple, Iterable
 import numpy as np
 import random
 import scipy
@@ -221,7 +221,7 @@ def decorator_timer(func: callable) -> callable:
 
     def wrapper(*args, **kwargs):
         t1 = time()
-        result = some_function(*args, **kwargs)
+        result = callable(*args, **kwargs)
         end = time()-t1
         return result, end
     return wrapper
