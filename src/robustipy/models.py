@@ -481,7 +481,6 @@ class OLSResult(Protoresult):
             if max(len(t) for t in self.y_name) == 1:
                 ic_array = np.array(self.summary_df[ic].to_list())
                 all_b = [arr[0] for arr in self.all_b]
-                print(all_b, ic_array)
                 coef_mat = np.vstack(all_b)
                 delta = ic_array - ic_array.min()
                 w = np.exp(-0.5 * delta)
