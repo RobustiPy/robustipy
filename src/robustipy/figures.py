@@ -1212,7 +1212,7 @@ def plot_results(
         ax3 = fig.add_subplot(gs[3:6, 17:24])
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax1, colormap=colormap, title='a.')
         plot_hexbin_r2(results_object, ax2, fig, colormap, title='b.', side='right')
-        plot_kfolds(results_object, colormap, ax3, title='c.', despine_left=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax3, colormap=colormap, title='c.', despine_left=True)
         plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
 
 
