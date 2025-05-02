@@ -477,16 +477,19 @@ class OLSResult(Protoresult):
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
-
         for ic in ['aic', 'bic', 'hqic']:
-            ic_array = np.array(self.summary_df[ic].to_list())
-            all_b = [arr[0] for arr in self.all_b]
-            coef_mat = np.vstack(all_b)
-            delta = ic_array - ic_array.min()
-            w = np.exp(-0.5 * delta)
-            w /= w.sum()
-            beta_avg = w @ coef_mat
-            self.inference[ic + '_average'] = beta_avg[0]
+            if max(len(t) for t in self.y_name) == 1:
+                ic_array = np.array(self.summary_df[ic].to_list())
+                all_b = [arr[0] for arr in self.all_b]
+                print(all_b, ic_array)
+                coef_mat = np.vstack(all_b)
+                delta = ic_array - ic_array.min()
+                w = np.exp(-0.5 * delta)
+                w /= w.sum()
+                beta_avg = w @ coef_mat
+                self.inference[ic + '_average'] = beta_avg[0]
+            else:
+                self.inference[ic + '_average'] = np.nan
 
         self.inference['median_p'] = (
             np.nan if not inference else
@@ -588,10 +591,12 @@ class OLSResult(Protoresult):
 
         print(f"Max beta (all specifications, no resampling): {round(self.inference['max_ns'], digits)}")
         print(f"Max beta (all bootstraps and specifications): {round(self.inference['max'], digits)}")
-
-        print(f"AIC-weighted beta (all specifications, no resampling): {round(self.inference['aic_average'], digits)}")
-        print(f"BIC-weighted beta (all specifications, no resampling): {round(self.inference['bic_average'], digits)}")
-        print(f"HQIC-weighted beta (all specifications, no resampling): {round(self.inference['hqic_average'], digits)}")
+        if self.inference['aic_average'] is not np.nan:
+            print(f"AIC-weighted beta (all specifications, no resampling): {round(self.inference['aic_average'], digits)}")
+        if self.inference['bic_average'] is not np.nan:
+            print(f"BIC-weighted beta (all specifications, no resampling): {round(self.inference['bic_average'], digits)}")
+        if self.inference['hqic_average'] is not np.nan:
+            print(f"HQIC-weighted beta (all specifications, no resampling): {round(self.inference['hqic_average'], digits)}")
 
         if not inference:
             print(f"Significant portion of beta (all specifications, no resampling): {round(self.inference['sig_prop_ns'], digits)}")
