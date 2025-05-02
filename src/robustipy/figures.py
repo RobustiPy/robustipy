@@ -1221,7 +1221,7 @@ def plot_results(
     plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_kfolds(results_object, colormap, ax, despine_left=False)
+    plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False)
     plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(12, 7))
