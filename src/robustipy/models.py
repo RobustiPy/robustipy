@@ -484,7 +484,7 @@ class OLSResult(Protoresult):
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
         self.inference['max_ns'] = df_model_result['betas'].max()
-        self.inference['max'] = self.estimates.min().max()
+        self.inference['max'] = self.estimates.max().max()
 
         self.inference['pos_ns'] = df_model_result['positive_beta'].sum()
         self.inference['pos_prop_ns'] = df_model_result['positive_beta'].mean()
@@ -728,7 +728,7 @@ class OLSResult(Protoresult):
         """
         Performs Bayesian Model Averaging (BMA) using BIC-implied priors.
 
-        Returns:
+        Returnsnt
         -------
             pd.DataFrame: DataFrame containing BMA results.
         """
