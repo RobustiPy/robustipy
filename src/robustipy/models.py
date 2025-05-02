@@ -398,12 +398,12 @@ class OLSResult(Protoresult):
         self.all_b = all_b
         self.all_p = all_p
         self.summary_df = self._compute_summary()
-        self._compute_inference()
         self.summary_df['r2'] = pd.Series(r2i_array)
         self.summary_df['ll'] = pd.Series(ll_array)
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
+        self._compute_inference()
         self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
@@ -477,6 +477,17 @@ class OLSResult(Protoresult):
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
+
+        for ic in ['aic', 'bic', 'hqic']:
+            ic_array = np.array(self.summary_df[ic].to_list())
+            all_b = [arr[0] for arr in self.all_b]
+            coef_mat = np.vstack(all_b)
+            delta = ic_array - ic_array.min()
+            w = np.exp(-0.5 * delta)
+            w /= w.sum()
+            beta_avg = w @ coef_mat
+            self.inference[ic + '_average'] = beta_avg[0]
+
         self.inference['median_p'] = (
             np.nan if not inference else
             (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
@@ -577,6 +588,10 @@ class OLSResult(Protoresult):
 
         print(f"Max beta (all specifications, no resampling): {round(self.inference['max_ns'], digits)}")
         print(f"Max beta (all bootstraps and specifications): {round(self.inference['max'], digits)}")
+
+        print(f"AIC-weighted beta (all specifications, no resampling): {round(self.inference['aic_average'], digits)}")
+        print(f"BIC-weighted beta (all specifications, no resampling): {round(self.inference['bic_average'], digits)}")
+        print(f"HQIC-weighted beta (all specifications, no resampling): {round(self.inference['hqic_average'], digits)}")
 
         if not inference:
             print(f"Significant portion of beta (all specifications, no resampling): {round(self.inference['sig_prop_ns'], digits)}")
