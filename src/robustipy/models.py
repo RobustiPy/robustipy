@@ -704,7 +704,7 @@ class OLSResult(Protoresult):
 
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
-                raise TypesError("'specs' must be a list of lists.")
+                raise TypeError("'specs' must be a list of lists.")
             if len(specs) > 3:
                 raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
