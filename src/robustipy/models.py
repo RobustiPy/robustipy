@@ -143,7 +143,6 @@ class MergedResult(Protoresult):
         Returns:
             pd.DataFrame: DataFrame containing median, min, max, and quantiles.
         """
-        # TODO: use pandas describe
         data = self.estimates.copy()
         out = pd.DataFrame()
         out['median'] = data.median(axis=1)
@@ -200,6 +199,7 @@ class MergedResult(Protoresult):
         plot_results(
             results_object=self,
             loess=loess,
+            ci=ci,
             specs=specs,
             ax=ax,
             colormap=colormap,
@@ -636,6 +636,7 @@ class OLSResult(Protoresult):
              loess: bool = True,
              specs: Optional[List[List[str]]] = None,
              ic: str = 'aic',
+             ci: float = 1,
              colormap: str = 'Spectral_r',
              figsize: Tuple[int, int] = (12, 6),
              ext: str = 'pdf',
@@ -652,6 +653,8 @@ class OLSResult(Protoresult):
             Up to three specific model specifications to highlight.
         ic : {'bic', 'aic', 'hqic'}, default='aic'
             Which information criterion to display.
+        ci: float, default=1
+            confidence interval.
         colormap : str, default='Spectral_r'
             Name of the matplotlib colormap for the plot.
         figsize : tuple of int, default=(12, 6)
@@ -686,7 +689,7 @@ class OLSResult(Protoresult):
 
         if specs is not None:
             if not all(isinstance(l, list) for l in specs):
-                raise TypeError("'specs' must be a list of lists.")
+                raise TypesError("'specs' must be a list of lists.")
             if len(specs) > 3:
                 raise ValueError("The max number of specifications to highlight is 3")
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
@@ -697,6 +700,7 @@ class OLSResult(Protoresult):
                             loess=loess,
                             specs=specs,
                             ic=ic,
+                            ci=ci,
                             colormap=colormap,
                             figsize=figsize,
                             ext=ext,
