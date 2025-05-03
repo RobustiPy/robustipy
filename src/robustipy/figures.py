@@ -653,7 +653,7 @@ def plot_curve(
 
     # Legend and formatting
     ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
-              loc='lower right', ncols=2, framealpha=1, facecolor='none')
+              loc='lower right', ncols=2, framealpha=1, facecolor='w')
     axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
     ax.set_xlim(0, n - 1)
     pad = (y1 - y0) * 0.1
@@ -663,10 +663,10 @@ def plot_curve(
     median_inf = results_object.inference['median']
     z_score = results_object.inference['Stouffers'][0]
     info_text = (
-        f'Number of specifications: {n}\n'
-        f'Number of bootstraps:     {results_object.draws}\n'
-        f'Number of folds:          {results_object.kfold}\n'
-        f'Median coef: {median_inf:.3f} (Z: {z_score:.3f})'
+        f'Specifications: {n}\n'
+        f'Bootstraps: {results_object.draws}\n'
+        f'Folds: {results_object.kfold}\n'
+        f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
     )
     ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
             fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
@@ -825,7 +825,7 @@ def plot_bdist(
     # 1. Build a long‐form DataFrame with one row per (draw, spec)
     draws_df = results_object.estimates.T.copy()
     # flatten the spec‐names into strings
-    spec_labels = [' / '.join(s) for s in results_object.specs_names]
+    spec_labels = [s for s in results_object.specs_names]
     draws_df.columns = spec_labels
 
     # pick out the special ones
@@ -833,8 +833,8 @@ def plot_bdist(
     full_label = spec_labels[-1]
     highlight = []
     if specs:
-        user_labels = [' / '.join(s) for s in specs]
-        highlight = [lab for lab in spec_labels if lab in user_labels]
+        requested: Set[frozenset] = { frozenset(sp) for sp in specs }
+        highlight = [lab for lab in spec_labels if lab in requested]
 
     # define the order we'll plot (so colors map consistently)
     order = [null_label] + highlight + [full_label]
@@ -974,7 +974,7 @@ def plot_kfolds(
 
     name = results_object.name_av_k_metric
     metric = r'R$^2$' if name.lower() == 'r-squared' else (name.upper() if name == 'rmse' else name.title())
-    axis_formatter(ax, 'Density', f'OOS Metric: {metric}', title)
+    axis_formatter(ax,  'Density', f'OOS Metric: {metric}', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
 
     if despine_left:
@@ -1182,6 +1182,6 @@ def plot_results(
         plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
-        plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=False)
         plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
         plt.close(fig)
