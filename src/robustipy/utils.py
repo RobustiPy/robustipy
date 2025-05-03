@@ -253,7 +253,7 @@ def get_selection_key(specs: List[List[str]]) -> List[frozenset]:
     else:
         raise ValueError('Argument `specs` must be a list of list.')
 
-
+'''
 def get_colormap_colors(
     colormap_name: str,
     num_colors: int = 3,
@@ -298,7 +298,47 @@ def get_colormap_colors(
         colors.append(color)
 
     return colors
+'''
 
+def get_colormap_colors(num_colors: int = 3) -> List[str]:
+    r"""
+    Return the first \(\texttt{num_colors}\) entries of a predetermined color palette.
+
+    Parameters
+    ----------
+    num_colors : int, optional
+        The number of colors to return. Must satisfy
+        \[
+            1 \;\le\; \texttt{num_colors} \;\le\; N,
+        \]
+        where \(N = 4\) is the total number of available colors in the palette.
+        Defaults to 3.
+
+    Returns
+    -------
+    List[str]
+        A list of hexadecimal color strings of length exactly \(\texttt{num_colors}\).
+
+    Raises
+    ------
+    TypeError
+        If `num_colors` is not an integer.
+    ValueError
+        If `num_colors < 1` or `num_colors > 4`.
+    """
+
+    palette: List[str] = ["#345995", "#B80C09", "#D4AF37", '#2E6F40', "#955196", "#3C4CAD"]
+
+    # Validate type
+    if not isinstance(num_colors, int):
+        raise TypeError(f"num_colors must be an integer, got {type(num_colors).__name__!r}")
+
+    N = len(palette)
+    # Validate bounds
+    if num_colors < 1 or num_colors > N:
+        raise ValueError(f"num_colors must be between 1 and {N}, inclusive (got {num_colors}).")
+
+    return palette[:num_colors]
 
 def get_colors(specs: List[List[str]], color_set_name: Optional[str] = 'Set1') -> List[Tuple[float, float, float, float]]:
     """
