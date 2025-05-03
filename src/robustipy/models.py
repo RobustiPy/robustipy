@@ -880,7 +880,7 @@ class OLSRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
-        threshold: int = 100_000
+        threshold: int = 1000000
     ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
@@ -901,7 +901,7 @@ class OLSRobust(BaseRobust):
             Number of parallel jobs; defaults to all available cores minus one.
         seed : int, optional
             Random seed for reproducibility.
-        threshold : int, default=100000
+        threshold : int, default=1000000
             Warn if total model runs exceed this number.
 
         Returns
@@ -1509,7 +1509,7 @@ class LRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
-        threshold: int = 100_000
+        threshold: int = 1000000
     ) -> 'LRobust':
         """
         Fit the logistic regression models over the specification space and bootstrap samples.
@@ -1532,7 +1532,7 @@ class LRobust(BaseRobust):
             Number of parallel jobs; defaults to all available.
         seed : int, optional
             Random seed for reproducibility.
-        threshold : int, default=100000
+        threshold : int, default=1000000
             Warn if `draws * n_specs` exceeds this.
 
         Returns
