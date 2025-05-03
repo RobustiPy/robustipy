@@ -729,7 +729,7 @@ def plot_ic(
         idxs = df.index[df['idx']].tolist()
         for idx, i in zip(idxs, range(n_specs)):
             col = colorset[i+1]                # shift by one
-            label = ', '.join(df.spec_name.iloc[idx]).title()
+            label = ', '.join(df.spec_name.iloc[idx])
             lines.append(ax.vlines(idx, ymin, df.at[idx, ic], color=col, label=label))
             markers.append(Line2D([0],[0],marker='o',color=col,
                                   markerfacecolor='w',markersize=10,label=label))
@@ -757,7 +757,7 @@ def plot_ic(
         ax.legend(handles=markers,
                   frameon=True, edgecolor='black',
                   fontsize=9, loc="upper left",
-                  ncols=1, framealpha=1, facecolor='none')
+                  ncols=1, framealpha=1, facecolor='w')
 
         if despine_left:
             sns.despine(ax=ax, right=False, left=True)
@@ -833,7 +833,7 @@ def plot_bdist(
     full_label = spec_labels[-1]
     highlight = []
     if specs:
-        requested: Set[frozenset] = { frozenset(sp) for sp in specs }
+        requested: Set[frozenset] = {frozenset(sp) for sp in specs }
         highlight = [lab for lab in spec_labels if lab in requested]
 
     # define the order we'll plot (so colors map consistently)
