@@ -1548,7 +1548,8 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv']
+            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv'],
+            threshold=threshold
         )
         print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
