@@ -530,7 +530,7 @@ def plot_curve(
     title: str = ''
 ) -> plt.Axes:
     """
-    Plot the specification‐curve of median and CI for coefficient estimates.
+    Plot the specification-curve of median and CI for coefficient estimates.
 
     Parameters
     ----------
@@ -541,8 +541,8 @@ def plot_curve(
     loess : bool, default=True
         Whether to smooth the lower/upper CI bounds with LOESS.
     ci : float, default=1
-        The confidence‐level (e.g. 0.95 for a 95% interval).
-    specs : list of control‐lists, optional
+        The confidence-level (e.g. 0.95 for a 95% interval).
+    specs : list of control-lists, optional
         Up to three specs to highlight. Default: None (no highlights).
     ax : matplotlib.axes.Axes, optional
         Axes to draw on.  Default: current axes.
@@ -560,148 +560,120 @@ def plot_curve(
     if ax is None:
         ax = plt.gca()
 
-    # Copy summary, compute quantiles, and mark full/spec highlights
+    # Compute quantiles and annotate DataFrame
     df = results_object.summary_df.copy()
     alpha = 1 - ci
-    # Compute lower/upper quantiles for each spec (axis=1 over draws)
     qs = results_object.estimates.quantile(q=[alpha/2, 1 - alpha/2],
                                            axis=1,
                                            interpolation='nearest')
-    df['q_low']  = qs.iloc[0].values
+    df['q_low'] = qs.iloc[0].values
     df['q_high'] = qs.iloc[1].values
 
-    # Flag the “full‐model” specification
-    full_spec = list(results_object.specs_names.iloc[-1])
-    full_key  = get_selection_key([full_spec])
-    df['full_spec_idx'] = df.spec_name.isin(full_key)
-
-    # Flag the “null‐model” specification
-    null_spec = list(results_object.specs_names.iloc[0])
-    null_key  = get_selection_key([null_spec])
-    df['null_spec_idx'] = df.spec_name.isin(null_key)
-
-    # Flag any user‐requested highlights
+    # Flag specs
+    full_spec, null_spec = list(results_object.specs_names.iloc[-1]), list(results_object.specs_names.iloc[0])
+    df['full_spec_idx'] = df.spec_name.isin(get_selection_key([full_spec]))
+    df['null_spec_idx'] = df.spec_name.isin(get_selection_key([null_spec]))
     if specs:
-        sel_key = get_selection_key(specs)
-        df['idx'] = df.spec_name.isin(sel_key)
+        df['idx'] = df.spec_name.isin(get_selection_key(specs))
 
-    # Sort everything by the median
+    # Sort by median
     df = df.sort_values(by='median').reset_index(drop=True)
     n = len(df)
 
-    # Plot the median curve
-    median_color = get_colormap_colors(colormap, 100)[0]
+    # Sample colours: first for null, next for highlights, last for full
+    n_hl = len(specs) if specs else 0
+    #colourset = get_colormap_colors(colormap, n_hl + 2)
+    colourset = get_colormap_colors(n_hl + 2)
+    null_color = colourset[0]
+    spec_colors = colourset[1:-1]
+    full_color = colourset[-1]
+
+    # Plot median
+    #median_color = get_colormap_colors(colormap, 100)[0]
+    median_color = 'k'
     df['median'].plot(ax=ax, color=median_color, linestyle='-')
 
-    # Depending on LOESS or raw
-    hi_color = get_colormap_colors(colormap, 100)[-1]
-    if loess is True:
-        # Fraction of data to use in each local fit
-        frac = max(2/n, 0.3)  # ensure at least 2 points in each local window
-        lo_low = sm.nonparametric.lowess(df['q_low'],  df.index, frac=frac)
-        lo_high= sm.nonparametric.lowess(df['q_high'], df.index, frac=frac)
-
-        # Plot smoothed bounds
-        ax.plot(lo_low[:, 0],  lo_low[:, 1],  color=hi_color, linestyle='--')
+    # Plot CI bounds
+    #hi_color = get_colormap_colors(colormap, 100)[-1]
+    hi_color = 'gray'
+    if loess:
+        frac = max(2/n, 0.3)
+        lo_low = sm.nonparametric.lowess(df['q_low'], df.index, frac=frac)
+        lo_high = sm.nonparametric.lowess(df['q_high'], df.index, frac=frac)
+        ax.plot(lo_low[:, 0], lo_low[:, 1], color=hi_color, linestyle='--')
         ax.plot(lo_high[:, 0], lo_high[:, 1], color=hi_color, linestyle='--')
-        ax.fill_between(df.index,
-                        lo_low[:, 1],
-                        lo_high[:, 1],
-                        facecolor='#fee08b',
-                        alpha=0.15)
+        ax.fill_between(df.index, lo_low[:, 1], lo_high[:, 1], facecolor='#fee08b', alpha=0.15)
     else:
-        # Plot raw bounds
-        ax.plot(df.index, df['q_low'],  color=hi_color, linestyle='--', label='Lower CI')
+        ax.plot(df.index, df['q_low'], color=hi_color, linestyle='--', label='Lower CI')
         ax.plot(df.index, df['q_high'], color=hi_color, linestyle='--', label='Upper CI')
-        ax.fill_between(df.index,
-                        df['q_low'],
-                        df['q_high'],
-                        facecolor='#fee08b',
-                        alpha=0.15)
-    # Zero reference line if zero is in range
+        ax.fill_between(df.index, df['q_low'], df['q_high'], facecolor='#fee08b', alpha=0.15)
+
+    # Zero line
     y0, y1 = ax.get_ylim()
     if y0 < 0 < y1:
         ax.axhline(0, color='k', ls='--')
 
-    # Highlight specific specs and full model
-    cmap_hl = get_colormap_colors(colormap, len(specs) if specs else 0)
+    # Highlights
     handles = []
     if specs:
         idxs = df.index[df['idx']].tolist()
         for j, idx in enumerate(idxs):
+            col = spec_colors[j]
             lbl = ', '.join(df.spec_name.iloc[idx])
-            low  = lo_low[idx, 1]  if loess else df.at[idx, 'q_low']
+            low = lo_low[idx, 1] if loess else df.at[idx, 'q_low']
             high = lo_high[idx, 1] if loess else df.at[idx, 'q_high']
-            # vertical bar + arrow + marker
-            ax.vlines(x=idx, ymin=low, ymax=high, color=cmap_hl[j])
-            arrow = FancyArrowPatch((idx, low), (idx, high),
-                                    arrowstyle='<|-|>', color=cmap_hl[j],
+            ax.vlines(idx, ymin=low, ymax=high, color=col)
+            arrow = FancyArrowPatch((idx, low), (idx, high), arrowstyle='<|-|>', color=col,
                                     mutation_scale=20, shrinkA=0, shrinkB=0)
             ax.add_artist(arrow)
-            ax.plot(idx, df.at[idx, 'median'],
-                    'o', markeredgecolor=cmap_hl[j],
-                    markerfacecolor='w', markersize=12)
-            handles.append(Line2D([0], [0], marker='o', color=cmap_hl[j],
-                                  markerfacecolor='w', markersize=10, label=lbl))
+            ax.plot(idx, df.at[idx, 'median'], 'o', markeredgecolor=col, markerfacecolor='w', markersize=12)
+            handles.append(Line2D([0], [0], marker='o', color=col, markerfacecolor='w', markersize=10, label=lbl))
 
-    # Full‐model highlight
+    # Full model
     pos_full = df.index[df['full_spec_idx']].item()
-    low_f  = lo_low[pos_full, 1]  if loess else df.at[pos_full, 'q_low']
+    low_f = lo_low[pos_full, 1] if loess else df.at[pos_full, 'q_low']
     high_f = lo_high[pos_full, 1] if loess else df.at[pos_full, 'q_high']
-    ax.vlines(pos_full, ymin=low_f, ymax=high_f, color='k')
-    arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f),
-                              arrowstyle='<|-|>', color='k',
+    ax.vlines(pos_full, ymin=low_f, ymax=high_f, color=full_color)
+    arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f), arrowstyle='<|-|>', color=full_color,
                               mutation_scale=20, shrinkA=0, shrinkB=0)
     ax.add_artist(arrow_f)
-    ax.plot(pos_full, df.at[pos_full, 'median'],
-            'o', markeredgecolor='k', markerfacecolor='w', markersize=12)
-    handles.append(Line2D([0], [0], marker='o', color='k',
-                          markerfacecolor='w', markersize=10, label='Full Model'))
+    ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
+    handles.append(Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
 
-    # Null‐model highlight
+    # Null model
     pos_null = df.index[df['null_spec_idx']].item()
-    low_n  = lo_low[pos_null, 1]  if loess else df.at[pos_null, 'q_low']
+    low_n = lo_low[pos_null, 1] if loess else df.at[pos_null, 'q_low']
     high_n = lo_high[pos_null, 1] if loess else df.at[pos_null, 'q_high']
-    ax.vlines(pos_null, ymin=low_n, ymax=high_n, color='gray')
-    arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n),
-                              arrowstyle='<|-|>', color='gray',
+    ax.vlines(pos_null, ymin=low_n, ymax=high_n, color=null_color)
+    arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n), arrowstyle='<|-|>', color=null_color,
                               mutation_scale=20, shrinkA=0, shrinkB=0)
     ax.add_artist(arrow_n)
-    ax.plot(pos_null, df.at[pos_null, 'median'],
-            'o', markeredgecolor='gray', markerfacecolor='w', markersize=12)
-    handles.append(Line2D([0], [0], marker='o', color='gray',
-                          markerfacecolor='w', markersize=10, label='No Controls'))
+    ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
+    handles.append(Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
 
-    # Legend
-    ax.legend(handles=handles,
-              frameon=True, edgecolor='black',
-              fontsize=11, loc='lower right',
-              ncol=2, framealpha=1, facecolor='none')
-
-    # Formatting and annotations
-    axis_formatter(ax, r'Coefficient Estimates',
-                   'Ordered Specifications', title)
+    # Legend and formatting
+    ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
+              loc='lower right', ncols=2, framealpha=1, facecolor='none')
+    axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
     ax.set_xlim(0, n - 1)
     pad = (y1 - y0) * 0.1
     ax.set_ylim(y0 - pad, y1 + pad)
 
     # Summary inset
     median_inf = results_object.inference['median']
-    z_score    = results_object.inference['Stouffers'][0]
+    z_score = results_object.inference['Stouffers'][0]
     info_text = (
         f'Number of specifications: {n}\n'
         f'Number of bootstraps:     {results_object.draws}\n'
         f'Number of folds:          {results_object.kfold}\n'
         f'Median coef: {median_inf:.3f} (Z: {z_score:.3f})'
     )
-    ax.text(0.05, 0.95, info_text,
-            transform=ax.transAxes, va='top', ha='left',
-            fontsize=12, color='black',
-            bbox=dict(facecolor='white', edgecolor='black',
-                      boxstyle='round,pad=1'))
+    ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
+            fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
 
     sns.despine(ax=ax)
     return ax
+
 
 
 def plot_ic(
@@ -714,211 +686,126 @@ def plot_ic(
     despine_left: bool = True
 ) -> plt.Axes:
     """
-    Plots the information criterion (IC) curve for the given results object.
-
-    Parameters
-    ----------
-    results_object : object
-        Must expose `summary_df` (with `ic` column) and `specs_names`.
-    ic : str
-        Which criterion to plot: 'aic', 'bic', or 'hqic'.
-    specs : list of control‐lists, optional
-        Specs to highlight. Default: None.
-    ax : matplotlib.axes.Axes, optional
-        Axes to draw on. Default: current axes.
-    colormap : str, default='Spectral_r'
-        Colormap for highlights.
-    title : str, optional
-        Title text for the axes.
-    despine_left : bool, default=True
-        If True, move the y‐axis ticks & spine to the right.
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The axes containing the plot.
+    Plots the information criterion (IC) curve, colouring:
+      • “No Controls” in the first colormap colour
+      • each user‐highlighted spec in the next colours
+      • “Full Model” in the last colormap colour
     """
-    # Validate that the requested IC column exists in summary_df
+    # Validate IC column
     if ic not in results_object.summary_df.columns:
-        available_ics = [col for col in results_object.summary_df.columns if col.lower() in {'aic', 'bic', 'hqic'}]
-        raise ValueError(
-            f"[plot_ic] Requested information criterion '{ic}' not found in results.\n"
-            f"Available options in this results object: {available_ics}\n"
-            f"Did you fit the model using a different IC or forget to specify '{ic}' during fitting?"
-        )
+        available_ics = [c for c in results_object.summary_df.columns
+                         if c.lower() in {'aic','bic','hqic'}]
+        raise ValueError(f"[plot_ic] '{ic}' not found. Available: {available_ics}")
+
     if ax is None:
         ax = plt.gca()
-    colorset = get_colormap_colors(colormap, len(specs))
+
+    # grab exactly len(specs)+2 colours
+    n_specs = len(specs) if specs else 0
+    #colorset = get_colormap_colors(colormap, n_specs + 2)
+    colorset = get_colormap_colors(n_specs + 2)
+
     df = results_object.summary_df.copy()
-    df = df.sort_values(by='median')
-    df = df.reset_index(drop=True)
+    df = df.sort_values(by=ic).reset_index(drop=True)
     axis_formatter(ax, f'{ic.upper()} curve', 'Ordered Specifications', title)
 
     if specs:
-        key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        null_spec = list(results_object.specs_names.iloc[0])
-        null_spec_key = get_selection_key([null_spec])
-        df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
-        df['null_spec_idx'] = df.spec_name.isin(null_spec_key)
+        key            = get_selection_key(specs)
+        full_spec_key  = get_selection_key([list(results_object.specs_names.iloc[-1])])
+        null_spec_key  = get_selection_key([list(results_object.specs_names.iloc[0])])
+        df['idx']            = df.spec_name.isin(key)
+        df['full_spec_idx']  = df.spec_name.isin(full_spec_key)
+        df['null_spec_idx']  = df.spec_name.isin(null_spec_key)
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ax.plot(df[ic], color='#002d87')
+
+        # main IC curve stays the same colour you had
+        ax.plot(df[ic], color='k')
+
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax)
+
+        lines, markers = [], []
+        # highlighted specs
         idxs = df.index[df['idx']].tolist()
-        ymin = ax.get_ylim()[0]
-        ymax = ax.get_ylim()[1]
-        ax.set_ylim(ymin, ymax)
-        lines = []
-        markers = []
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
-            lines.append(ax.vlines(x=idx,
-                                   ymin=ymin,
-                                   ymax=df.at[idx, ic],
-                                   color=colorset[i],
-                                   label=label)
-                         )
-            markers.append(Line2D([0], [0],
-                                  marker='o',
-                                  color=colorset[i],
-                                  markerfacecolor='w',
-                                  markersize=10,
-                                  label=label)
-                           )
-            ax.plot(idx,
-                    df.at[idx, ic],
-                    'o',
-                    markeredgecolor=colorset[i],
-                    markerfacecolor='w',
-                    markersize=15,
-                    label=label)
-        full_spec_pos = df.index[df[('full_spec_idx')]].to_list()[0]
-        null_spec_pos = df.index[df['null_spec_idx']].to_list()[0]
-        lines.append(ax.vlines(x=full_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[full_spec_pos, ic],
-                               color='k',
-                               label='Full Model'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='k',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='Full Model')
-                       )
-        ax.plot(full_spec_pos,
-                df.at[full_spec_pos, ic],
-                'o',
-                markeredgecolor='k',
-                markerfacecolor='w',
-                markersize=15)
+        for idx, i in zip(idxs, range(n_specs)):
+            col = colorset[i+1]                # shift by one
+            label = ', '.join(df.spec_name.iloc[idx]).title()
+            lines.append(ax.vlines(idx, ymin, df.at[idx, ic], color=col, label=label))
+            markers.append(Line2D([0],[0],marker='o',color=col,
+                                  markerfacecolor='w',markersize=10,label=label))
+            ax.plot(idx, df.at[idx, ic], 'o',
+                    markeredgecolor=col, markerfacecolor='w', markersize=15)
 
-        lines.append(ax.vlines(x=null_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[null_spec_pos, ic],
-                               color='gray',
-                               label='No Controls'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='gray',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='No Controls')
-                       )
-        ax.plot(null_spec_pos,
-                df.at[null_spec_pos, ic],
-                'o',
-                markeredgecolor='gray',
-                markerfacecolor='w',
-                markersize=15)
+        # full‐model in last colour
+        full_pos = df.index[df['full_spec_idx']].item()
+        col_f    = colorset[-1]
+        lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
+        markers.append(Line2D([0],[0],marker='o',color=col_f,
+                              markerfacecolor='w',markersize=10,label='Full Model'))
+        ax.plot(full_pos, df.at[full_pos, ic], 'o',
+                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
 
+        # no‐controls in first colour
+        null_pos = df.index[df['null_spec_idx']].item()
+        col_n    = colorset[0]
+        lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
+        markers.append(Line2D([0],[0],marker='o',color=col_n,
+                              markerfacecolor='w',markersize=10,label='No Controls'))
+        ax.plot(null_pos, df.at[null_pos, ic], 'o',
+                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
 
         ax.legend(handles=markers,
-                  frameon=True,
-                  edgecolor=(0, 0, 0, 1),
-                  fontsize=9,
-                  loc="upper left",
-                  ncols=1,
-                  framealpha=1,
-                  facecolor=((1, 1, 1, 0)
-                  )
-                  )
-        if despine_left is True:
+                  frameon=True, edgecolor='black',
+                  fontsize=9, loc="upper left",
+                  ncols=1, framealpha=1, facecolor='none')
+
+        if despine_left:
             sns.despine(ax=ax, right=False, left=True)
             ax.yaxis.set_label_position("right")
         else:
-            ax.yaxis.set_label_position("left")
             sns.despine(ax=ax)
+
     else:
+        df['full_spec_idx'] = df.spec_name.isin(get_selection_key([list(results_object.specs_names.iloc[-1])]))
+        df['null_spec_idx'] = df.spec_name.isin(get_selection_key([list(results_object.specs_names.iloc[0])]))
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ax.plot(df[ic], color='#002d87')
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
 
-        null_spec = list(results_object.specs_names.iloc[-1])
-        null_spec_key = get_selection_key([null_spec])
-        df['null_spec_idx'] = df.spec_name.isin(null_spec_key)
-
-        ymin = ax.get_ylim()[0]
-        ymax = ax.get_ylim()[1]
+        ax.plot(df[ic], color='k')
+        ymin, ymax = ax.get_ylim()
         ax.set_ylim(ymin, ymax)
-        lines = []
-        markers = []
-        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-        null_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-        lines.append(ax.vlines(x=full_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[full_spec_pos, ic],
-                               color='k',
-                               label='Full Model'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='k',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='Full Model')
-                       )
-        ax.plot(full_spec_pos,
-                df.at[full_spec_pos, ic],
-                'o',
-                markeredgecolor='k',
-                markerfacecolor='w',
-                markersize=15)
 
-        lines.append(ax.vlines(x=null_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[null_spec_pos, ic],
-                               color='gray',
-                               label='No Controls'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='gray',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='No Controls')
-                       )
-        ax.plot(null_spec_pos,
-                df.at[null_spec_pos, ic],
-                'o',
-                markeredgecolor='gray',
-                markerfacecolor='w',
-                markersize=15)
+        lines, markers = [], []
+        # full model
+        full_pos = df.index[df['full_spec_idx']].item()
+        col_f    = colorset[-1]
+        lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
+        markers.append(Line2D([0],[0],marker='o',color=col_f,
+                              markerfacecolor='w',markersize=10,label='Full Model'))
+        ax.plot(full_pos, df.at[full_pos, ic], 'o',
+                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
+
+        # no controls
+        null_pos = df.index[df['null_spec_idx']].item()
+        col_n    = colorset[0]
+        lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
+        markers.append(Line2D([0],[0],marker='o',color=col_n,
+                              markerfacecolor='w',markersize=10,label='No Controls'))
+        ax.plot(null_pos, df.at[null_pos, ic], 'o',
+                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
 
         ax.legend(handles=markers,
-                  frameon=True,
-                  edgecolor=(0, 0, 0, 1),
-                  fontsize=9,
-                  loc="upper left",
-                  ncols=1,
-                  framealpha=1,
-                  facecolor=((1, 1, 1, 0)
-                  )
-                  )
-        if despine_left is True:
+                  frameon=True, edgecolor='black',
+                  fontsize=9, loc="upper left",
+                  ncols=1, framealpha=1, facecolor='none')
+
+        if despine_left:
             ax.yaxis.set_label_position("right")
             sns.despine(ax=ax, right=False, left=True)
         else:
-            ax.yaxis.set_label_position("left")
             sns.despine(ax=ax)
+
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
+    return ax
 
 
 def plot_bdist(
@@ -928,120 +815,88 @@ def plot_bdist(
     colormap: str = 'Spectral_r',
     title: str = '',
     despine_left: bool = True,
-    legend_bool: bool = False
+    legend_bool: bool = False,
+    bw_adjust: float = 0.5
 ) -> plt.Axes:
     """
-    Plot kernel‐density distributions of coefficient estimates for select specs.
-
-    Parameters
-    ----------
-    results_object : object
-        Must expose `estimates` (DataFrame) and `specs_names`.
-    specs : list of control‐lists, optional
-        Which specs to overlay. Default: None.
-    ax : matplotlib.axes.Axes, optional
-        Axes to draw on. Default: current axes.
-    colormap : str, default='Spectral_r'
-        Colormap for the highlighted densities.
-    title : str, optional
-        Title text for the axes.
-    despine_left : bool, default=True
-        If True, move the y‐axis to the right.
-    legend_bool : bool, default=False
-        If True, draw a legend of the highlighted specs.
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The axes containing the density plot.
+    Plot density‐scaled histograms and KDEs of coefficient distributions,
+    in a fully generalisable way.
     """
+    # 1. Build a long‐form DataFrame with one row per (draw, spec)
+    draws_df = results_object.estimates.T.copy()
+    # flatten the spec‐names into strings
+    spec_labels = [' / '.join(s) for s in results_object.specs_names]
+    draws_df.columns = spec_labels
 
-    def make_leg(results_object):
-        df = results_object.summary_df.copy()
-        df = df.sort_values(by='median')
-        df = df.reset_index(drop=True)
-        key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        null_spec = list(results_object.specs_names.iloc[0])
-        null_spec_key = get_selection_key([null_spec])
-        df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
-        df['null_spec_idx'] = df.spec_name.isin(null_spec_key)
-        idxs = df.index[df['idx']].tolist()
-        leg = []
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
-            leg.append([colorset[i], label])
-        leg.append(['k', 'Full Model'])
-        leg.append(['gray', 'No Controls'])
-        return leg
+    # pick out the special ones
+    null_label = spec_labels[0]
+    full_label = spec_labels[-1]
+    highlight = []
+    if specs:
+        user_labels = [' / '.join(s) for s in specs]
+        highlight = [lab for lab in spec_labels if lab in user_labels]
 
-    colorset = get_colormap_colors(colormap, len(specs))
+    # define the order we'll plot (so colors map consistently)
+    order = [null_label] + highlight + [full_label]
+    #palette = get_colormap_colors(colormap, len(order))
+    palette = get_colormap_colors(len(order))
+
+    # melt into long form
+    df_long = draws_df[order].melt(var_name='spec', value_name='coef')
+
     if ax is None:
         ax = plt.gca()
-    df = results_object.estimates.copy().T
-    df.columns = results_object.specs_names
-    if specs:
-        key = get_selection_key(specs)
-        matching_cols = [col for col in df.columns if col in key]
-        for i, col in enumerate(matching_cols):
-            sns.kdeplot(df[col].squeeze(), common_norm=True, ax=ax, color=colorset[i], legend=False)
-    sns.kdeplot(df.iloc[:, -1:].squeeze(), common_norm=True, legend=False,
-                color='black', ax=ax, label='Full Model')
-    sns.kdeplot(df.iloc[:, 0:1].squeeze(), common_norm=True, legend=False,
-                color='gray', ax=ax, label='No Controls')
-    markers=[]
+
+    # 2. Histogram (density‐scaled) + KDE overlay
+    sns.histplot(
+        data=df_long,
+        x='coef',
+        hue='spec',
+        element='bars',
+        stat='density',        # <-- scale bars so area=1
+        common_norm=False,     # <-- each spec integrates to 1
+        palette=palette,
+        alpha=0.4,
+        ax=ax,
+        legend=False
+    )
+    sns.kdeplot(
+        data=df_long,
+        x='coef',
+        hue='spec',
+        common_norm=False,
+        bw_adjust=bw_adjust,   # <-- controls the smoothness
+        palette=palette,
+        linewidth=2,
+        ax=ax,
+        legend=False
+    )
+
+    # 3. Optionally draw a custom legend
     if legend_bool:
-        leg = make_leg(results_object)
-        for ele in leg:
-            markers.append(Line2D([0], [0],
-                                  marker='o',
-                                  color=ele[0],
-                                  markerfacecolor='w',
-                                  markersize=0,
-                                  label=ele[1])
-                           )
-        # Temporarily place the legend at "upper left" to check for overlap
-        temp_legend = ax.legend(handles=markers,
-                                frameon=True,
-                                edgecolor=(0, 0, 0, 1),
-                                fontsize=9,
-                                loc="upper left",  # Start with "upper left"
-                                ncols=1,
-                                framealpha=1,
-                                facecolor=((1, 1, 1, 0)
-                                )
-                                )
+        handles = []
+        for col, lab in zip(palette, order):
+            handles.append(
+                Line2D([0], [0],
+                       marker='s',
+                       color=col,
+                       markerfacecolor=col,
+                       markersize=10,
+                       linestyle='',
+                       label=lab)
+            )
+        ax.legend(handles=handles, title='Specification',
+                  frameon=True, loc='upper right')
 
-        # Get the bounding box of the plot and the legend
-        plot_bbox = ax.get_tightbbox(plt.gcf().canvas.get_renderer())
-        legend_bbox = temp_legend.get_window_extent(plt.gcf().canvas.get_renderer())
-
-        # Check if the legend overlaps with the plot area
-        if legend_bbox.overlaps(plot_bbox):
-            # Remove the temporary legend
-            temp_legend.remove()
-
-            # Place the legend in the upper right to avoid overlap
-            ax.legend(handles=markers,
-                      frameon=True,
-                      edgecolor=(0, 0, 0, 1),
-                      fontsize=9,
-                      loc="upper right",  # Move to "upper right" if overlapping
-                      ncols=1,
-                      framealpha=1,
-                      facecolor=((1, 1, 1, 0)
-                      )
-                      )
+    # 4. Final formatting
     axis_formatter(ax, 'Density', 'Coefficient Estimate', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
-    if despine_left is True:
+    if despine_left:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
     else:
         sns.despine(ax=ax)
+
     return ax
 
 
@@ -1086,8 +941,8 @@ def plot_kfolds(
 
     # KDE & histogram
     data  = results_object.summary_df['av_k_metric']
-    colors = get_colormap_colors(colormap, 100)
-    sns.kdeplot(data, ax=ax, alpha=1, color=colors[99])
+    colors = get_colormap_colors(2)
+    sns.kdeplot(data, ax=ax, alpha=1, color=colors[1])
     sns.histplot(data, ax=ax, alpha=1, color=colors[0], bins=30, stat='density')
 
     # Symmetric x-padding
@@ -1099,7 +954,7 @@ def plot_kfolds(
     legend_loc = _legend_side_from_hist(ax, tau=tau)
 
     legend_elements = [
-        Line2D([0], [0], color=colors[99], lw=2, label='Density'),
+        Line2D([0], [0], color=colors[1], lw=2, label='Density'),
         Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1), label='Histogram')
     ]
     ax.legend(handles=legend_elements,
@@ -1164,7 +1019,7 @@ def plot_bma(
     bma['probs'].plot(kind='barh',
                       ax=ax,
                       alpha=1,
-                      color=get_colormap_colors(colormap, 100)[0],
+                      color=get_colormap_colors(1),
                       edgecolor='k',
                       )
     axis_formatter(ax, r'', 'BMA Probabilities', title)
@@ -1194,6 +1049,22 @@ def title_setter(
         return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26)
     else:
         return ax.set_title(title, loc='left', fontsize=16, y=1)
+
+
+def _sanitize_specs(
+    specs: Optional[List[List[str]]],
+    max_len: int = 4
+) -> Optional[List[List[str]]]:
+    """
+    Truncate the specs list to at most `max_len`, warning if we had to cut.
+    """
+    if specs is not None and len(specs) > max_len:
+        warnings.warn(
+            f"Received {len(specs)} specs; only the first {max_len} will be used.",
+            UserWarning
+        )
+        return specs[:max_len]
+    return specs
 
 
 def plot_results(
@@ -1238,6 +1109,8 @@ def plot_results(
     - Saves a combined “_all” figure plus individual panels named:
       `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
     """
+    specs = _sanitize_specs(specs, max_len=6)
+
     figpath = os.path.join(os.getcwd(), 'figures', project_name)
     if not os.path.exists(figpath):
         os.makedirs(figpath)
