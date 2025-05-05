@@ -99,7 +99,7 @@ def axis_formatter(
     ax.set_ylabel(ylabel, fontsize=13)
     title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
-
+_
 def plot_hexbin_r2(
     results_object,
     ax: plt.Axes,
@@ -207,7 +207,7 @@ def plot_hexbin_r2(
     axis_formatter(
         ax,
         r"In-Sample R$^2$",
-        r"Bootstrapped $\hat{\beta}$ Estimate",
+        r"Bootstrapped Estimand",
         title,
         side,
     )
@@ -307,7 +307,7 @@ def plot_hexbin_log(
     else:
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
-    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', title)
+    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimatand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
@@ -654,7 +654,7 @@ def plot_curve(
     # Legend and formatting
     ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
               loc='lower right', ncols=2, framealpha=1, facecolor='w')
-    axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
+    axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
     ax.set_xlim(0, n - 1)
     pad = (y1 - y0) * 0.1
     ax.set_ylim(y0 - pad, y1 + pad)
@@ -847,27 +847,16 @@ def plot_bdist(
     if ax is None:
         ax = plt.gca()
 
-    # 2. Histogram (density‐scaled) + KDE overlay
-    sns.histplot(
-        data=df_long,
-        x='coef',
-        hue='spec',
-        element='bars',
-        stat='density',        # <-- scale bars so area=1
-        common_norm=False,     # <-- each spec integrates to 1
-        palette=palette,
-        alpha=0.4,
-        ax=ax,
-        legend=False
-    )
     sns.kdeplot(
         data=df_long,
         x='coef',
         hue='spec',
-        common_norm=False,
-        bw_adjust=bw_adjust,   # <-- controls the smoothness
-        palette=palette,
+        common_norm=False,  # each group integrates to 1
+        bw_adjust=bw_adjust,  # controls smoothness (h ∝ bw_adjust)
+        palette=palette,  # line colours for each 'spec'
         linewidth=2,
+        fill=True,  # fill under the curve
+        alpha=0.3,  # light shading
         ax=ax,
         legend=False
     )
@@ -889,7 +878,7 @@ def plot_bdist(
                   frameon=True, loc='upper right')
 
     # 4. Final formatting
-    axis_formatter(ax, 'Density', 'Coefficient Estimate', title)
+    axis_formatter(ax, 'Density', 'Estimand of Interest', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
     if despine_left:
         ax.yaxis.set_label_position("right")
