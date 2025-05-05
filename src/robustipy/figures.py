@@ -307,7 +307,7 @@ def plot_hexbin_log(
     else:
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
-    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimatand', title)
+    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
