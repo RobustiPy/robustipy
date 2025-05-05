@@ -99,7 +99,6 @@ def axis_formatter(
     ax.set_ylabel(ylabel, fontsize=13)
     title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
-_
 def plot_hexbin_r2(
     results_object,
     ax: plt.Axes,
