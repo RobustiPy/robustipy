@@ -99,6 +99,7 @@ def axis_formatter(
     ax.set_ylabel(ylabel, fontsize=13)
     title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
+
 def plot_hexbin_r2(
     results_object,
     ax: plt.Axes,
@@ -450,6 +451,7 @@ def shap_violin(
                 alpha=alpha,
                 linewidth=0,
                 zorder=1,
+                rasterized=True
             )
             cvals = values[np.invert(nan_mask)].astype(np.float64)
             cvals_imp = cvals.copy()
@@ -467,6 +469,7 @@ def shap_violin(
                 alpha=alpha,
                 linewidth=0,
                 zorder=1,
+                rasterized=True,
             )
             smooth_values -= vmin
             if vmax - vmin > 0:
@@ -490,6 +493,7 @@ def shap_violin(
             showmeans=False,
             showextrema=False,
             showmedians=False,
+            rasterized=True
         )
         for pc in parts["bodies"]:
             pc.set_facecolor(color)
