@@ -5,7 +5,7 @@ from multiprocessing import cpu_count
 import numpy as np
 import pandas as pd
 
-from robustipy.utils import all_subsets, space_size
+from robustipy.utils import all_subsets, space_size, sample_y_masks
 
 
 class Protomodel(ABC):
@@ -140,23 +140,72 @@ class BaseRobust(Protomodel):
     def get_results(self):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
+#    def multiple_y(self) -> None:
+#        """
+#        Build `self.y_composites` and `self.y_specs`.
+#
+#        If `self._selected_y_masks` is not None, restrict to those masks.
+#        """
+#        self.y_specs = []
+#        self.y_composites = []
+#        print("Calculating Composite Ys")
+#        subsets = list(all_subsets(self.y))
+#        iterator = subsets 
+#        for spec in iterator:
+#            if len(spec) > 0:
+#                subset = self.data[list(spec)]
+#                subset = (subset - subset.mean()) / subset.std()
+#                self.y_composites.append(subset.mean(axis=1))
+#                self.y_specs.append(spec)
+#        self.parameters['y_specs'] = self.y_specs
+#        self.parameters['y_composites'] = self.y_composites
+
     def multiple_y(self) -> None:
         """
-        Compute composite outcomes when multiple y indicators are provided.
+        Build the lists
+            * self.y_composites  – pandas Series, one per composite Y
+            * self.y_specs       – tuple[str], names that form that composite
+
+        If `self.composite_sample` is a positive int, draw that many random
+        non-empty subsets of the raw Y columns *before* we create any Series.
+        Otherwise enumerate **all** non-empty subsets (original behaviour).
         """
-        self.y_specs = []
-        self.y_composites = []
         print("Calculating Composite Ys")
-        subsets = list(all_subsets(self.y))
-        iterator = subsets 
-        for spec in iterator:
-            if len(spec) > 0:
-                subset = self.data[list(spec)]
-                subset = (subset - subset.mean()) / subset.std()
-                self.y_composites.append(subset.mean(axis=1))
-                self.y_specs.append(spec)
-        self.parameters['y_specs'] = self.y_specs
-        self.parameters['y_composites'] = self.y_composites
+        y_cols = self.y                               # list[str] of raw outcome vars
+        n_y    = len(y_cols)
+
+        # ------------------------------------------------------------------
+        # Decide which subsets to build
+        # ------------------------------------------------------------------
+        if getattr(self, "composite_sample", None) and self.composite_sample > 0:
+            masks = sample_y_masks(
+                n_y=n_y,
+                n_masks=self.composite_sample,
+                seed=getattr(self, "seed", None)
+            )
+            subset_iter = [
+                tuple(y_cols[i] for i in range(n_y) if (m >> i) & 1)
+                for m in masks
+            ]
+        else:
+            # Exhaustive: use generator but skip the very first (empty) subset
+            subset_iter = (
+                spec for spec in all_subsets(y_cols) if spec  # truthy -> non-empty
+            )
+        # ------------------------------------------------------------------
+
+        self.y_composites = []
+        self.y_specs      = []
+
+        for spec in subset_iter:
+            subset = self.data[list(spec)]
+            subset = (subset - subset.mean()) / subset.std(ddof=0)  # z-score
+            self.y_composites.append(subset.mean(axis=1))
+            self.y_specs.append(spec)
+
+        # keep for reproducibility
+        self.parameters["y_specs"]      = self.y_specs
+        self.parameters["y_composites"] = self.y_composites
     
     def fit(self, *, controls: List[str], group: Optional[str] = None, draws: int = 500,
             kfold: int = 5, oos_metric: str = 'r-squared', n_cpu: Optional[int] = None,
