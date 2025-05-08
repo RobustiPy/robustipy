@@ -1,7 +1,15 @@
 robustipy package
 =================
 
-bootstrap\_utils module
+.. automodule:: robustipy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Submodules
+----------
+
+robustipy.bootstrap\_utils module
 ---------------------------------
 
 .. automodule:: robustipy.bootstrap_utils
@@ -9,7 +17,7 @@ bootstrap\_utils module
    :undoc-members:
    :show-inheritance:
 
-figures module
+robustipy.figures module
 ------------------------
 
 .. automodule:: robustipy.figures
@@ -17,7 +25,7 @@ figures module
    :undoc-members:
    :show-inheritance:
 
-models module
+robustipy.models module
 -----------------------
 
 .. automodule:: robustipy.models
@@ -25,7 +33,7 @@ models module
    :undoc-members:
    :show-inheritance:
 
-prototypes module
+robustipy.prototypes module
 ---------------------------
 
 .. automodule:: robustipy.prototypes
@@ -33,12 +41,10 @@ prototypes module
    :undoc-members:
    :show-inheritance:
 
-utils module
+robustipy.utils module
 ----------------------
 
 .. automodule:: robustipy.utils
    :members:
    :undoc-members:
    :show-inheritance:
-
-

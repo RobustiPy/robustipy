@@ -1,5 +1,5 @@
-src
-===
+robustipy
+=========
 
 .. toctree::
    :maxdepth: 4

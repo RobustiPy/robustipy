@@ -10,8 +10,8 @@ import sys
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'RobustiPy'
-copyright = '2024, Daniel Valdenegro Ibarra, Charles Rahal, and Jiani Yan'
-author = 'Daniel Valdenegro Ibarra, Charles Rahal, and Jiani Yan'
+copyright = '2024, Daniel Valdenegro Ibarra, Charles Rahal, Jiani Yan and Duiyi Dai'
+author = 'Daniel Valdenegro Ibarra, Charles Rahal, Jiani Yan and  Duiyi Dai'
 release = 'v 0.1'
 
 # -- General configuration ---------------------------------------------------

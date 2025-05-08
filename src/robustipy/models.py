@@ -637,8 +637,8 @@ class OLSResult(Protoresult):
         print(f"Min HQIC: {round(self.summary_df['hqic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print(f"Max Log Likelihood: {round(self.summary_df['ll'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
         print(f"Min Log Likelihood: {round(self.summary_df['ll'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
-        print(f"Max { 'Adj-' if "OLS" in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
-        print(f"Min { 'Adj-' if "OLS" in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
+        print(f"Max { 'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
+        print(f"Min { 'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
 
         print_separator()
         print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
