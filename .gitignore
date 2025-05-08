@@ -147,11 +147,9 @@ pyvenv.cfg
 *~
 share/
 *.dta
-*.ipynb
 etc/
 
-/data/input/CleanData_LASpending.dta
-/full_replications/
+/data/
 
 
 /src/docs/_build/
