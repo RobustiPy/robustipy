@@ -1103,7 +1103,7 @@ def plot_results(
     """
     specs = _sanitize_specs(specs, max_len=6)
 
-    figpath = os.path.join(os.getcwd(), 'figures', project_name)
+    figpath = os.path.join(os.getcwd(), project_name)
     if not os.path.exists(figpath):
         os.makedirs(figpath)
 
