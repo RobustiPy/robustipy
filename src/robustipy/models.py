@@ -880,13 +880,9 @@ class OLSRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
-<<<<<<< HEAD
-        threshold: int = 10_000,
-        composite_sample: Optional[int] = None
-=======
+        composite_sample: Optional[int] = None,
         threshold: int = 1000000
->>>>>>> d8c6e16301666144ff400a427cb5231ede7424db
-    ) -> 'OLSRobust':
+        ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
