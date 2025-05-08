@@ -610,3 +610,31 @@ def calculate_imv_score(y_true, y_enhanced):
     # Compute IMV
     imv = (w_enhanced - w_null) / w_null
     return imv
+
+
+def sample_y_masks(
+    n_y: int,                      # how many raw outcome variables
+    n_masks: int,                  # how many composites you want
+    seed: Optional[int] = None
+) -> List[int]:
+    """
+    Uniformly sample `n_masks` bit-masks from the non-empty power-set of
+    `n_y` items **without** enumerating the 2^n_y possibilities.
+
+    Returns
+    -------
+    list[int]   each mask is an `int` whose binary representation tells
+                which outcomes enter the composite.
+    """
+    full_space = (1 << n_y) - 1        # ignore the 0/empty mask
+    if n_masks >= full_space:
+        # exhaustive: 1 … (2^n_y − 1)
+        return list(range(1, full_space + 1))
+
+    rng   = np.random.default_rng(seed)
+    masks = rng.choice(
+        full_space,
+        size=n_masks,
+        replace=False
+    ) + 1           # shift from 0..full_space-1 to 1..full_space
+    return masks.tolist()

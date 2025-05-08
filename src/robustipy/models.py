@@ -880,8 +880,9 @@ class OLSRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
+        composite_sample: Optional[int] = None,
         threshold: int = 1000000
-    ) -> 'OLSRobust':
+        ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
@@ -909,6 +910,8 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+        self.composite_sample = composite_sample      # int or None
+        self.seed             = seed
         if len(self.y) > 1:
             self.multiple_y()
         n_cpu = self._validate_fit_args(
