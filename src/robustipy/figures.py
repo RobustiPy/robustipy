@@ -207,7 +207,7 @@ def plot_hexbin_r2(
     axis_formatter(
         ax,
         r"In-Sample R$^2$",
-        r"Bootstrapped $\hat{\beta}$ Estimate",
+        r"Bootstrapped Estimand",
         title,
         side,
     )
@@ -307,7 +307,7 @@ def plot_hexbin_log(
     else:
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     cb.ax.set_title('Count')
-    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample $\mathrm{\hat{\beta}}$ Coefficient Estimates', title)
+    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
@@ -451,6 +451,7 @@ def shap_violin(
                 alpha=alpha,
                 linewidth=0,
                 zorder=1,
+                rasterized=True
             )
             cvals = values[np.invert(nan_mask)].astype(np.float64)
             cvals_imp = cvals.copy()
@@ -468,6 +469,7 @@ def shap_violin(
                 alpha=alpha,
                 linewidth=0,
                 zorder=1,
+                rasterized=True,
             )
             smooth_values -= vmin
             if vmax - vmin > 0:
@@ -491,6 +493,7 @@ def shap_violin(
             showmeans=False,
             showextrema=False,
             showmedians=False,
+            rasterized=True
         )
         for pc in parts["bodies"]:
             pc.set_facecolor(color)
@@ -523,24 +526,29 @@ def shap_violin(
 def plot_curve(
     results_object,
     loess: bool = True,
+    ci: float = 1,
     specs: Optional[List[List[str]]] = None,
     ax: Optional[plt.Axes] = None,
     colormap: str = 'Spectral_r',
     title: str = ''
 ) -> plt.Axes:
     """
-    Plot the specification‐curve of median and CI for coefficient estimates.
+    Plot the specification-curve of median and CI for coefficient estimates.
 
     Parameters
     ----------
     results_object : object
-        Must expose `summary_df` (with columns 'median','min','max'), `specs_names`, etc.
+        Must expose `.summary_df` (with columns 'median'), `.specs_names`,
+        `.estimates` (DataFrame of bootstrap draws), `.draws`, `.kfold`,
+        and `.inference` dict.
     loess : bool, default=True
-        Whether to smooth the min/max curves with LOESS.
-    specs : list of control‐lists, optional
+        Whether to smooth the lower/upper CI bounds with LOESS.
+    ci : float, default=1
+        The confidence-level (e.g. 0.95 for a 95% interval).
+    specs : list of control-lists, optional
         Up to three specs to highlight. Default: None (no highlights).
     ax : matplotlib.axes.Axes, optional
-        Axes to draw on. Default: current axes.
+        Axes to draw on.  Default: current axes.
     colormap : str, default='Spectral_r'
         Colormap for the main curve.
     title : str, optional
@@ -551,146 +559,125 @@ def plot_curve(
     matplotlib.axes.Axes
         The axes containing the plot.
     """
-    colorset = get_colormap_colors(colormap, len(specs))
+    # Prepare axes
     if ax is None:
         ax = plt.gca()
+
+    # Compute quantiles and annotate DataFrame
     df = results_object.summary_df.copy()
-    full_spec = list(results_object.specs_names.iloc[-1])
-    full_spec_key = get_selection_key([full_spec])
-    df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
+    alpha = 1 - ci
+    qs = results_object.estimates.quantile(q=[alpha/2, 1 - alpha/2],
+                                           axis=1,
+                                           interpolation='nearest')
+    df['q_low'] = qs.iloc[0].values
+    df['q_high'] = qs.iloc[1].values
+
+    # Flag specs
+    full_spec, null_spec = list(results_object.specs_names.iloc[-1]), list(results_object.specs_names.iloc[0])
+    df['full_spec_idx'] = df.spec_name.isin(get_selection_key([full_spec]))
+    df['null_spec_idx'] = df.spec_name.isin(get_selection_key([null_spec]))
     if specs:
-        key = get_selection_key(specs)
-        df['idx'] = df.spec_name.isin(key)
-    df = df.sort_values(by='median')
-    df = df.reset_index(drop=True)
-    df['median'].plot(ax=ax,
-                      color=get_colormap_colors(colormap, 100)[0],
-                      linestyle='-')
+        df['idx'] = df.spec_name.isin(get_selection_key(specs))
 
-    if loess:  # Check if LOESS should be applied
-        loess_min = sm.nonparametric.lowess(df['min'],
-                                            pd.to_numeric(df.index),
-                                            frac=0.05)
-        loess_max = sm.nonparametric.lowess(df['max'],
-                                            pd.to_numeric(df.index),
-                                            frac=0.05)
-        ax.plot(loess_min[:, 0], loess_min[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
-        ax.plot(loess_max[:, 0], loess_max[:, 1], color=get_colormap_colors(colormap, 100)[99], linestyle='--')
-        ax.fill_between(df.index,
-                        loess_min[:, 1],
-                        loess_max[:, 1],
-                        facecolor='#fee08b',
-                        alpha=0.15)
+    # Sort by median
+    df = df.sort_values(by='median').reset_index(drop=True)
+    n = len(df)
+
+    # Sample colours: first for null, next for highlights, last for full
+    n_hl = len(specs) if specs else 0
+    #colourset = get_colormap_colors(colormap, n_hl + 2)
+    colourset = get_colormap_colors(n_hl + 2)
+    null_color = colourset[0]
+    spec_colors = colourset[1:-1]
+    full_color = colourset[-1]
+
+    # Plot median
+    #median_color = get_colormap_colors(colormap, 100)[0]
+    median_color = 'k'
+    df['median'].plot(ax=ax, color=median_color, linestyle='-')
+
+    # Plot CI bounds
+    #hi_color = get_colormap_colors(colormap, 100)[-1]
+    hi_color = 'gray'
+    if loess:
+        frac = max(2/n, 0.3)
+        lo_low = sm.nonparametric.lowess(df['q_low'], df.index, frac=frac)
+        lo_high = sm.nonparametric.lowess(df['q_high'], df.index, frac=frac)
+        ax.plot(lo_low[:, 0], lo_low[:, 1], color=hi_color, linestyle='--')
+        ax.plot(lo_high[:, 0], lo_high[:, 1], color=hi_color, linestyle='--')
+        ax.fill_between(df.index, lo_low[:, 1], lo_high[:, 1], facecolor='#fee08b', alpha=0.15)
     else:
-        # Plot raw min and max as dashed lines similar to loess
-        ax.plot(df.index, df['min'], color=get_colormap_colors(colormap, 100)[99], linestyle='--', label='Min')
-        ax.plot(df.index, df['max'], color=get_colormap_colors(colormap, 100)[99], linestyle='--', label='Max')
-        ax.fill_between(df.index,
-                        df['min'],
-                        df['max'],
-                        facecolor='#fee08b',
-                        alpha=0.15)
+        ax.plot(df.index, df['q_low'], color=hi_color, linestyle='--', label='Lower CI')
+        ax.plot(df.index, df['q_high'], color=hi_color, linestyle='--', label='Upper CI')
+        ax.fill_between(df.index, df['q_low'], df['q_high'], facecolor='#fee08b', alpha=0.15)
 
-    if ax.get_ylim()[0] < 0 and ax.get_ylim()[1] > 0:
-        ax.axhline(y=0, color='k', ls='--')
+    # Zero line
+    y0, y1 = ax.get_ylim()
+    if y0 < 0 < y1:
+        ax.axhline(0, color='k', ls='--')
 
-    lines = []
-    markers = []
+    # Highlights
+    handles = []
     if specs:
         idxs = df.index[df['idx']].tolist()
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names)
-            lines.append(ax.vlines(x=idx,
-                                   ymin=df['min'].iloc[idx] if not loess else loess_min[idx, 1],
-                                   ymax=df['max'].iloc[idx] if not loess else loess_max[idx, 1],
-                                   color=colorset[i],
-                                   label=label))
-            markers.append(Line2D([0], [0],
-                                  marker='o',
-                                  color=colorset[i],
-                                  markerfacecolor='w',
-                                  markersize=10,
-                                  label=label)
-                           )
-            myArrow = FancyArrowPatch(posA=(idx, df['min'].iloc[idx] if not loess else loess_min[idx, 1]),
-                                      posB=(idx, df['max'].iloc[idx] if not loess else loess_max[idx, 1]),
-                                      arrowstyle='<|-|>',
-                                      color=colorset[i],
-                                      mutation_scale=20,
-                                      shrinkA=0,
-                                      shrinkB=0)
-            ax.add_artist(myArrow)
-            ax.plot(idx,
-                    df.at[idx, 'median'],
-                    'o',
-                    markeredgecolor=colorset[i],
-                    markerfacecolor='w',
-                    markersize=15)
+        for j, idx in enumerate(idxs):
+            col = spec_colors[j]
+            lbl = ', '.join(df.spec_name.iloc[idx])
+            low = lo_low[idx, 1] if loess else df.at[idx, 'q_low']
+            high = lo_high[idx, 1] if loess else df.at[idx, 'q_high']
+            ax.vlines(idx, ymin=low, ymax=high, color=col)
+            arrow = FancyArrowPatch((idx, low), (idx, high), arrowstyle='<|-|>', color=col,
+                                    mutation_scale=20, shrinkA=0, shrinkB=0)
+            ax.add_artist(arrow)
+            ax.plot(idx, df.at[idx, 'median'], 'o', markeredgecolor=col, markerfacecolor='w', markersize=12)
+            handles.append(Line2D([0], [0], marker='o', color=col, markerfacecolor='w', markersize=10, label=lbl))
 
-    full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-    lines.append(ax.vlines(x=full_spec_pos,
-                           ymin=df['min'].iloc[full_spec_pos] if not loess else loess_min[full_spec_pos, 1],
-                           ymax=df['max'].iloc[full_spec_pos] if not loess else loess_max[full_spec_pos, 1],
-                           color='k',
-                           label='Full Model'))
-    markers.append(Line2D([0], [0],
-                          marker='o',
-                          color='k',
-                          markerfacecolor='w',
-                          markersize=10,
-                          label='Full Model')
-                   )
-    myArrow = FancyArrowPatch(
-        posA=(full_spec_pos, df['min'].iloc[full_spec_pos] if not loess else loess_min[full_spec_pos, 1]),
-        posB=(full_spec_pos, df['max'].iloc[full_spec_pos] if not loess else loess_max[full_spec_pos, 1]),
-        arrowstyle='<|-|>',
-        color='k',
-        mutation_scale=20,
-        shrinkA=0,
-        shrinkB=0)
-    ax.add_artist(myArrow)
-    ax.plot(full_spec_pos,
-            df['median'].iloc[full_spec_pos],
-            'o',
-            markeredgecolor='k',
-            markerfacecolor='w',
-            markersize=15)
+    # Full model
+    pos_full = df.index[df['full_spec_idx']].item()
+    low_f = lo_low[pos_full, 1] if loess else df.at[pos_full, 'q_low']
+    high_f = lo_high[pos_full, 1] if loess else df.at[pos_full, 'q_high']
+    ax.vlines(pos_full, ymin=low_f, ymax=high_f, color=full_color)
+    arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f), arrowstyle='<|-|>', color=full_color,
+                              mutation_scale=20, shrinkA=0, shrinkB=0)
+    ax.add_artist(arrow_f)
+    ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
+    handles.append(Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
 
-    ax.legend(handles=markers,
-              frameon=True,
-              edgecolor=(0, 0, 0, 1),
-              fontsize=11,
-              loc="lower right",
-              ncols=2,
-              framealpha=1,
-              facecolor=((1, 1, 1, 0)
-              )
-              )
+    # Null model
+    pos_null = df.index[df['null_spec_idx']].item()
+    low_n = lo_low[pos_null, 1] if loess else df.at[pos_null, 'q_low']
+    high_n = lo_high[pos_null, 1] if loess else df.at[pos_null, 'q_high']
+    ax.vlines(pos_null, ymin=low_n, ymax=high_n, color=null_color)
+    arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n), arrowstyle='<|-|>', color=null_color,
+                              mutation_scale=20, shrinkA=0, shrinkB=0)
+    ax.add_artist(arrow_n)
+    ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
+    handles.append(Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
 
-    axis_formatter(ax, r'Coefficient Estimates', 'Ordered Specifications', title)
-    ax.set_xlim(0, len(results_object.specs_names))
-    ax.set_ylim(ax.get_ylim()[0] - (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10,
-                ax.get_ylim()[1] + (np.abs(ax.get_ylim()[1]) - np.abs(ax.get_ylim()[0])) / 10)
-    final_string = f"Median coef: {results_object.inference['median']:.3f} (Z: {results_object.inference['Stouffers'][0]:.3f})"
-    ax.text(
-        0.05, 0.95,
-        (f'Number of specifications: {len(results_object.specs_names)}\n' +
-         f'Number of bootstraps: {results_object.draws}\n' +
-         f'Number of folds: {results_object.kfold}\n' +
-         final_string
-         ),
-        transform=ax.transAxes,
-        verticalalignment='top',
-        horizontalalignment='left',
-        color='black',
-        fontsize=12,
-        bbox=dict(facecolor='white',
-                  edgecolor='black',
-                  boxstyle='round,pad=1')
+    # Legend and formatting
+    ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
+              loc='lower right', ncols=2, framealpha=1, facecolor='w')
+    axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
+    ax.set_xlim(0, n - 1)
+    pad = (y1 - y0) * 0.1
+    ax.set_ylim(y0 - pad, y1 + pad)
+
+    # Summary inset
+    median_inf = results_object.inference['median']
+    z_score = results_object.inference['Stouffers'][0]
+    info_text = (
+        f'Specifications: {n}\n'
+        f'Bootstraps: {results_object.draws}\n'
+        f'Folds: {results_object.kfold}\n'
+        f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
     )
+    ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
+            fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
+
     sns.despine(ax=ax)
     return ax
+
+
 
 def plot_ic(
     results_object,
@@ -702,162 +689,126 @@ def plot_ic(
     despine_left: bool = True
 ) -> plt.Axes:
     """
-    Plots the information criterion (IC) curve for the given results object.
-
-    Parameters
-    ----------
-    results_object : object
-        Must expose `summary_df` (with `ic` column) and `specs_names`.
-    ic : str
-        Which criterion to plot: 'aic', 'bic', or 'hqic'.
-    specs : list of control‐lists, optional
-        Specs to highlight. Default: None.
-    ax : matplotlib.axes.Axes, optional
-        Axes to draw on. Default: current axes.
-    colormap : str, default='Spectral_r'
-        Colormap for highlights.
-    title : str, optional
-        Title text for the axes.
-    despine_left : bool, default=True
-        If True, move the y‐axis ticks & spine to the right.
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The axes containing the plot.
+    Plots the information criterion (IC) curve, colouring:
+      • “No Controls” in the first colormap colour
+      • each user‐highlighted spec in the next colours
+      • “Full Model” in the last colormap colour
     """
-    # Validate that the requested IC column exists in summary_df
+    # Validate IC column
     if ic not in results_object.summary_df.columns:
-        available_ics = [col for col in results_object.summary_df.columns if col.lower() in {'aic', 'bic', 'hqic'}]
-        raise ValueError(
-            f"[plot_ic] Requested information criterion '{ic}' not found in results.\n"
-            f"Available options in this results object: {available_ics}\n"
-            f"Did you fit the model using a different IC or forget to specify '{ic}' during fitting?"
-        )
+        available_ics = [c for c in results_object.summary_df.columns
+                         if c.lower() in {'aic','bic','hqic'}]
+        raise ValueError(f"[plot_ic] '{ic}' not found. Available: {available_ics}")
+
     if ax is None:
         ax = plt.gca()
-    colorset = get_colormap_colors(colormap, len(specs))
+
+    # grab exactly len(specs)+2 colours
+    n_specs = len(specs) if specs else 0
+    #colorset = get_colormap_colors(colormap, n_specs + 2)
+    colorset = get_colormap_colors(n_specs + 2)
+
     df = results_object.summary_df.copy()
-    df = df.sort_values(by='median')
-    df = df.reset_index(drop=True)
+    df = df.sort_values(by=ic).reset_index(drop=True)
     axis_formatter(ax, f'{ic.upper()} curve', 'Ordered Specifications', title)
 
     if specs:
-        key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
+        key            = get_selection_key(specs)
+        full_spec_key  = get_selection_key([list(results_object.specs_names.iloc[-1])])
+        null_spec_key  = get_selection_key([list(results_object.specs_names.iloc[0])])
+        df['idx']            = df.spec_name.isin(key)
+        df['full_spec_idx']  = df.spec_name.isin(full_spec_key)
+        df['null_spec_idx']  = df.spec_name.isin(null_spec_key)
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ax.plot(df[ic], color='#002d87')
+
+        # main IC curve stays the same colour you had
+        ax.plot(df[ic], color='k')
+
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax)
+
+        lines, markers = [], []
+        # highlighted specs
         idxs = df.index[df['idx']].tolist()
-        ymin = ax.get_ylim()[0]
-        ymax = ax.get_ylim()[1]
-        ax.set_ylim(ymin, ymax)
-        lines = []
-        markers = []
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
-            lines.append(ax.vlines(x=idx,
-                                   ymin=ymin,
-                                   ymax=df.at[idx, ic],
-                                   color=colorset[i],
-                                   label=label)
-                         )
-            markers.append(Line2D([0], [0],
-                                  marker='o',
-                                  color=colorset[i],
-                                  markerfacecolor='w',
-                                  markersize=10,
-                                  label=label)
-                           )
-            ax.plot(idx,
-                    df.at[idx, ic],
-                    'o',
-                    markeredgecolor=colorset[i],
-                    markerfacecolor='w',
-                    markersize=15,
-                    label=label)
-        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-        lines.append(ax.vlines(x=full_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[full_spec_pos, ic],
-                               color='k',
-                               label='Full Model'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='k',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='Full Model')
-                       )
-        ax.plot(full_spec_pos,
-                df.at[full_spec_pos, ic],
-                'o',
-                markeredgecolor='k',
-                markerfacecolor='w',
-                markersize=15)
+        for idx, i in zip(idxs, range(n_specs)):
+            col = colorset[i+1]                # shift by one
+            label = ', '.join(df.spec_name.iloc[idx])
+            lines.append(ax.vlines(idx, ymin, df.at[idx, ic], color=col, label=label))
+            markers.append(Line2D([0],[0],marker='o',color=col,
+                                  markerfacecolor='w',markersize=10,label=label))
+            ax.plot(idx, df.at[idx, ic], 'o',
+                    markeredgecolor=col, markerfacecolor='w', markersize=15)
+
+        # full‐model in last colour
+        full_pos = df.index[df['full_spec_idx']].item()
+        col_f    = colorset[-1]
+        lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
+        markers.append(Line2D([0],[0],marker='o',color=col_f,
+                              markerfacecolor='w',markersize=10,label='Full Model'))
+        ax.plot(full_pos, df.at[full_pos, ic], 'o',
+                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
+
+        # no‐controls in first colour
+        null_pos = df.index[df['null_spec_idx']].item()
+        col_n    = colorset[0]
+        lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
+        markers.append(Line2D([0],[0],marker='o',color=col_n,
+                              markerfacecolor='w',markersize=10,label='No Controls'))
+        ax.plot(null_pos, df.at[null_pos, ic], 'o',
+                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
+
         ax.legend(handles=markers,
-                  frameon=True,
-                  edgecolor=(0, 0, 0, 1),
-                  fontsize=9,
-                  loc="upper left",
-                  ncols=1,
-                  framealpha=1,
-                  facecolor=((1, 1, 1, 0)
-                  )
-                  )
-        if despine_left is True:
+                  frameon=True, edgecolor='black',
+                  fontsize=9, loc="upper left",
+                  ncols=1, framealpha=1, facecolor='w')
+
+        if despine_left:
             sns.despine(ax=ax, right=False, left=True)
             ax.yaxis.set_label_position("right")
         else:
-            ax.yaxis.set_label_position("left")
             sns.despine(ax=ax)
+
     else:
+        df['full_spec_idx'] = df.spec_name.isin(get_selection_key([list(results_object.specs_names.iloc[-1])]))
+        df['null_spec_idx'] = df.spec_name.isin(get_selection_key([list(results_object.specs_names.iloc[0])]))
         df = df.sort_values(by=ic).reset_index(drop=True)
-        ax.plot(df[ic], color='#002d87')
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
-        ymin = ax.get_ylim()[0]
-        ymax = ax.get_ylim()[1]
+
+        ax.plot(df[ic], color='k')
+        ymin, ymax = ax.get_ylim()
         ax.set_ylim(ymin, ymax)
-        lines = []
-        markers = []
-        full_spec_pos = df.index[df['full_spec_idx']].to_list()[0]
-        lines.append(ax.vlines(x=full_spec_pos,
-                               ymin=ymin,
-                               ymax=df.at[full_spec_pos, ic],
-                               color='k',
-                               label='Full Model'))
-        markers.append(Line2D([0], [0], marker='o',
-                              color='k',
-                              markerfacecolor='w',
-                              markersize=10,
-                              label='Full Model')
-                       )
-        ax.plot(full_spec_pos,
-                df.at[full_spec_pos, ic],
-                'o',
-                markeredgecolor='k',
-                markerfacecolor='w',
-                markersize=15)
+
+        lines, markers = [], []
+        # full model
+        full_pos = df.index[df['full_spec_idx']].item()
+        col_f    = colorset[-1]
+        lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
+        markers.append(Line2D([0],[0],marker='o',color=col_f,
+                              markerfacecolor='w',markersize=10,label='Full Model'))
+        ax.plot(full_pos, df.at[full_pos, ic], 'o',
+                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
+
+        # no controls
+        null_pos = df.index[df['null_spec_idx']].item()
+        col_n    = colorset[0]
+        lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
+        markers.append(Line2D([0],[0],marker='o',color=col_n,
+                              markerfacecolor='w',markersize=10,label='No Controls'))
+        ax.plot(null_pos, df.at[null_pos, ic], 'o',
+                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
+
         ax.legend(handles=markers,
-                  frameon=True,
-                  edgecolor=(0, 0, 0, 1),
-                  fontsize=9,
-                  loc="upper left",
-                  ncols=1,
-                  framealpha=1,
-                  facecolor=((1, 1, 1, 0)
-                  )
-                  )
-        if despine_left is True:
+                  frameon=True, edgecolor='black',
+                  fontsize=9, loc="upper left",
+                  ncols=1, framealpha=1, facecolor='none')
+
+        if despine_left:
             ax.yaxis.set_label_position("right")
             sns.despine(ax=ax, right=False, left=True)
         else:
-            ax.yaxis.set_label_position("left")
             sns.despine(ax=ax)
+
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
+    return ax
 
 
 def plot_bdist(
@@ -867,114 +818,77 @@ def plot_bdist(
     colormap: str = 'Spectral_r',
     title: str = '',
     despine_left: bool = True,
-    legend_bool: bool = False
+    legend_bool: bool = False,
+    bw_adjust: float = 0.5
 ) -> plt.Axes:
     """
-    Plot kernel‐density distributions of coefficient estimates for select specs.
-
-    Parameters
-    ----------
-    results_object : object
-        Must expose `estimates` (DataFrame) and `specs_names`.
-    specs : list of control‐lists, optional
-        Which specs to overlay. Default: None.
-    ax : matplotlib.axes.Axes, optional
-        Axes to draw on. Default: current axes.
-    colormap : str, default='Spectral_r'
-        Colormap for the highlighted densities.
-    title : str, optional
-        Title text for the axes.
-    despine_left : bool, default=True
-        If True, move the y‐axis to the right.
-    legend_bool : bool, default=False
-        If True, draw a legend of the highlighted specs.
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The axes containing the density plot.
+    Plot density‐scaled histograms and KDEs of coefficient distributions,
+    in a fully generalisable way.
     """
+    # 1. Build a long‐form DataFrame with one row per (draw, spec)
+    draws_df = results_object.estimates.T.copy()
+    # flatten the spec‐names into strings
+    spec_labels = [s for s in results_object.specs_names]
+    draws_df.columns = spec_labels
 
-    def make_leg(results_object):
-        df = results_object.summary_df.copy()
-        df = df.sort_values(by='median')
-        df = df.reset_index(drop=True)
-        key = get_selection_key(specs)
-        full_spec = list(results_object.specs_names.iloc[-1])
-        full_spec_key = get_selection_key([full_spec])
-        df['idx'] = df.spec_name.isin(key)
-        df['full_spec_idx'] = df.spec_name.isin(full_spec_key)
-        idxs = df.index[df['idx']].tolist()
-        leg = []
-        for idx, i in zip(idxs, range(len(specs))):
-            control_names = list(df.spec_name.iloc[idx])
-            label = ', '.join(control_names).title()
-            leg.append([colorset[i], label])
-        leg.append(['k', 'Full Model'])
-        return leg
+    # pick out the special ones
+    null_label = spec_labels[0]
+    full_label = spec_labels[-1]
+    highlight = []
+    if specs:
+        requested: Set[frozenset] = {frozenset(sp) for sp in specs }
+        highlight = [lab for lab in spec_labels if lab in requested]
 
-    colorset = get_colormap_colors(colormap, len(specs))
+    # define the order we'll plot (so colors map consistently)
+    order = [null_label] + highlight + [full_label]
+    #palette = get_colormap_colors(colormap, len(order))
+    palette = get_colormap_colors(len(order))
+
+    # melt into long form
+    df_long = draws_df[order].melt(var_name='spec', value_name='coef')
+
     if ax is None:
         ax = plt.gca()
-    df = results_object.estimates.copy().T
-    df.columns = results_object.specs_names
-    if specs:
-        key = get_selection_key(specs)
-        matching_cols = [col for col in df.columns if col in key]
-        for i, col in enumerate(matching_cols):
-            sns.kdeplot(df[col].squeeze(), common_norm=True, ax=ax, color=colorset[i], legend=False)
-    sns.kdeplot(df.iloc[:, -1:].squeeze(), common_norm=True, legend=False,
-                color='black', ax=ax, label='Full Model')
-    markers=[]
+
+    sns.kdeplot(
+        data=df_long,
+        x='coef',
+        hue='spec',
+        common_norm=False,  # each group integrates to 1
+        bw_adjust=bw_adjust,  # controls smoothness (h ∝ bw_adjust)
+        palette=palette,  # line colours for each 'spec'
+        linewidth=2,
+        fill=True,  # fill under the curve
+        alpha=0.3,  # light shading
+        ax=ax,
+        legend=False
+    )
+
+    # 3. Optionally draw a custom legend
     if legend_bool:
-        leg = make_leg(results_object)
-        for ele in leg:
-            markers.append(Line2D([0], [0],
-                                  marker='o',
-                                  color=ele[0],
-                                  markerfacecolor='w',
-                                  markersize=0,
-                                  label=ele[1])
-                           )
-        # Temporarily place the legend at "upper left" to check for overlap
-        temp_legend = ax.legend(handles=markers,
-                                frameon=True,
-                                edgecolor=(0, 0, 0, 1),
-                                fontsize=9,
-                                loc="upper left",  # Start with "upper left"
-                                ncols=1,
-                                framealpha=1,
-                                facecolor=((1, 1, 1, 0)
-                                )
-                                )
+        handles = []
+        for col, lab in zip(palette, order):
+            handles.append(
+                Line2D([0], [0],
+                       marker='s',
+                       color=col,
+                       markerfacecolor=col,
+                       markersize=10,
+                       linestyle='',
+                       label=lab)
+            )
+        ax.legend(handles=handles, title='Specification',
+                  frameon=True, loc='upper right')
 
-        # Get the bounding box of the plot and the legend
-        plot_bbox = ax.get_tightbbox(plt.gcf().canvas.get_renderer())
-        legend_bbox = temp_legend.get_window_extent(plt.gcf().canvas.get_renderer())
-
-        # Check if the legend overlaps with the plot area
-        if legend_bbox.overlaps(plot_bbox):
-            # Remove the temporary legend
-            temp_legend.remove()
-
-            # Place the legend in the upper right to avoid overlap
-            ax.legend(handles=markers,
-                      frameon=True,
-                      edgecolor=(0, 0, 0, 1),
-                      fontsize=9,
-                      loc="upper right",  # Move to "upper right" if overlapping
-                      ncols=1,
-                      framealpha=1,
-                      facecolor=((1, 1, 1, 0)
-                      )
-                      )
-    axis_formatter(ax, 'Density', 'Coefficient Estimate', title)
+    # 4. Final formatting
+    axis_formatter(ax, 'Density', 'Estimand of Interest', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
-    if despine_left is True:
+    if despine_left:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
     else:
         sns.despine(ax=ax)
+
     return ax
 
 
@@ -1019,8 +933,8 @@ def plot_kfolds(
 
     # KDE & histogram
     data  = results_object.summary_df['av_k_metric']
-    colors = get_colormap_colors(colormap, 100)
-    sns.kdeplot(data, ax=ax, alpha=1, color=colors[99])
+    colors = get_colormap_colors(2)
+    sns.kdeplot(data, ax=ax, alpha=1, color=colors[1])
     sns.histplot(data, ax=ax, alpha=1, color=colors[0], bins=30, stat='density')
 
     # Symmetric x-padding
@@ -1032,7 +946,7 @@ def plot_kfolds(
     legend_loc = _legend_side_from_hist(ax, tau=tau)
 
     legend_elements = [
-        Line2D([0], [0], color=colors[99], lw=2, label='Density'),
+        Line2D([0], [0], color=colors[1], lw=2, label='Density'),
         Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1), label='Histogram')
     ]
     ax.legend(handles=legend_elements,
@@ -1052,7 +966,7 @@ def plot_kfolds(
 
     name = results_object.name_av_k_metric
     metric = r'R$^2$' if name.lower() == 'r-squared' else (name.upper() if name == 'rmse' else name.title())
-    axis_formatter(ax, 'Density', f'OOS Metric: {metric}', title)
+    axis_formatter(ax,  'Density', f'OOS Metric: {metric}', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
 
     if despine_left:
@@ -1097,7 +1011,7 @@ def plot_bma(
     bma['probs'].plot(kind='barh',
                       ax=ax,
                       alpha=1,
-                      color=get_colormap_colors(colormap, 100)[0],
+                      color=get_colormap_colors(1),
                       edgecolor='k',
                       )
     axis_formatter(ax, r'', 'BMA Probabilities', title)
@@ -1129,9 +1043,26 @@ def title_setter(
         return ax.set_title(title, loc='left', fontsize=16, y=1)
 
 
+def _sanitize_specs(
+    specs: Optional[List[List[str]]],
+    max_len: int = 4
+) -> Optional[List[List[str]]]:
+    """
+    Truncate the specs list to at most `max_len`, warning if we had to cut.
+    """
+    if specs is not None and len(specs) > max_len:
+        warnings.warn(
+            f"Received {len(specs)} specs; only the first {max_len} will be used.",
+            UserWarning
+        )
+        return specs[:max_len]
+    return specs
+
+
 def plot_results(
     results_object,
     loess: bool = True,
+    ci: float = 1,
     specs: Optional[List[List[str]]] = None,
     ic: Optional[str] = None,
     colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
@@ -1149,6 +1080,8 @@ def plot_results(
         `shap_return`, `summary_df`, `specs_names`, etc.).
     loess : bool, default=True
         Whether to apply LOESS smoothing to the coefficient–specification curve.
+    ci: float, default=1
+        The confidence interval to use.
     specs : list of list of str, optional
         Up to three specs (lists of control names) to highlight in the curve, IC, and distribution panels.
     ic : str, optional
@@ -1168,6 +1101,8 @@ def plot_results(
     - Saves a combined “_all” figure plus individual panels named:
       `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
     """
+    specs = _sanitize_specs(specs, max_len=6)
+
     figpath = os.path.join(os.getcwd(), 'figures', project_name)
     if not os.path.exists(figpath):
         os.makedirs(figpath)
@@ -1192,7 +1127,7 @@ def plot_results(
         feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
         plot_bma(results_object, colormap, ax3, feature_order, title='c.')
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
-        plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax6, colormap=colormap, title='f.')
+        plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax6, colormap=colormap, title='f.')
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
         plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
@@ -1202,9 +1137,9 @@ def plot_results(
         ax1 = fig.add_subplot(gs[0:6, 0:16])
         ax2 = fig.add_subplot(gs[0:3, 17:24])
         ax3 = fig.add_subplot(gs[3:6, 17:24])
-        plot_curve(results_object=results_object, loess=loess, specs=specs, ax=ax1, colormap=colormap, title='a.')
+        plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax1, colormap=colormap, title='a.')
         plot_hexbin_r2(results_object, ax2, fig, colormap, title='b.', side='right')
-        plot_kfolds(results_object, colormap, ax3, title='c.', despine_left=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax3, colormap=colormap, title='c.', despine_left=True)
         plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
 
 
@@ -1213,11 +1148,11 @@ def plot_results(
     plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_kfolds(results_object, colormap, ax, despine_left=False)
+    plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False)
     plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(12, 7))
-    plot_curve(results_object=results_object, specs=specs, ax=ax, colormap=colormap)
+    plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax, colormap=colormap)
     plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
 
@@ -1239,6 +1174,6 @@ def plot_results(
         plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
-        plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=False)
         plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
         plt.close(fig)

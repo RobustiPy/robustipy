@@ -143,7 +143,6 @@ class MergedResult(Protoresult):
         Returns:
             pd.DataFrame: DataFrame containing median, min, max, and quantiles.
         """
-        # TODO: use pandas describe
         data = self.estimates.copy()
         out = pd.DataFrame()
         out['median'] = data.median(axis=1)
@@ -200,6 +199,7 @@ class MergedResult(Protoresult):
         plot_results(
             results_object=self,
             loess=loess,
+            ci=ci,
             specs=specs,
             ax=ax,
             colormap=colormap,
@@ -398,12 +398,12 @@ class OLSResult(Protoresult):
         self.all_b = all_b
         self.all_p = all_p
         self.summary_df = self._compute_summary()
-        self._compute_inference()
         self.summary_df['r2'] = pd.Series(r2i_array)
         self.summary_df['ll'] = pd.Series(ll_array)
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
+        self._compute_inference()
         self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
         self.summary_df['spec_name'] = self.specs_names
         self.summary_df['y'] = self.y_name
@@ -477,6 +477,19 @@ class OLSResult(Protoresult):
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
+        for ic in ['aic', 'bic', 'hqic']:
+            if max(len(t) for t in self.y_name) == 1:
+                ic_array = np.array(self.summary_df[ic].to_list())
+                all_b = [arr[0] for arr in self.all_b]
+                coef_mat = np.vstack(all_b)
+                delta = ic_array - ic_array.min()
+                w = np.exp(-0.5 * delta)
+                w /= w.sum()
+                beta_avg = w @ coef_mat
+                self.inference[ic + '_average'] = beta_avg[0]
+            else:
+                self.inference[ic + '_average'] = np.nan
+
         self.inference['median_p'] = (
             np.nan if not inference else
             (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
@@ -484,7 +497,7 @@ class OLSResult(Protoresult):
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
         self.inference['max_ns'] = df_model_result['betas'].max()
-        self.inference['max'] = self.estimates.min().max()
+        self.inference['max'] = self.estimates.max().max()
 
         self.inference['pos_ns'] = df_model_result['positive_beta'].sum()
         self.inference['pos_prop_ns'] = df_model_result['positive_beta'].mean()
@@ -577,6 +590,12 @@ class OLSResult(Protoresult):
 
         print(f"Max beta (all specifications, no resampling): {round(self.inference['max_ns'], digits)}")
         print(f"Max beta (all bootstraps and specifications): {round(self.inference['max'], digits)}")
+        if self.inference['aic_average'] is not np.nan:
+            print(f"AIC-weighted beta (all specifications, no resampling): {round(self.inference['aic_average'], digits)}")
+        if self.inference['bic_average'] is not np.nan:
+            print(f"BIC-weighted beta (all specifications, no resampling): {round(self.inference['bic_average'], digits)}")
+        if self.inference['hqic_average'] is not np.nan:
+            print(f"HQIC-weighted beta (all specifications, no resampling): {round(self.inference['hqic_average'], digits)}")
 
         if not inference:
             print(f"Significant portion of beta (all specifications, no resampling): {round(self.inference['sig_prop_ns'], digits)}")
@@ -636,6 +655,7 @@ class OLSResult(Protoresult):
              loess: bool = True,
              specs: Optional[List[List[str]]] = None,
              ic: str = 'aic',
+             ci: float = 1,
              colormap: str = 'Spectral_r',
              figsize: Tuple[int, int] = (12, 6),
              ext: str = 'pdf',
@@ -652,6 +672,8 @@ class OLSResult(Protoresult):
             Up to three specific model specifications to highlight.
         ic : {'bic', 'aic', 'hqic'}, default='aic'
             Which information criterion to display.
+        ci: float, default=1
+            confidence interval.
         colormap : str, default='Spectral_r'
             Name of the matplotlib colormap for the plot.
         figsize : tuple of int, default=(12, 6)
@@ -697,6 +719,7 @@ class OLSResult(Protoresult):
                             loess=loess,
                             specs=specs,
                             ic=ic,
+                            ci=ci,
                             colormap=colormap,
                             figsize=figsize,
                             ext=ext,
@@ -724,7 +747,7 @@ class OLSResult(Protoresult):
         """
         Performs Bayesian Model Averaging (BMA) using BIC-implied priors.
 
-        Returns:
+        Returnsnt
         -------
             pd.DataFrame: DataFrame containing BMA results.
         """
@@ -857,8 +880,12 @@ class OLSRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
+<<<<<<< HEAD
         threshold: int = 10_000,
         composite_sample: Optional[int] = None
+=======
+        threshold: int = 1000000
+>>>>>>> d8c6e16301666144ff400a427cb5231ede7424db
     ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
@@ -879,7 +906,7 @@ class OLSRobust(BaseRobust):
             Number of parallel jobs; defaults to all available cores minus one.
         seed : int, optional
             Random seed for reproducibility.
-        threshold : int, default=10000
+        threshold : int, default=1000000
             Warn if total model runs exceed this number.
 
         Returns
@@ -1476,6 +1503,8 @@ class LRobust(BaseRobust):
         """
         x_test = add_constant(x_test, prepend=False)
         return 1 / (1 + np.exp(-x_test.dot(betas)))
+
+
     def fit(
         self,
         *,
@@ -1487,7 +1516,7 @@ class LRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
-        threshold: int = 10_000
+        threshold: int = 1000000
     ) -> 'LRobust':
         """
         Fit the logistic regression models over the specification space and bootstrap samples.
@@ -1510,7 +1539,7 @@ class LRobust(BaseRobust):
             Number of parallel jobs; defaults to all available.
         seed : int, optional
             Random seed for reproducibility.
-        threshold : int, default=10000
+        threshold : int, default=1000000
             Warn if `draws * n_specs` exceeds this.
 
         Returns
@@ -1526,7 +1555,8 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv']
+            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv'],
+            threshold=threshold
         )
         print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
 
