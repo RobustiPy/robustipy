@@ -74,13 +74,13 @@ def logistic_regression_sm(y, x) -> dict:
     """
     X_const = sm.add_constant(x, prepend=False)
     model = sm.Logit(y, X_const)
-    result = model.fit(method='newton', tol=1e-8, disp=0)
+    result = model.fit(method='newton', tol=1e-7, disp=0)
     n = result.nobs
     k = result.df_model + 1
     ll = result.llf
 
     null_model = sm.Logit(y, np.ones_like(y))  # only intercept
-    result_null = null_model.fit(method='newton', tol=1e-8, disp=0)
+    result_null = null_model.fit(method='newton', tol=1e-7, disp=0)
     ll_null = result_null.llf
     r2 = 1 - (ll / ll_null)
     return {'b': [[x] for x in result.params.values],
