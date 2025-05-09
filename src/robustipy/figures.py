@@ -1112,10 +1112,13 @@ def plot_results(
     Notes
     -----
     - Automatically creates `./figures/{project_name}/` if it does not exist.
-    - Saves a combined “_all” figure plus individual panels named:
+    - Saves a combiIned “_all” figure plus individual panels named:
       `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
     """
     specs = _sanitize_specs(specs, max_len=6)
+
+    if not (0 <= ci <= 1):
+        sys.exit(f"`ci` must lie strictly between 0 and 1; received ci={ci!r}")
 
     outdir = _prepare_output_dir(Path(figpath) if figpath else None, project_name)
 
@@ -1123,7 +1126,7 @@ def plot_results(
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
         ax1 = fig.add_subplot(gs[0:3, 0:12])
-        ax2 = fig.add_subplot(gs[0:3, 13:24])
+        ax2 f= fig.add_subplot(gs[0:3, 13:24])
         ax4 = fig.add_subplot(gs[3:5, 6:14])
         ax3 = fig.add_subplot(gs[3:5, 0:6])
         ax5 = fig.add_subplot(gs[3:5, 14:23])
