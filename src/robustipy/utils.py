@@ -72,8 +72,7 @@ def logistic_regression_sm(y, x) -> dict:
     dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
           AIC, BIC, and HQIC.
     """
-    X_const = sm.add_constant(x, prepend=False)
-    model = sm.Logit(y, X_const)
+    model = sm.Logit(y, x)
     result = model.fit(method='newton', tol=1e-8, disp=0)
     n = result.nobs
     k = result.df_model + 1
