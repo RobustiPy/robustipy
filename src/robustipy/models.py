@@ -159,8 +159,9 @@ class MergedResult(Protoresult):
         colormap: str = 'Spectral_r',
         figsize: Tuple[int, int] = (16, 14),
         ext: str = 'pdf',
-        figpath = None,
-        project_name: str = 'no_project_name',
+        figpath: str = None,
+        project_name: str = None,
+        oddsratio: bool = False,
     ) -> plt.Figure:
         """
         Plot specification results highlighting up to three specs.
@@ -181,7 +182,8 @@ class MergedResult(Protoresult):
             Directory in which to save outputs; if None, uses current working dir.
         project_name : str
             Prefix for saved figure.
-
+        oddsratio bool, default=False
+            Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
         -------
         matplotlib.figure.Figure:
@@ -208,7 +210,8 @@ class MergedResult(Protoresult):
             colormap=colormap,
             ext=ext,
             figpath=figpath,
-            project_name=project_name
+            project_name=project_name,
+            oddsratio=oddsratio
         )
         return fig
 
@@ -640,9 +643,20 @@ class OLSResult(Protoresult):
         print(f"Min BIC: {round(self.summary_df['bic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {round(self.summary_df['hqic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print(f"Max Log Likelihood: {round(self.summary_df['ll'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
-        print(f"Min Log Likelihood: {round(self.summary_df['ll'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
-        print(f"Max { 'Adj-' if "OLS" in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
-        print(f"Min { 'Adj-' if "OLS" in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
+        print(
+            f"Min Log Likelihood: {self.summary_df['ll'].min():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}"
+        )
+        print(
+            f"Max {'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R²: "
+            f"{self.summary_df['r2'].max():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}"
+        )
+        print(
+            f"Min {'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R²: "
+            f"{self.summary_df['r2'].min():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}"
+        )
 
         print_separator()
         print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
@@ -664,7 +678,8 @@ class OLSResult(Protoresult):
              figsize: Tuple[int, int] = (12, 6),
              ext: str = '   pdf',
              figpath = None,
-             project_name: str = 'no_project_name'
+             project_name: str = 'no_project_name',
+             oddsratio: bool = False
              ) -> plt.Figure:
         """
         Plots the regression results using specified options.
@@ -689,7 +704,8 @@ class OLSResult(Protoresult):
             File extension if saving the figure (unused if not saving).
         project_name : str, default='no_project_name'
             Project identifier used in saved filename (unused if not saving).
-
+        oddsratio bool, default=False
+            Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
         -------
         fig : matplotlib.figure.Figure
@@ -731,7 +747,8 @@ class OLSResult(Protoresult):
                             figsize=figsize,
                             ext=ext,
                             figpath=figpath,
-                            project_name=project_name)
+                            project_name=project_name,
+                            oddsratio=oddsratio)
 
     def _compute_summary(self):
         """
