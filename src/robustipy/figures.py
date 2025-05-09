@@ -1059,6 +1059,17 @@ def _sanitize_specs(
     return specs
 
 
+def _prepare_output_dir(figpath: Optional[Path], project: Optional[str]) -> Path:
+    base = figpath or Path.cwd()
+    if project:
+        base = base / project
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise RuntimeError(f"Could not create output directory {base!r}") from e
+    return base
+
+
 def plot_results(
     results_object,
     loess: bool = True,
@@ -1068,7 +1079,8 @@ def plot_results(
     colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
     figsize: Tuple[int, int] = (16, 16),
     ext: str = 'pdf',
-    project_name: str = 'no_project_name'
+    figpath = None,
+    project_name: str = None
 ) -> None:
     """
     Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
@@ -1090,6 +1102,8 @@ def plot_results(
         Colormap used consistently for all panels.
     figsize : (width, height), default=(16,16)
         Size of the full figure in inches.
+    figpath : str or Path, optional
+        Directory in which to save outputs; if None, uses current working dir.
     ext : str, default='pdf'
         File extension to save each panel (e.g. 'png','pdf').
     project_name : str, default='no_project_name'
@@ -1103,9 +1117,7 @@ def plot_results(
     """
     specs = _sanitize_specs(specs, max_len=6)
 
-    figpath = os.path.join(os.getcwd(), project_name)
-    if not os.path.exists(figpath):
-        os.makedirs(figpath)
+    outdir = _prepare_output_dir(Path(figpath) if figpath else None, project_name)
 
     if max(len(t) for t in results_object.y_name) == 1:
         fig = plt.figure(figsize=figsize)
@@ -1130,7 +1142,7 @@ def plot_results(
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax6, colormap=colormap, title='f.')
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7, colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs, ax=ax8, colormap=colormap, title='h.', despine_left=True)
-        plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_all.'+ext), bbox_inches='tight')
     else:
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(6, 24, wspace=-.25, hspace=5)
@@ -1140,40 +1152,40 @@ def plot_results(
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax1, colormap=colormap, title='a.')
         plot_hexbin_r2(results_object, ax2, fig, colormap, title='b.', side='right')
         plot_bdist(results_object=results_object, specs=specs, ax=ax3, colormap=colormap, title='c.', despine_left=True)
-        plt.savefig(os.path.join(figpath, project_name + '_all.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_all.'+ext), bbox_inches='tight')
 
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_r2(results_object, ax, fig, colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_name + '_R2hexbin.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False)
-    plt.savefig(os.path.join(figpath, project_name + '_OOS.'+ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_name + '_OOS.'+ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs, ax=ax, colormap=colormap)
-    plt.savefig(os.path.join(figpath, project_name + '_curve.'+ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_name + '_curve.'+ext), bbox_inches='tight')
     plt.close(fig)
 
     if max(len(t) for t in results_object.y_name) == 1:
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_hexbin_log(results_object, ax, fig, colormap)
-        plt.savefig(os.path.join(figpath, project_name + '_LLhexbin.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_LLhexbin.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
         feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
-        plt.savefig(os.path.join(figpath, project_name + '_SHAP.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_SHAP.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bma(results_object, colormap, ax, feature_order)
-        plt.savefig(os.path.join(figpath, project_name + '_BMA.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_BMA.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.', despine_left=False)
-        plt.savefig(os.path.join(figpath, project_name + '_IC.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_IC.'+ext), bbox_inches='tight')
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax, colormap=colormap, despine_left=False, legend_bool=False)
-        plt.savefig(os.path.join(figpath, project_name + '_bdist.'+ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_name + '_bdist.'+ext), bbox_inches='tight')
         plt.close(fig)
