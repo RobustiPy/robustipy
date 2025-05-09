@@ -159,7 +159,9 @@ class MergedResult(Protoresult):
         colormap: str = 'Spectral_r',
         figsize: Tuple[int, int] = (16, 14),
         ext: str = 'pdf',
-        project_name: str = 'no_project_name',
+        figpath: str = None,
+        project_name: str = None,
+        oddsratio: bool = False,
     ) -> plt.Figure:
         """
         Plot specification results highlighting up to three specs.
@@ -176,9 +178,12 @@ class MergedResult(Protoresult):
             Figure size (width, height).
         ext : str
             File extension for saving.
+        figpath : str or Path, optional
+            Directory in which to save outputs; if None, uses current working dir.
         project_name : str
             Prefix for saved figure.
-
+        oddsratio bool, default=False
+            Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
         -------
         matplotlib.figure.Figure:
@@ -204,7 +209,9 @@ class MergedResult(Protoresult):
             ax=ax,
             colormap=colormap,
             ext=ext,
-            project_name=project_name
+            figpath=figpath,
+            project_name=project_name,
+            oddsratio=oddsratio
         )
         return fig
 
@@ -636,9 +643,20 @@ class OLSResult(Protoresult):
         print(f"Min BIC: {round(self.summary_df['bic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
         print(f"Min HQIC: {round(self.summary_df['hqic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
         print(f"Max Log Likelihood: {round(self.summary_df['ll'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
-        print(f"Min Log Likelihood: {round(self.summary_df['ll'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}")
-        print(f"Max { 'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}")
-        print(f"Min { 'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R2: {round(self.summary_df['r2'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}")
+        print(
+            f"Min Log Likelihood: {self.summary_df['ll'].min():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}"
+        )
+        print(
+            f"Max {'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R²: "
+            f"{self.summary_df['r2'].max():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmax()])}"
+        )
+        print(
+            f"Min {'Adj-' if 'OLS' in self.model_name else 'Pseudo'} R²: "
+            f"{self.summary_df['r2'].min():.{digits}f}, "
+            f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['r2'].idxmin()])}"
+        )
 
         print_separator()
         print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
@@ -658,8 +676,10 @@ class OLSResult(Protoresult):
              ci: float = 1,
              colormap: str = 'Spectral_r',
              figsize: Tuple[int, int] = (12, 6),
-             ext: str = 'pdf',
-             project_name: str = 'no_project_name'
+             ext: str = '   pdf',
+             figpath = None,
+             project_name: str = 'no_project_name',
+             oddsratio: bool = False
              ) -> plt.Figure:
         """
         Plots the regression results using specified options.
@@ -676,13 +696,16 @@ class OLSResult(Protoresult):
             confidence interval.
         colormap : str, default='Spectral_r'
             Name of the matplotlib colormap for the plot.
+        figpath : str or Path, optional
+            Directory in which to save outputs; if None, uses current working dir.
         figsize : tuple of int, default=(12, 6)
             Figure width and height in inches.
         ext : str, default='pdf'
             File extension if saving the figure (unused if not saving).
         project_name : str, default='no_project_name'
             Project identifier used in saved filename (unused if not saving).
-
+        oddsratio bool, default=False
+            Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
         -------
         fig : matplotlib.figure.Figure
@@ -723,7 +746,9 @@ class OLSResult(Protoresult):
                             colormap=colormap,
                             figsize=figsize,
                             ext=ext,
-                            project_name=project_name)
+                            figpath=figpath,
+                            project_name=project_name,
+                            oddsratio=oddsratio)
 
     def _compute_summary(self):
         """
@@ -880,8 +905,9 @@ class OLSRobust(BaseRobust):
         oos_metric: str = 'r-squared',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
+        composite_sample: Optional[int] = None,
         threshold: int = 1000000
-    ) -> 'OLSRobust':
+        ) -> 'OLSRobust':
         """
         Fit the OLS models into the specification space as well as over the bootstrapped samples.
 
@@ -909,6 +935,8 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+        self.composite_sample = composite_sample      # int or None
+        self.seed             = seed
         combined = self.x + controls
         found_constant = any(
             self.data[col].nunique(dropna=False) == 1

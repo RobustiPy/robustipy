@@ -73,13 +73,13 @@ def logistic_regression_sm(y, x) -> dict:
           AIC, BIC, and HQIC.
     """
     model = sm.Logit(y, x)
-    result = model.fit(method='newton', tol=1e-8, disp=0)
+    result = model.fit(method='newton', tol=1e-7, disp=0)
     n = result.nobs
     k = result.df_model + 1
     ll = result.llf
 
     null_model = sm.Logit(y, np.ones_like(y))  # only intercept
-    result_null = null_model.fit(method='newton', tol=1e-8, disp=0)
+    result_null = null_model.fit(method='newton', tol=1e-7, disp=0)
     ll_null = result_null.llf
     r2 = 1 - (ll / ll_null)
     return {'b': [[x] for x in result.params.values],
@@ -608,3 +608,31 @@ def calculate_imv_score(y_true, y_enhanced):
     # Compute IMV
     imv = (w_enhanced - w_null) / w_null
     return imv
+
+
+def sample_y_masks(
+    n_y: int,                      # how many raw outcome variables
+    n_masks: int,                  # how many composites you want
+    seed: Optional[int] = None
+) -> List[int]:
+    """
+    Uniformly sample `n_masks` bit-masks from the non-empty power-set of
+    `n_y` items **without** enumerating the 2^n_y possibilities.
+
+    Returns
+    -------
+    list[int]   each mask is an `int` whose binary representation tells
+                which outcomes enter the composite.
+    """
+    full_space = (1 << n_y) - 1        # ignore the 0/empty mask
+    if n_masks >= full_space:
+        # exhaustive: 1 … (2^n_y − 1)
+        return list(range(1, full_space + 1))
+
+    rng   = np.random.default_rng(seed)
+    masks = rng.choice(
+        full_space,
+        size=n_masks,
+        replace=False
+    ) + 1           # shift from 0..full_space-1 to 1..full_space
+    return masks.tolist()
