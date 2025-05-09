@@ -146,7 +146,6 @@ def simple_ols(y, x) -> dict:
     dict: Dictionary containing regression results, including coefficients, p-values, log-likelihood,
           AIC, BIC, and HQIC.
     """
-    x['const'] = 1
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:
