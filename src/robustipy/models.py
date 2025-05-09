@@ -159,6 +159,7 @@ class MergedResult(Protoresult):
         colormap: str = 'Spectral_r',
         figsize: Tuple[int, int] = (16, 14),
         ext: str = 'pdf',
+        figpath = None,
         project_name: str = 'no_project_name',
     ) -> plt.Figure:
         """
@@ -176,6 +177,8 @@ class MergedResult(Protoresult):
             Figure size (width, height).
         ext : str
             File extension for saving.
+        figpath : str or Path, optional
+            Directory in which to save outputs; if None, uses current working dir.
         project_name : str
             Prefix for saved figure.
 
@@ -204,6 +207,7 @@ class MergedResult(Protoresult):
             ax=ax,
             colormap=colormap,
             ext=ext,
+            figpath=figpath,
             project_name=project_name
         )
         return fig
@@ -658,7 +662,8 @@ class OLSResult(Protoresult):
              ci: float = 1,
              colormap: str = 'Spectral_r',
              figsize: Tuple[int, int] = (12, 6),
-             ext: str = 'pdf',
+             ext: str = '   pdf',
+             figpath = None,
              project_name: str = 'no_project_name'
              ) -> plt.Figure:
         """
@@ -676,6 +681,8 @@ class OLSResult(Protoresult):
             confidence interval.
         colormap : str, default='Spectral_r'
             Name of the matplotlib colormap for the plot.
+        figpath : str or Path, optional
+            Directory in which to save outputs; if None, uses current working dir.
         figsize : tuple of int, default=(12, 6)
             Figure width and height in inches.
         ext : str, default='pdf'
@@ -723,6 +730,7 @@ class OLSResult(Protoresult):
                             colormap=colormap,
                             figsize=figsize,
                             ext=ext,
+                            figpath=figpath,
                             project_name=project_name)
 
     def _compute_summary(self):

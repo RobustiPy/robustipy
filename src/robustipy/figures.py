@@ -11,6 +11,8 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, Patch, Rectangle
 
+import sys
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -1126,7 +1128,7 @@ def plot_results(
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
         ax1 = fig.add_subplot(gs[0:3, 0:12])
-        ax2 f= fig.add_subplot(gs[0:3, 13:24])
+        ax2 = fig.add_subplot(gs[0:3, 13:24])
         ax4 = fig.add_subplot(gs[3:5, 6:14])
         ax3 = fig.add_subplot(gs[3:5, 0:6])
         ax5 = fig.add_subplot(gs[3:5, 14:23])
