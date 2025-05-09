@@ -909,6 +909,16 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+        combined = self.x + controls
+        found_constant = any(
+            self.data[col].nunique(dropna=False) == 1
+            for col in combined
+        )
+        if not found_constant:
+            self.data['const'] = 1.0
+            self.x = self.x + ['const']
+
+
         if len(self.y) > 1:
             self.multiple_y()
         n_cpu = self._validate_fit_args(
