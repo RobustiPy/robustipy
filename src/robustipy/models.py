@@ -1002,7 +1002,7 @@ class OLSRobust(BaseRobust):
                      for seed in seeds))
                     y_names.append(y_name)
                     specs.append(frozenset(list(y_name) + list(spec)))
-                    all_predictors.append(self.x + list(spec) + ['const'])
+                    all_predictors.append(self.x + list(spec))
                     b_array[index, :] = b_list
                     p_array[index, :] = p_list
                     b_array_ystar[index, :] = b_list_ystar
@@ -1121,7 +1121,7 @@ class OLSRobust(BaseRobust):
                  for seed in seeds))
 
                 specs.append(frozenset(spec))
-                all_predictors.append(self.x + list(spec) + ['const'])
+                all_predictors.append(self.x + list(spec))
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
                 b_array_ystar[index, :] = b_list_ystar
@@ -1642,7 +1642,7 @@ class LRobust(BaseRobust):
                  for seed in seeds))
 
                 specs.append(frozenset(spec))
-                all_predictors.append(self.x + list(spec) + ['const'])
+                all_predictors.append(self.x + list(spec))
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
                 b_array_ystar[index, :] = np.nan*len(b_list)
