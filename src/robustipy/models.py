@@ -1540,6 +1540,15 @@ class LRobust(BaseRobust):
         self : LRobust
             Self, with `.results` populated as an `OLSResult`.
         """
+        combined = self.x + controls
+        found_constant = any(
+            self.data[col].nunique(dropna=False) == 1
+            for col in combined
+        )
+        if not found_constant:
+            self.data['const'] = 1.0
+            self.x = self.x + ['const']
+
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
