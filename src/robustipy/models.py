@@ -937,6 +937,16 @@ class OLSRobust(BaseRobust):
         """
         self.composite_sample = composite_sample      # int or None
         self.seed             = seed
+        combined = self.x + controls
+        found_constant = any(
+            self.data[col].nunique(dropna=False) == 1
+            for col in combined
+        )
+        if not found_constant:
+            self.data['const'] = 1.0
+            self.x = self.x + ['const']
+
+
         if len(self.y) > 1:
             self.multiple_y()
         n_cpu = self._validate_fit_args(
@@ -1020,7 +1030,7 @@ class OLSRobust(BaseRobust):
                      for seed in seeds))
                     y_names.append(y_name)
                     specs.append(frozenset(list(y_name) + list(spec)))
-                    all_predictors.append(self.x + list(spec) + ['const'])
+                    all_predictors.append(self.x + list(spec))
                     b_array[index, :] = b_list
                     p_array[index, :] = p_list
                     b_array_ystar[index, :] = b_list_ystar
@@ -1139,7 +1149,7 @@ class OLSRobust(BaseRobust):
                  for seed in seeds))
 
                 specs.append(frozenset(spec))
-                all_predictors.append(self.x + list(spec) + ['const'])
+                all_predictors.append(self.x + list(spec))
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
                 b_array_ystar[index, :] = b_list_ystar
@@ -1522,7 +1532,6 @@ class LRobust(BaseRobust):
         ndarray
             Predicted probabilities for the positive class.
         """
-        x_test = add_constant(x_test, prepend=False)
         return 1 / (1 + np.exp(-x_test.dot(betas)))
 
 
@@ -1568,6 +1577,15 @@ class LRobust(BaseRobust):
         self : LRobust
             Self, with `.results` populated as an `OLSResult`.
         """
+        combined = self.x + controls
+        found_constant = any(
+            self.data[col].nunique(dropna=False) == 1
+            for col in combined
+        )
+        if not found_constant:
+            self.data['const'] = 1.0
+            self.x = self.x + ['const']
+
         n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
@@ -1652,7 +1670,7 @@ class LRobust(BaseRobust):
                  for seed in seeds))
 
                 specs.append(frozenset(spec))
-                all_predictors.append(self.x + list(spec) + ['const'])
+                all_predictors.append(self.x + list(spec))
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
                 b_array_ystar[index, :] = np.nan*len(b_list)
