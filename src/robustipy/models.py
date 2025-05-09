@@ -1494,7 +1494,6 @@ class LRobust(BaseRobust):
         ndarray
             Predicted probabilities for the positive class.
         """
-        x_test = add_constant(x_test, prepend=False)
         return 1 / (1 + np.exp(-x_test.dot(betas)))
 
 
