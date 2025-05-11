@@ -958,7 +958,7 @@ class OLSRobust(BaseRobust):
 
         if len(self.y) > 1:
             self.multiple_y()
-        n_cpu = self._validate_fit_args(
+            n_cpu = self._validate_fit_args(
             controls=controls,
             group=group,
             draws=draws,
