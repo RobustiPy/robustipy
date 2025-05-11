@@ -277,6 +277,25 @@ class BaseRobust(Protomodel):
         cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
         _check_numeric_columns(self.data, cols_to_check)
 
+    def _check_colinearity(self, X: pd.DataFrame):
+        """
+        Ensure no perfect multicollinearity in X. If found, list the offending columns.
+        Raises a ValueError if rank < n_cols.
+        """
+        mat = X.values
+        n_cols = mat.shape[1]
+        rank  = np.linalg.matrix_rank(mat)
+        if rank < n_cols:
+            # look for near-zero singular values
+            sv         = np.linalg.svd(mat, compute_uv=False)
+            zero_idxs  = np.where(np.isclose(sv, 0, atol=1e-8))[0]
+            problematic = [X.columns[i] for i in zero_idxs]
+            raise ValueError(
+                f"Perfect collinearity detected (rank={rank} < {n_cols}).\n"
+                f"Variables causing linear dependence: {problematic}\n"
+                "Please remove or merge these predictors."
+            )
+
     def _validate_fit_args(
         self,
         controls: List[str],

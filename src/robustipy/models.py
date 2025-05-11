@@ -1664,6 +1664,8 @@ class LRobust(BaseRobust):
 
                 if group:
                     comb = group_demean(comb, group=group)
+                X_design = comb.drop(columns=comb.columns[0])
+                self._check_colinearity(X_design)
                 (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
