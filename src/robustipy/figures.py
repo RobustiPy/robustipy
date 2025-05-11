@@ -87,8 +87,8 @@ def axis_formatter(
     title : str
         Title text for the plot.
     side : {'left', 'right'}, default='left'
-        Side on which to draw the y-axis label and title.  
-        - 'left': y-label on left, title aligned slightly left.  
+        Side on which to draw the y-axis label and title.
+        - 'left': y-label on left, title aligned slightly left.
         - 'right': y-label on right, title aligned to the right side of the axes.
 
     Returns
@@ -612,6 +612,7 @@ def plot_curve(
     df['null_spec_idx'] = results_object.specs_names.isin(get_selection_key([null_spec]))
     if specs:
         df['idx'] = results_object.specs_names.isin(get_selection_key(specs))
+        df['specs_names'] = results_object.specs_names
 
     # Sort by median
     df = df.sort_values(by='median').reset_index(drop=True)
@@ -656,7 +657,7 @@ def plot_curve(
         idxs = df.index[df['idx']].tolist()
         for j, idx in enumerate(idxs):
             col = spec_colors[j]
-            lbl = ', '.join(results_object.specs_names.iloc[idx])
+            lbl = ', '.join(df['specs_names'].iloc[idx])
             low = lo_low[idx, 1] if loess else df.at[idx, 'q_low']
             high = lo_high[idx, 1] if loess else df.at[idx, 'q_high']
             ax.vlines(idx, ymin=low, ymax=high, color=col)
