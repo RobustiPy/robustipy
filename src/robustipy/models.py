@@ -935,6 +935,15 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+        for col in controls:
+            if self.data[col].nunique(dropna=False) == 1:
+                warnings.warn(
+                    f"The control variable '{col}' has the same value for all observations. "
+                    "This means it acts like a constant (intercept) term. "
+                    "Since it's in `controls`, it will only be included in some model specifications. "
+                    "If you want all models to include an intercept, move this variable to `x` instead of `controls`.",
+                    UserWarning
+                )
         self.composite_sample = composite_sample      # int or None
         self.seed             = seed
         combined = self.x + controls
