@@ -291,7 +291,7 @@ class BaseRobust(Protomodel):
             zero_idxs  = np.where(np.isclose(sv, 0, atol=1e-8))[0]
             problematic = [X.columns[i] for i in zero_idxs]
             raise ValueError(
-                f"Perfect collinearity detected (rank={rank} < {n_cols}).\n"
+                f"Perfect collinearity detected.\n"
                 f"Variables causing linear dependence: {problematic}\n"
                 "Please remove or merge these predictors."
             )
