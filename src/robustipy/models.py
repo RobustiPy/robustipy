@@ -1020,6 +1020,15 @@ class OLSRobust(BaseRobust):
 
                     if group:
                         comb = group_demean(comb, group=group)
+                    X_design = comb.drop(columns=comb.columns[0])
+                    try:
+                        self._check_colinearity(X_design)
+                    except ValueError as e:
+                        warnings.warn(
+                            f"[OLSRobust] Spec {spec!r} may be unstable due to perfect collinearity:\n{e}\n"
+                            "Proceeding with pseudoinverse; coefficients may not be uniquely identified.",
+                            UserWarning
+                        )
                     (b_all, p_all, r2_i, ll_i,
                      aic_i, bic_i, hqic_i,
                      av_k_metric_i) = self._full_sample_OLS(comb,
