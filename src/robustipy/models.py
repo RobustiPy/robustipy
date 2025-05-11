@@ -952,7 +952,8 @@ class OLSRobust(BaseRobust):
             for col in combined
         )
         if not found_constant:
-            self.data['const'] = 1.0
+            self.data = self.data.copy()
+            self.data.loc[:, 'const'] = 1.0
             self.x = self.x + ['const']
 
 
@@ -1601,7 +1602,8 @@ class LRobust(BaseRobust):
             for col in combined
         )
         if not found_constant:
-            self.data['const'] = 1.0
+            self.data = self.data.copy()
+            self.data.loc[:, 'const'] = 1.0
             self.x = self.x + ['const']
 
         n_cpu = self._validate_fit_args(
