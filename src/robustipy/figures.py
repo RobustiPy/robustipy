@@ -405,14 +405,15 @@ def shap_violin(
         features = None
     num_features = shap_values.shape[1]
     if features is not None:
-        shape_msg = "The shape of the shap_values matrix does not match the shape of the provided data matrix."
-        if num_features - 1 == features.shape[1]:
+        if shap_values.shape[1] == features.shape[1] + 1:
+            shap_values = shap_values[:, :-1]   # drop bias
+            num_features -= 1
+        elif shap_values.shape[1] != features.shape[1]:
             raise ValueError(
-                shape_msg + " Perhaps the extra column in the shap_values matrix is the "
-                            "constant offset? Of so just pass shap_values[:,:-1]."
-            )
-        else:
-            assert num_features == features.shape[1], shape_msg
+                f"shap_values has {shap_values.shape[1]} columns but "
+                f"features has {features.shape[1]} – shapes don’t match."
+            )                             
+
     if feature_names is None:
         feature_names = np.array([labels["FEATURE"] % str(i) for i in range(num_features)])
     if use_log_scale:
