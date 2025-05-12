@@ -661,7 +661,10 @@ class OLSResult(Protoresult):
             )
 
             print_separator()
-        print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
+        if max(len(t) for t in self.y_name) == 1:
+            print(f'2.3 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
+        else:
+            print(f'2.2 Out-Of-Sample Metrics ({self.name_av_k_metric} averaged across folds)')
         print_separator()
         oos_max_row = self.summary_df.loc[self.summary_df['av_k_metric'].idxmax(),]
         print(f'Max Average: {round(oos_max_row["av_k_metric"], digits)}, Specs: {list(oos_max_row["spec_name"])} ')
