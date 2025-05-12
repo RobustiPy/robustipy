@@ -1133,7 +1133,7 @@ class OLSRobust(BaseRobust):
                 SHAP_comb = self.data[self.y + self.x + controls]
             SHAP_comb = SHAP_comb.dropna()
             SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
-            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls],
+            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
                                                            SHAP_comb[self.y],
                                                            test_size=0.2,
                                                            random_state=seed
@@ -1656,7 +1656,7 @@ class LRobust(BaseRobust):
             SHAP_comb = SHAP_comb.dropna()
             SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
 
-            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls],
+            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const']),
                                                            SHAP_comb[self.y],
                                                            test_size=0.2,
                                                            random_state=seed

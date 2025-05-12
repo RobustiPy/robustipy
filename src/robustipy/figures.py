@@ -1185,8 +1185,8 @@ def plot_results(
         ax8 = fig.add_subplot(gs[7:9, 13:23])
 
         shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
-        shap_x = results_object.shap_return[1].drop(results_object.x_name, axis=1).to_numpy()
-        shap_cols = results_object.shap_return[1].drop(results_object.x_name, axis=1).columns
+        shap_x = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").to_numpy()
+        shap_cols = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").columns
         plot_hexbin_r2(results_object, ax1, fig,
                        oddsratio, colormap, title='a.')
         plot_hexbin_log(results_object, ax2, fig,
