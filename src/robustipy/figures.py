@@ -1133,7 +1133,7 @@ def _prepare_output_dir(figpath: Optional[Path], project: Optional[str]) -> Path
 def plot_results(
         results_object,
         loess: bool = True,
-        ci: float = 1,
+        ci: float = 0.95,
         specs: Optional[List[List[str]]] = None,
         ic: Optional[str] = None,
         colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
@@ -1153,7 +1153,7 @@ def plot_results(
         `shap_return`, `summary_df`, `specs_names`, etc.).
     loess : bool, default=True
         Whether to apply LOESS smoothing to the coefficient–specification curve.
-    ci: float, default=1
+    ci: float, default=0.95
         The confidence interval to use.
     specs : list of list of str, optional
         Up to three specs (lists of control names) to highlight in the curve, IC, and distribution panels.
