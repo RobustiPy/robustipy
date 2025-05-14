@@ -412,7 +412,7 @@ def shap_violin(
             raise ValueError(
                 f"shap_values has {shap_values.shape[1]} columns but "
                 f"features has {features.shape[1]} – shapes don’t match."
-            )                             
+            )
 
     if feature_names is None:
         feature_names = np.array([labels["FEATURE"] % str(i) for i in range(num_features)])
@@ -677,8 +677,12 @@ def plot_curve(
                               mutation_scale=20, shrinkA=0, shrinkB=0)
     ax.add_artist(arrow_f)
     ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
-    handles.append(
-        Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
+    if max(len(t) for t in results_object.y_name) == 1:
+        handles.append(
+            Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
+    else:
+        handles.append(
+            Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='All Data Used'))
 
     # Null model
     pos_null = df.index[df['null_spec_idx']].item()
@@ -689,9 +693,12 @@ def plot_curve(
                               mutation_scale=20, shrinkA=0, shrinkB=0)
     ax.add_artist(arrow_n)
     ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
-    handles.append(
-        Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
-
+    if max(len(t) for t in results_object.y_name) == 1:
+        handles.append(
+            Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
+    else:
+        handles.append(
+            Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
     # Legend and formatting
     ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
               loc='lower right', ncols=2, framealpha=1, facecolor='w')
