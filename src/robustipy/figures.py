@@ -196,7 +196,7 @@ def plot_hexbin_r2(
     else:
         cb.set_ticklabels([f"{t:.0f}" for t in ticks])
 
-    cb.ax.set_ylabel('Count', rotation=90, va='center', labelpad=10)
+    cb.ax.set_title('Count')
 
     # ------------------------------------------------------------------ #
     # 2a.  Optional trimming & baseline alignment (only when on the left)#
@@ -217,13 +217,24 @@ def plot_hexbin_r2(
     # ------------------------------------------------------------------ #
     # 3.  Axes labels, title, tick locators                              #
     # ------------------------------------------------------------------ #
-    axis_formatter(
-        ax,
-        r"In-Sample R$^2$",
-        r"Bootstrapped Estimand",
-        title,
-        side,
-    )
+    #
+    if results_object.model_name=='Logistic Regression Robust':
+        axis_formatter(
+            ax,
+            r"R$_{\mathrm{McF}}^2$",
+            r"Bootstrapped Estimand",
+            title,
+            side,
+        )
+    else:
+        axis_formatter(
+            ax,
+            r"In-Sample $\bar{\mathrm{R}}^2$",
+            r"Bootstrapped Estimand",
+            title,
+            side,
+        )
+
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
 
