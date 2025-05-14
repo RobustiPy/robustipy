@@ -1,5 +1,5 @@
 # Module containing utility functions for the library
-from typing import Optional, List, Tuple, Iterable
+from typing import Optional, List, Tuple, Iterable, Sequence
 import numpy as np
 import random
 import scipy
@@ -390,7 +390,7 @@ def join_sig_test(*,
 
     Returns
     ----------
-    float: 
+    float:
         Estimated p-value for the joint significance test.
     """
     if positive:
@@ -548,22 +548,76 @@ def reservoir_sampling(generator: Iterable, k: int) -> List:
     return reservoir
 
 
-def mcfadden_r2(y_true, y_prob):
+import numpy as np
+from typing import Sequence
+
+def pseudo_r2(
+    y_pred: Sequence,
+    y_true: Sequence,
+    mean_y_train: float
+) -> float:
+    """
+    Compute the pseudo-R² (1 - MSE_model / MSE_null), coercing inputs to floats.
+
+    Parameters
+    ----------
+    y_pred : Sequence
+        Model predictions (can be list/array of floats or strings convertible to float).
+    y_true : Sequence
+        True target values (same length as y_pred).
+    mean_y_train : float
+        The baseline prediction (e.g. the training‐set mean of y).
+
+    Returns
+    -------
+    float
+        Pseudo‐R² = 1 - (MSE_model / MSE_null).
+
+    Raises
+    ------
+    ValueError
+        If lengths differ, if mean‐square‐null is zero, or if conversion to float fails.
+    """
+    # --- Coerce to numpy arrays of floats ---
+    try:
+        y_pred_arr = np.asarray(y_pred, dtype=float)
+        y_true_arr = np.asarray(y_true, dtype=float)
+    except Exception as e:
+        raise ValueError(f"Could not convert inputs to floats: {e!s}")
+
+    if y_pred_arr.shape != y_true_arr.shape:
+        raise ValueError(
+            f"Length mismatch: y_pred has shape {y_pred_arr.shape}, "
+            f"y_true has shape {y_true_arr.shape}"
+        )
+
+    n = y_true_arr.size
+
+    # --- Compute mean‐squared errors ---
+    mse_model = np.mean((y_true_arr - y_pred_arr) ** 2)
+    mse_null  = np.mean((y_true_arr - float(mean_y_train)) ** 2)
+
+    if mse_null == 0.0:
+        raise ValueError(
+            "MSE_null is zero → pseudo-R^2 undefined (division by zero)."
+        )
+
+    return 1.0 - mse_model / mse_null
+
+
+def mcfadden_r2(y_true, y_prob, insample_mean):
     """
     Compute McFadden's pseudo R-squared for logistic regression.
     """
     y_true = np.asarray(y_true)
     y_prob = np.asarray(y_prob)
-
     # Compute log-likelihood for the fitted model
     eps = 1e-15  # to avoid log(0)
     y_prob = np.clip(y_prob, eps, 1 - eps)
     log_l_model = np.sum(y_true * np.log(y_prob) + (1 - y_true) * np.log(1 - y_prob))
-
     # Compute log-likelihood for the null model
-    p_null = np.mean(y_true)
+    p_null = np.mean(insample_mean)
     log_l_null = np.sum(y_true * np.log(p_null) + (1 - y_true) * np.log(1 - p_null))
-
     return 1 - (log_l_model / log_l_null)
 
 

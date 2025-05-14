@@ -18,7 +18,7 @@ import sklearn
 from joblib import Parallel, delayed
 from rich.progress import track
 from scipy.stats import norm
-from sklearn.metrics import log_loss, r2_score, root_mean_squared_error
+from sklearn.metrics import log_loss, root_mean_squared_error
 from sklearn.model_selection import GroupKFold, KFold, train_test_split
 from statsmodels.tools.tools import add_constant
 
@@ -32,6 +32,7 @@ from robustipy.utils import (
     simple_ols,
     space_size,
     mcfadden_r2,
+    pseudo_r2,
     calculate_imv_score
 )
 def stouffer_method(
@@ -575,7 +576,10 @@ class OLSResult(Protoresult):
         print_separator("1. Model Summary")
         print(f"Model: {self.model_name}")
         print("Inference Tests:", "Yes" if inference else "No")
-        print(f"Dependent variable: {self.y_name}")
+        if max(len(t) for t in self.y_name) > 1:
+            print(f"Dependent variable: {set().union(*self.y_name)}")
+        else:
+            print(f"Dependent variable: {self.y_name}")
         print(f"Independent variable: {self.x_name}")
         print(f"Number of possible controls: {len(self.controls)}")
         print(f"Number of draws: {self.draws}")
@@ -1297,7 +1301,7 @@ class OLSRobust(BaseRobust):
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
                     elif oos_metric_name == 'r-squared':
-                        k_r2 = r2_score(y_true, y_pred)
+                        k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
                     else:
                         raise ValueError('No valid OOS metric provided.')
@@ -1314,7 +1318,7 @@ class OLSRobust(BaseRobust):
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
                     elif oos_metric_name == 'r-squared':
-                        k_r2 = r2_score(y_true, y_pred)
+                        k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
                     else:
                         raise ValueError('No valid OOS metric provided.')
@@ -1516,7 +1520,9 @@ class LRobust(BaseRobust):
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
                 elif oos_metric_name == 'r-squared':
-                    k_r2 = r2_score(y_true, y_pred)
+                    k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.loc[train]))
+                    # not this!
+                    # k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                     metric.append(k_r2)
                 elif oos_metric_name == 'cross-entropy':
                     k_cross_entropy = log_loss(y_true, y_pred)
