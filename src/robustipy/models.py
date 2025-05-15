@@ -911,7 +911,7 @@ class OLSRobust(BaseRobust):
         group: Optional[str] = None,
         draws: int = 500,
         kfold: int = 5,
-        oos_metric: str = 'r-squared',
+        oos_metric: str = 'pseudo-r2',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
@@ -930,7 +930,7 @@ class OLSRobust(BaseRobust):
             Number of bootstrap resamples per specification.
         kfold : int, default=5
             Number of folds for out-of-sample evaluation; requires `oos_metric`.
-        oos_metric : {'r-squared','rmse'}, default='r-squared'
+        oos_metric : {'pseudo-r2','rmse'}, default='pseudo-r2'
             Metric for cross-validated performance.
         n_cpu : int, optional
             Number of parallel jobs; defaults to all available cores minus one.
@@ -976,7 +976,7 @@ class OLSRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse'],
+            valid_oos_metrics=['pseudo-r2','rmse'],
             threshold=threshold
         )
         print(f'[OLSRobust] Running with n_cpu={n_cpu}, draws={draws}')
@@ -1300,7 +1300,7 @@ class OLSRobust(BaseRobust):
                     if oos_metric_name == 'rmse':
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
-                    elif oos_metric_name == 'r-squared':
+                    elif oos_metric_name == 'pseudo-r2':
                         k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
                     else:
@@ -1317,7 +1317,7 @@ class OLSRobust(BaseRobust):
                     if oos_metric_name == 'rmse':
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
-                    elif oos_metric_name == 'r-squared':
+                    elif oos_metric_name == 'pseudo-r2':
                         k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
                     else:
@@ -1481,7 +1481,7 @@ class LRobust(BaseRobust):
         group : str or None
             Grouping variable name (for future FE support).
         oos_metric_name : str
-            Out-of-sample metric: 'r-squared', 'rmse', or 'cross-entropy'.
+            Out-of-sample metric: 'mcfadden-r2', 'pseudo-r2', 'rmse', or 'cross-entropy'.
 
 
         Returns
@@ -1519,10 +1519,11 @@ class LRobust(BaseRobust):
                 if oos_metric_name == 'rmse':
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
-                elif oos_metric_name == 'r-squared':
+                elif oos_metric_name == 'mcfadden-r2':
                     k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.loc[train]))
-                    # not this!
-                    # k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
+                    metric.append(k_r2)
+                elif oos_metric_name == 'pseudo-r2':
+                    k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                     metric.append(k_r2)
                 elif oos_metric_name == 'cross-entropy':
                     k_cross_entropy = log_loss(y_true, y_pred)
@@ -1573,7 +1574,7 @@ class LRobust(BaseRobust):
         draws: int = 500,
         sample_size: Optional[int] = None,
         kfold: int = 5,
-        oos_metric: str = 'r-squared',
+        oos_metric: str = 'pseudo-r2',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         threshold: int = 1000000
@@ -1593,7 +1594,7 @@ class LRobust(BaseRobust):
             Number of observations per bootstrap draw; defaults to full dataset.
         kfold : int, default=5
             Folds for out-of-sample CV; set to 0 to disable.
-        oos_metric : {'r-squared','rmse','cross-entropy'}, default='r-squared'
+        oos_metric : {'pseudo-r2', 'mcfadden-r2', 'imv', 'rmse','cross-entropy'}, default='r-squared'
             Metric to compute on held-out folds.
         n_cpu : int, optional
             Number of parallel jobs; defaults to all available.
@@ -1625,7 +1626,7 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['r-squared','rmse','cross-entropy','imv'],
+            valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
             threshold=threshold
         )
         print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
