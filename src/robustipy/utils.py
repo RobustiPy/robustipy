@@ -616,7 +616,7 @@ def mcfadden_r2(y_true, y_prob, insample_mean):
     y_prob = np.clip(y_prob, eps, 1 - eps)
     log_l_model = np.sum(y_true * np.log(y_prob) + (1 - y_true) * np.log(1 - y_prob))
     # Compute log-likelihood for the null model
-    p_null = np.mean(insample_mean)
+    p_null = insample_mean
     log_l_null = np.sum(y_true * np.log(p_null) + (1 - y_true) * np.log(1 - p_null))
     return 1 - (log_l_model / log_l_null)
 
