@@ -8,12 +8,16 @@ analysis, along with utilities for model merging, plotting, and Bayesian model a
 from __future__ import annotations
 import _pickle
 import warnings
+import inquirer
+from inquirer.themes import GreenPassion
+from inquirer.errors import ValidationError
 from typing import Any, Optional, Sequence, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
+import sys
 import sklearn
 from joblib import Parallel, delayed
 from rich.progress import track
@@ -35,6 +39,88 @@ from robustipy.utils import (
     pseudo_r2,
     calculate_imv_score
 )
+
+class IntegerRangeValidator:
+    def __init__(self, min_value, max_value):
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def __call__(self, _, current):
+        try:
+            value = int(current)
+        except ValueError:
+            raise ValidationError('', reason="Input must be an integer.")
+        if not (self.min_value <= value <= self.max_value):
+            raise ValidationError(
+                '',
+                reason=f"Input must be between {self.min_value} and {self.max_value} (inclusive)."
+            )
+        return True
+
+def is_interactive():
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+def make_inquiry(model_name, y, data, draws, kfolds, oos_metric):
+    """
+    Prompt the user for missing inputs if in an interactive environment.
+    Otherwise, silently fall back to default values.
+
+    Returns
+    -------
+    tuple[int, int, str]
+        Number of bootstrap draws, number of k-folds, and out-of-sample evaluation metric.
+    """
+    if model_name == 'OLS Robust':
+        oos_metric_choices = ['pseudo-r2', 'rmse']
+    elif model_name == 'Logistic Regression Robust':
+        oos_metric_choices = ['mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy']
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
+
+    interactive = is_interactive()
+
+    if draws is None:
+        if interactive:
+            question_draws = [
+                inquirer.Text(
+                    'draws_inq',
+                    message="Enter number of bootstrap draws",
+                    validate=IntegerRangeValidator(2, 1000000)
+                )
+            ]
+            draws = int(inquirer.prompt(question_draws, theme=GreenPassion())['draws_inq'])
+        else:
+            draws = 1000  # default fallback
+
+    if kfolds is None:
+        max_k = len(data[y])
+        if interactive:
+            question_kfolds = [
+                inquirer.Text(
+                    'kfolds_inq',
+                    message="Enter number of folds for cross-validation",
+                    validate=IntegerRangeValidator(2, max_k)
+                )
+            ]
+            kfolds = int(inquirer.prompt(question_kfolds, theme=GreenPassion())['kfolds_inq'])
+        else:
+            kfolds = 10  # default fallback
+
+    if oos_metric is None:
+        if interactive:
+            question_oos = [
+                inquirer.List(
+                    'oos_inq',
+                    message="Select the out-of-sample evaluation metric",
+                    choices=oos_metric_choices,
+                    carousel=True
+                )
+            ]
+            oos_metric = inquirer.prompt(question_oos, theme=GreenPassion())['oos_inq']
+        else:
+            oos_metric = 'pseudo-r2'  # default fallback
+    return draws, kfolds, oos_metric
+
 def stouffer_method(
     p_values: Sequence[float],
     weights: Optional[Sequence[float]] = None,
@@ -389,6 +475,7 @@ class OLSResult(Protoresult):
         shap_return
             Optional return of (shap_values, input_matrix).
         """
+
         super().__init__()
         self.y_name = y
         self.x_name = x
@@ -909,9 +996,9 @@ class OLSRobust(BaseRobust):
         *,
         controls: List[str],
         group: Optional[str] = None,
-        draws: int = 500,
-        kfold: int = 5,
-        oos_metric: str = 'pseudo-r2',
+        draws: int = None,
+        kfold: int = None,
+        oos_metric: str = None,
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
@@ -926,9 +1013,9 @@ class OLSRobust(BaseRobust):
             Candidate control variables to include in model specifications.
         group : str, optional
             Column name for grouping fixed effects; de-meaned if provided.
-        draws : int, default=500
+        draws : int, default=1000
             Number of bootstrap resamples per specification.
-        kfold : int, default=5
+        kfold : int, default=10
             Number of folds for out-of-sample evaluation; requires `oos_metric`.
         oos_metric : {'pseudo-r2','rmse'}, default='pseudo-r2'
             Metric for cross-validated performance.
@@ -944,6 +1031,14 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+
+        draws, kfold, oos_metric = make_inquiry(self.model_name,
+                                                self.y,
+                                                self.data,
+                                                draws,
+                                                kfold,
+                                                oos_metric)
+
         for col in controls:
             if self.data[col].nunique(dropna=False) == 1:
                 warnings.warn(
@@ -953,7 +1048,7 @@ class OLSRobust(BaseRobust):
                     "If you want all models to include an intercept, move this variable to `x` instead of `controls`.",
                     UserWarning
                 )
-        self.composite_sample = composite_sample      # int or None
+        self.composite_sample = composite_sample
         self.seed             = seed
         combined = self.x + controls
         found_constant = any(
@@ -1571,9 +1666,9 @@ class LRobust(BaseRobust):
         *,
         controls: List[str],
         group: Optional[str] = None,
-        draws: int = 500,
+        draws: int = 1000,
         sample_size: Optional[int] = None,
-        kfold: int = 5,
+        kfold: int = 10,
         oos_metric: str = 'pseudo-r2',
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
@@ -1608,6 +1703,14 @@ class LRobust(BaseRobust):
         self : LRobust
             Self, with `.results` populated as an `OLSResult`.
         """
+
+        draws, kfold, oos_metric = make_inquiry(self.model_name,
+                                                self.y,
+                                                self.data,
+                                                draws,
+                                                kfold,
+                                                oos_metric)
+
         combined = self.x + controls
         found_constant = any(
             self.data[col].nunique(dropna=False) == 1
