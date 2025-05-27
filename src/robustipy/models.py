@@ -1063,7 +1063,7 @@ class OLSRobust(BaseRobust):
 
         if len(self.y) > 1:
             self.multiple_y()
-        n_cpu = self._validate_fit_args(
+            self._validate_fit_args(
             controls=controls,
             group=group,
             draws=draws,
@@ -1666,10 +1666,10 @@ class LRobust(BaseRobust):
         *,
         controls: List[str],
         group: Optional[str] = None,
-        draws: int = 1000,
+        draws: int = None,
         sample_size: Optional[int] = None,
-        kfold: int = 10,
-        oos_metric: str = 'pseudo-r2',
+        kfold: int = None,
+        oos_metric: str = None,
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         threshold: int = 1000000
@@ -1683,13 +1683,14 @@ class LRobust(BaseRobust):
             Names of optional control variables to include in every spec.
         group : str, optional
             *Currently ignored.* Placeholder for future fixed-effect demeaning.
-        draws : int, default=500
+        draws : int, default=None
             Number of bootstrap resamples per specification.
         sample_size : int, optional
             Number of observations per bootstrap draw; defaults to full dataset.
-        kfold : int, default=5
+        kfold : int, default=None
             Folds for out-of-sample CV; set to 0 to disable.
-        oos_metric : {'pseudo-r2', 'mcfadden-r2', 'imv', 'rmse','cross-entropy'}, default='r-squared'
+        oos_metric : default None.
+            Options:    {'pseudo-r2', 'mcfadden-r2', 'imv', 'rmse','cross-entropy'}.
             Metric to compute on held-out folds.
         n_cpu : int, optional
             Number of parallel jobs; defaults to all available.
@@ -1721,7 +1722,7 @@ class LRobust(BaseRobust):
             self.data.loc[:, 'const'] = 1.0
             self.x = self.x + ['const']
 
-        n_cpu = self._validate_fit_args(
+            self._validate_fit_args(
             controls=controls,
             group=group,
             draws=draws,
