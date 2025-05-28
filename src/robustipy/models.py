@@ -41,6 +41,13 @@ from robustipy.utils import (
     calculate_imv_score
 )
 
+
+def rescale(variable):
+    variable = np.asarray(variable, dtype=np.float64)
+    return ((variable - np.mean(variable, axis=0, keepdims=True)) /
+            np.std(variable, axis=0, keepdims=True))
+
+
 class IntegerRangeValidator:
     def __init__(self, min_value, max_value):
         self.min_value = min_value
@@ -1030,6 +1037,9 @@ class OLSRobust(BaseRobust):
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
+        rescale_y: Optional[bool] = False,
+        rescale_x: Optional[bool] = False,
+        rescale_z: Optional[bool] = False,
         threshold: int = 1000000
         ) -> 'OLSRobust':
         """
@@ -1051,6 +1061,12 @@ class OLSRobust(BaseRobust):
             Number of parallel jobs; defaults to all available cores minus one.
         seed : int, optional
             Random seed for reproducibility.
+        rescale_y : bool, default=False
+            rescale the dependent variable to have mean 0 and std 1.
+        rescale_x : bool, default=False
+            rescale the x variable to have mean 0 and std 1.
+        rescale_z : bool, default=False
+            rescale the z variable to have mean 0 and std 1.
         threshold : int, default=1000000
             Warn if total model runs exceed this number.
 
@@ -1059,6 +1075,22 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
+
+        if rescale_y is True:
+            if len(self.y) > 1:
+                warnings.warn(
+                    "Rescaling of the dependent variable already occurs with multiple "
+                    "y variables. Skipping additional rescaling.",
+                    UserWarning
+                )
+            else:
+                self.data[self.y] = rescale(self.data[self.y])
+        if rescale_x is True:
+            for column in self.x:
+                self.data[column] = rescale(self.data[column])
+        if rescale_z is True:
+            for column in controls:
+                self.data[column] = rescale(self.data[column])
 
         draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
                                                        self.y,
@@ -1104,7 +1136,14 @@ class OLSRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2','rmse'],
             threshold=threshold
         )
-        print(f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, folds={kfold}, seed={seed}.\nWe're evaluating our out-of-sample predictions with the {oos_metric} metric.\nThe target variable of interest is {self.x[0]}. Lets begin the calculations...")
+        print(
+            f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, "
+            f"folds={kfold}, seed={seed}.\n"
+            f"We're evaluating our out-of-sample predictions with the "
+            f"{oos_metric} metric.\n"
+            f"The target variable of interest is {self.x[0]}. "
+            f"Let's begin the calculations..."
+        )
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -1526,6 +1565,7 @@ class OLSRobust(BaseRobust):
         p_ystar = output_ystar['p']
         return b[0][0], p[0][0], r2, b_ystar[0][0], p_ystar[0][0]
 
+
 class LRobust(BaseRobust):
     """
     A class to perform logistic regression analysis, underlying lr package = statsmodel
@@ -1702,6 +1742,9 @@ class LRobust(BaseRobust):
         oos_metric: str = None,
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
+        rescale_x: Optional[bool] = False,
+        rescale_y: Optional[bool] = False,
+        rescale_z: Optional[bool] = False,
         threshold: int = 1000000
     ) -> 'LRobust':
         """
@@ -1726,6 +1769,12 @@ class LRobust(BaseRobust):
             Number of parallel jobs; defaults to all available.
         seed : int, optional
             Random seed for reproducibility.
+        rescale_y  : bool, default=False
+            Rescale the dependent variable.
+        rescale_x  : bool, default=False
+            Rescale the x variable.
+        rescale_z  : bool, default=False
+            Rescale the z variables.
         threshold : int, default=1000000
             Warn if `draws * n_specs` exceeds this.
 
@@ -1734,6 +1783,22 @@ class LRobust(BaseRobust):
         self : LRobust
             Self, with `.results` populated as an `OLSResult`.
         """
+
+        if rescale_y is True:
+            if len(self.y) > 1:
+                warnings.warn(
+                    "Rescaling of the dependent variable already occurs with multiple "
+                    "y variables. Skipping additional rescaling.",
+                    UserWarning
+                )
+            else:
+                self.data[self.y] = rescale(self.data[self.y])
+        if rescale_x is True:
+            for column in self.x:
+                self.data[column] = rescale(self.data[column])
+        if rescale_z is True:
+            for column in controls:
+                self.data[column] = rescale(self.data[column])
 
         draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
                                                        self.y,
@@ -1765,8 +1830,14 @@ class LRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
             threshold=threshold
         )
-        print(f'LRobust is running with n_cpu={n_cpu}, draws={draws}, folds={kfold}, seed={seed}.\n The target variable of interest is {self.x}. Lets begin the calculations...')
-
+        print(
+            f"LRobust is running with n_cpu={n_cpu}, draws={draws}, "
+            f"folds={kfold}, seed={seed}.\n"
+            f"We're evaluating our out-of-sample predictions with the "
+            f"{oos_metric} metric.\n"
+            f"The target variable of interest is {self.x[0]}. "
+            f"Let's begin the calculations..."
+        )
 
         self.oos_metric_name = oos_metric
 
