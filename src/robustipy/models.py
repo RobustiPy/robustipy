@@ -12,6 +12,7 @@ import inquirer
 from inquirer.themes import GreenPassion
 from inquirer.errors import ValidationError
 from typing import Any, Optional, Sequence, List, Tuple, Union
+from multiprocessing import cpu_count
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +61,7 @@ class IntegerRangeValidator:
 def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty()
 
-def make_inquiry(model_name, y, data, draws, kfolds, oos_metric):
+def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
     """
     Prompt the user for missing inputs if in an interactive environment.
     Otherwise, silently fall back to default values.
@@ -119,7 +120,34 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric):
             oos_metric = inquirer.prompt(question_oos, theme=GreenPassion())['oos_inq']
         else:
             oos_metric = 'pseudo-r2'  # default fallback
-    return draws, kfolds, oos_metric
+
+
+    if n_cpu is None:
+        if interactive:
+            question_ncpu = [
+                inquirer.List(
+                    'ncpu_inq',
+                    message=f"You havent specified the number of CPUs you want to use. Is {max(1, cpu_count()-1)} ok?",
+                    choices=['Yes', 'No'],
+                    carousel=True
+                )
+            ]
+            n_cpu_answer = inquirer.prompt(question_ncpu, theme=GreenPassion())['ncpu_inq']
+            if n_cpu_answer == 'Yes':
+                n_cpu = max(1, cpu_count()-1)
+            elif n_cpu_answer == 'No':
+                question_ncpu = [
+                    inquirer.Text(
+                        'ncpu_inq',
+                        message="Enter number of CPUs to use",
+                        validate=IntegerRangeValidator(1, cpu_count())
+                    )
+                ]
+                n_cpu = int(inquirer.prompt(question_ncpu, theme=GreenPassion())['ncpu_inq'])
+        else:
+            n_cpu = max(1, cpu_count()-1)  # default fallback
+
+    return draws, kfolds, oos_metric, n_cpu
 
 def stouffer_method(
     p_values: Sequence[float],
@@ -1032,12 +1060,14 @@ class OLSRobust(BaseRobust):
             The fitted model instance, with `.results` attached.
         """
 
-        draws, kfold, oos_metric = make_inquiry(self.model_name,
-                                                self.y,
-                                                self.data,
-                                                draws,
-                                                kfold,
-                                                oos_metric)
+        draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
+                                                       self.y,
+                                                       self.data,
+                                                       draws,
+                                                       kfold,
+                                                       oos_metric,
+                                                       n_cpu
+                                                       )
 
         for col in controls:
             if self.data[col].nunique(dropna=False) == 1:
@@ -1074,7 +1104,7 @@ class OLSRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2','rmse'],
             threshold=threshold
         )
-        print(f'[OLSRobust] Running with n_cpu={n_cpu}, draws={draws}')
+        print(f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, folds={kfold}, seed={seed}.\nWe're evaluating our out-of-sample predictions with the {oos_metric} metric.\nThe target variable of interest is {self.x[0]}. Lets begin the calculations...")
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
@@ -1705,12 +1735,14 @@ class LRobust(BaseRobust):
             Self, with `.results` populated as an `OLSResult`.
         """
 
-        draws, kfold, oos_metric = make_inquiry(self.model_name,
-                                                self.y,
-                                                self.data,
-                                                draws,
-                                                kfold,
-                                                oos_metric)
+        draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
+                                                       self.y,
+                                                       self.data,
+                                                       draws,
+                                                       kfold,
+                                                       oos_metric,
+                                                       n_cpu
+                                                       )
 
         combined = self.x + controls
         found_constant = any(
@@ -1733,7 +1765,7 @@ class LRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
             threshold=threshold
         )
-        print(f'[LRobust] Running with n_cpu={n_cpu}, draws={draws}')
+        print(f'LRobust is running with n_cpu={n_cpu}, draws={draws}, folds={kfold}, seed={seed}.\n The target variable of interest is {self.x}. Lets begin the calculations...')
 
 
         self.oos_metric_name = oos_metric

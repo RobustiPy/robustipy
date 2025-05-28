@@ -383,7 +383,7 @@ class BaseRobust(Protomodel):
 
         # n_cpu
         if n_cpu is None:
-            n_cpu = max(1, cpu_count()-1)
+            raise ValueError(f"CPU count is currently {n_cpu}.")
         else:
             if not isinstance(n_cpu, int):
                 raise TypeError("n_cpu must be an integer")
