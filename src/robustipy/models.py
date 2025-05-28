@@ -44,8 +44,10 @@ from robustipy.utils import (
 
 def rescale(variable):
     variable = np.asarray(variable, dtype=np.float64)
-    return ((variable - np.mean(variable, axis=0, keepdims=True)) /
-            np.std(variable, axis=0, keepdims=True))
+    mean = np.nanmean(variable, axis=0, keepdims=True)
+    std = np.nanstd(variable, axis=0, keepdims=True)
+    out = (variable - mean) / std
+    return out
 
 
 class IntegerRangeValidator:
@@ -1075,7 +1077,6 @@ class OLSRobust(BaseRobust):
         self : OLSRobust
             The fitted model instance, with `.results` attached.
         """
-
         if rescale_y is True:
             if len(self.y) > 1:
                 warnings.warn(
