@@ -36,7 +36,10 @@ def sim2(project_name):
     data['group'] = group_list
     sim = OLSRobust(y=['y'], x=['x1'], data=data)
     sim.fit(controls=['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7'],
-            group='group', draws=1000, kfold=10, seed=192735)
+            group='group',
+            #draws=1000,
+            #kfold=10,
+            seed=192735)
     results = sim.get_results()
     results.plot(specs=[['z1', 'z2', 'z3']], ic='hqic',
                  figsize=(16, 16), ext='pdf', project_name=project_name)
