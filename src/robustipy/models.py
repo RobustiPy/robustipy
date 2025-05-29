@@ -1037,7 +1037,7 @@ class OLSRobust(BaseRobust):
         kfold: int = None,
         oos_metric: str = None,
         n_cpu: Optional[int] = None,
-        seed: Optional[int] = None,
+        seed: Optional[int] = 192735,
         composite_sample: Optional[int] = None,
         rescale_y: Optional[bool] = False,
         rescale_x: Optional[bool] = False,
