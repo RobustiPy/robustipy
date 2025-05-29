@@ -34,7 +34,7 @@ def sim5(project_name):
 
     # 6. Fit robust OLS
     model = OLSRobust(y=Y, x=['x1'], data=df)
-    model.fit(controls=Z, draws=1000, kfold=10)
+    model.fit(controls=Z, draws=1000, kfold=10, rescale_y=True, rescale_x=True, rescale_z=True)
 
     # 7. Retrieve and plot results
     res = model.get_results()

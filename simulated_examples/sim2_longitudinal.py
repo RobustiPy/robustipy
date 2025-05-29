@@ -39,6 +39,8 @@ def sim2(project_name):
             group='group',
             #draws=1000,
             #kfold=10,
+            rescale_y=True,
+            rescale_z=True,
             seed=192735)
     results = sim.get_results()
     results.plot(specs=[['z1', 'z2', 'z3']], ic='hqic',
