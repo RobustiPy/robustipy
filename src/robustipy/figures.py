@@ -1138,7 +1138,7 @@ def plot_results(
         ic: Optional[str] = None,
         colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
         figsize: Tuple[int, int] = (16, 16),
-        ext = 'pdf',
+        ext: str = 'pdf',
         figpath=None,
         oddsratio=False,
         project_name: str = None
@@ -1178,6 +1178,8 @@ def plot_results(
       `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
       for the case when len(y_name) == 1, and a subset for when >1.
     """
+
+    ext = ext.strip()
     specs = _sanitize_specs(specs, max_len=6)
     if oddsratio is True:
         if results_object.model_name=='Logistic Regression Robust':
@@ -1239,6 +1241,7 @@ def plot_results(
         plot_bdist(results_object=results_object, specs=specs,
                    ax=ax3, oddsratio=oddsratio, colormap=colormap,
                    title='c.', despine_left=True)
+        print(ext)
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
