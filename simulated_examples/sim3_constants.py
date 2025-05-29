@@ -26,12 +26,13 @@ def sim3(project_name):
                                           'z7'])
     y = ['y1']
     x = ['x1', 'z1']
-    c = ['z2', 'z3','z4', 'z5', 'z6', 'z7']
+    z = ['z2', 'z3','z4', 'z5', 'z6', 'z7']
     sim3 = OLSRobust(y=y, x=x, data=data)
-    sim3.fit(controls=c, draws=1000, kfold=10, seed=192735)
+    sim3.fit(controls=z, draws=1000, kfold=10, seed=192735)
     sim3_results = sim3.get_results()
     sim3_results.plot(specs=[['z4', 'z5']],
                       ic='hqic', figsize=(16, 16),
+                      figpath='../figures',
                       ext='pdf', project_name=project_name)
     sim3_results.summary()
 

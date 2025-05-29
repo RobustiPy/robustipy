@@ -30,11 +30,11 @@ def sim5(project_name):
 
     # 5. Specify outcome and control names
     Y = [f'y{j}' for j in range(1, 5)]
-    Z = [f'z{j}' for j in range(1, 5)]
+    z = [f'z{j}' for j in range(1, 5)]
 
     # 6. Fit robust OLS
     model = OLSRobust(y=Y, x=['x1'], data=df)
-    model.fit(controls=Z, draws=1000, kfold=10, rescale_y=True, rescale_x=True, rescale_z=True)
+    model.fit(controls=z, draws=1000, kfold=10, rescale_y=True, rescale_x=True, rescale_z=True)
 
     # 7. Retrieve and plot results
     res = model.get_results()
@@ -43,6 +43,7 @@ def sim5(project_name):
         specs=[['y1', 'y2', 'z1', 'z2'],
                ['y3', 'y4', 'z3', 'z4']],
         figsize=(16, 8),
+        figpath='../figures',
         project_name=project_name
     )
     res.summary()

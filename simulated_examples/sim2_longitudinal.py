@@ -44,6 +44,7 @@ def sim2(project_name):
             seed=192735)
     results = sim.get_results()
     results.plot(specs=[['z1', 'z2', 'z3']], ic='hqic',
+                 figpath='../figures',
                  figsize=(16, 16), ext='pdf', project_name=project_name)
     results.summary()
 

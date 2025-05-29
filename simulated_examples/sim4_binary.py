@@ -34,13 +34,14 @@ def sim4(project_name):
 
     y = ['y1']
     x = ['x1']
-    c = ['z1','z2','z3','z4','z5','z6','z7']
+    z = ['z1','z2','z3','z4','z5','z6','z7']
     sim4 = LRobust(y=y, x=x, data=data)
-    sim4.fit(controls=c, draws=1000, kfold=10, seed=192735)
+    sim4.fit(controls=z, draws=1000, kfold=10, seed=192735)
     sim4_results = sim4.get_results()
     sim4_results.plot(specs=[['z1'], ['z2','z4'],
                              ['z3','z5']],
                       ic='hqic', figsize=(16,16),
+                      figpath='../figures',
                       ext='pdf', project_name=project_name)
     sim4_results.summary()
 
