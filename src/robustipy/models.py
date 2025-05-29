@@ -508,7 +508,7 @@ class OLSResult(Protoresult):
         model_name
             Human-readable name of the model (“OLS Robust”).
         name_av_k_metric
-            Label for the CV metric (e.g. “r-squared”).
+            Label for the CV metric.
         shap_return
             Optional return of (shap_values, input_matrix).
         """
@@ -1423,7 +1423,7 @@ class OLSRobust(BaseRobust):
         group : str or None
             Grouping column for fixed effects (dropped before fit).
         oos_metric_name : str
-            Out-of-sample metric ('r-squared' or 'rmse')..
+            Out-of-sample metric ('pseudo-r2' or 'rmse')..
 
         Returns
         -------
