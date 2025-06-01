@@ -67,19 +67,49 @@ class IntegerRangeValidator:
             )
         return True
 
-def is_interactive():
+
+def _running_in_jupyter() -> bool:
+    """
+    Return True exactly if this process is running inside a Jupyter (ZMQInteractiveShell) kernel.
+    """
+    try:
+        from IPython import get_ipython
+        shell = get_ipython().__class__.__name__
+        return shell == "ZMQInteractiveShell"
+    except (ImportError, AttributeError):
+        return False
+
+def _is_real_tty() -> bool:
+    """
+    Return True exactly if both sys.stdin and sys.stdout are real TTYs.
+    (That is, neither has been redirected to a file, and we are not inside Jupyter.)
+    """
     return sys.stdin.isatty() and sys.stdout.isatty()
+
+def is_interactive() -> bool:
+    """
+    Return True if either:
+      (a) we are inside a Jupyter notebook/lab, OR
+      (b) we are running from a real terminal (both stdin and stdout are TTYs).
+    """
+    return _running_in_jupyter() or _is_real_tty()
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  (2) Revised make_inquiry: use three‐way branching
+# ───────────────────────────────────────────────────────────────────────────────
 
 def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
     """
-    Prompt the user for missing inputs if in an interactive environment.
-    Otherwise, silently fall back to default values.
+    Prompt the user for missing inputs if in an interactive environment;
+    otherwise, silently fall back to default values.
 
     Returns
     -------
-    tuple[int, int, str]
-        Number of bootstrap draws, number of k-folds, and out-of-sample evaluation metric.
+    tuple[int, int, str, int]
+        (draws, kfolds, oos_metric, n_cpu)
     """
+
+    # 1) Determine which metrics apply to this model_name:
     if model_name == 'OLS Robust':
         oos_metric_choices = ['pseudo-r2', 'rmse']
     elif model_name == 'Logistic Regression Robust':
@@ -87,10 +117,60 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-    interactive = is_interactive()
+    # 2) Check interactive status:
+    in_jupyter = _running_in_jupyter()
+    in_real_tty = _is_real_tty()
 
+    # 3) Helper: pure‐Python loop for integer input in [min_val, max_val]:
+    def _ask_integer(prompt_text: str, min_val: int, max_val: int) -> int:
+        """
+        Repeatedly call input() until user enters a valid integer in [min_val, max_val].
+        Raise ValidationError otherwise. Return the integer once valid.
+        """
+        while True:
+            raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
+            try:
+                val = int(raw)
+            except ValueError:
+                print(f"Invalid: '{raw}' is not an integer.")
+                continue
+            if val < min_val or val > max_val:
+                print(f"Invalid: must be between {min_val} and {max_val}.")
+                continue
+            return val
+
+    # 4) Helper: pure‐Python loop for selecting one choice from choices list:
+    def _ask_choice(prompt_text: str, choices: list[str]) -> str:
+        """
+        Print all choices with numeric indices, then loop until the user types
+        either a valid index (1–len(choices)) or a choice name exactly.
+        Return the chosen string.
+        """
+        # Display a numbered list:
+        print(prompt_text)
+        for idx, choice in enumerate(choices, start=1):
+            print(f"  {idx}. {choice}")
+        while True:
+            raw = input(f"Type number (1–{len(choices)}) or exact choice: ").strip()
+            # Try interpreting as integer index:
+            if raw.isdigit():
+                idx = int(raw)
+                if 1 <= idx <= len(choices):
+                    return choices[idx - 1]
+                else:
+                    print(f"Number out of range. Must be 1–{len(choices)}.")
+                    continue
+            # Otherwise check if it exactly matches one of the choices:
+            if raw in choices:
+                return raw
+            print(f"Invalid: type one of {choices}, or a valid index.")
+
+    # ───────────────────────────────────────────────────────────────
+    # 5) If draws is missing, decide which prompt to run:
+    # ───────────────────────────────────────────────────────────────
     if draws is None:
-        if interactive:
+        if in_real_tty:
+            # (a) Real TTY: use inquirer.Text with IntegerRangeValidator
             question_draws = [
                 inquirer.Text(
                     'draws_inq',
@@ -98,13 +178,22 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
                     validate=IntegerRangeValidator(2, 1000000)
                 )
             ]
+            # inquirer.prompt(...) returns a dict; we extract and convert to int
             draws = int(inquirer.prompt(question_draws, theme=GreenPassion())['draws_inq'])
+        elif in_jupyter:
+            # (b) Jupyter: fall back to pure input() + validator
+            draws = _ask_integer("Enter number of bootstrap draws", 2, 1000000)
         else:
-            draws = 1000  # default fallback
+            # (c) Neither TTY nor Jupyter: use default
+            draws = 1000
 
+    # ───────────────────────────────────────────────────────────────
+    # 6) If kfolds is missing, prompt for number of folds:
+    # ───────────────────────────────────────────────────────────────
     if kfolds is None:
+        # The maximum valid folds is len(data[y]); we compute it now:
         max_k = len(data[y])
-        if interactive:
+        if in_real_tty:
             question_kfolds = [
                 inquirer.Text(
                     'kfolds_inq',
@@ -113,11 +202,16 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
                 )
             ]
             kfolds = int(inquirer.prompt(question_kfolds, theme=GreenPassion())['kfolds_inq'])
+        elif in_jupyter:
+            kfolds = _ask_integer("Enter number of folds for cross-validation", 2, max_k)
         else:
-            kfolds = 10  # default fallback
+            kfolds = 10
 
+    # ───────────────────────────────────────────────────────────────
+    # 7) If oos_metric is missing, prompt the user to choose one:
+    # ───────────────────────────────────────────────────────────────
     if oos_metric is None:
-        if interactive:
+        if in_real_tty:
             question_oos = [
                 inquirer.List(
                     'oos_inq',
@@ -127,36 +221,49 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
                 )
             ]
             oos_metric = inquirer.prompt(question_oos, theme=GreenPassion())['oos_inq']
+        elif in_jupyter:
+            oos_metric = _ask_choice("Select the out-of-sample evaluation metric:", oos_metric_choices)
         else:
-            oos_metric = 'pseudo-r2'  # default fallback
+            oos_metric = 'pseudo-r2'
 
-
+    # ───────────────────────────────────────────────────────────────
+    # 8) If n_cpu is missing, ask about CPU count:
+    # ───────────────────────────────────────────────────────────────
     if n_cpu is None:
-        if interactive:
+        default_cpus = max(1, cpu_count() - 1)
+        if in_real_tty:
             question_ncpu = [
                 inquirer.List(
                     'ncpu_inq',
-                    message=f"You havent specified the number of CPUs you want to use. Is {max(1, cpu_count()-1)} ok?",
+                    message=f"You haven’t specified the number of CPUs. Is {default_cpus} ok?",
                     choices=['Yes', 'No'],
                     carousel=True
                 )
             ]
             n_cpu_answer = inquirer.prompt(question_ncpu, theme=GreenPassion())['ncpu_inq']
             if n_cpu_answer == 'Yes':
-                n_cpu = max(1, cpu_count()-1)
-            elif n_cpu_answer == 'No':
-                question_ncpu = [
+                n_cpu = default_cpus
+            else:
+                question_ncpu2 = [
                     inquirer.Text(
                         'ncpu_inq',
                         message="Enter number of CPUs to use",
                         validate=IntegerRangeValidator(1, cpu_count())
                     )
                 ]
-                n_cpu = int(inquirer.prompt(question_ncpu, theme=GreenPassion())['ncpu_inq'])
+                n_cpu = int(inquirer.prompt(question_ncpu2, theme=GreenPassion())['ncpu_inq'])
+        elif in_jupyter:
+            # In Jupyter, ask via input() if default is OK:
+            ans = input(f"You haven’t specified the number of CPUs. Is {default_cpus} okay? (yes/no): ").strip().lower()
+            if ans in ('y', 'yes'):
+                n_cpu = default_cpus
+            else:
+                n_cpu = _ask_integer("Enter number of CPUs to use", 1, cpu_count())
         else:
-            n_cpu = max(1, cpu_count()-1)  # default fallback
+            n_cpu = default_cpus
 
     return draws, kfolds, oos_metric, n_cpu
+
 
 def stouffer_method(
     p_values: Sequence[float],
@@ -1742,7 +1849,7 @@ class LRobust(BaseRobust):
         kfold: int = None,
         oos_metric: str = None,
         n_cpu: Optional[int] = None,
-        seed: Optional[int] = None,
+        seed: Optional[int] = 192735,
         rescale_x: Optional[bool] = False,
         rescale_y: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
