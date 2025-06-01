@@ -98,15 +98,24 @@ def is_interactive() -> bool:
 #  (2) Revised make_inquiry: use three‐way branching
 # ───────────────────────────────────────────────────────────────────────────────
 
-def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
+def make_inquiry(
+    model_name,
+    y,
+    data,
+    draws,
+    kfolds,
+    oos_metric,
+    n_cpu,
+    seed
+):
     """
     Prompt the user for missing inputs if in an interactive environment;
     otherwise, silently fall back to default values.
 
     Returns
     -------
-    tuple[int, int, str, int]
-        (draws, kfolds, oos_metric, n_cpu)
+    tuple[int, int, str, int, int]
+        (draws, kfolds, oos_metric, n_cpu, seed)
     """
 
     # 1) Determine which metrics apply to this model_name:
@@ -262,7 +271,46 @@ def make_inquiry(model_name, y, data, draws, kfolds, oos_metric, n_cpu):
         else:
             n_cpu = default_cpus
 
-    return draws, kfolds, oos_metric, n_cpu
+        # ───────────────────────────────────────────────────────────────
+        #  9) If seed is missing, prompt the user (TTY, Jupyter, or fallback)
+        # ───────────────────────────────────────────────────────────────
+        SEED_MIN = 0
+        SEED_MAX = 2 ** 31 - 1
+        in_jupyter = _running_in_jupyter()
+        in_real_tty = _is_real_tty()
+
+        def _ask_seed_input(prompt_text: str, min_val: int, max_val: int) -> int:
+            """
+            Repeatedly call input() until user enters a valid integer in [min_val, max_val].
+            """
+            while True:
+                raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
+                try:
+                    val = int(raw)
+                except ValueError:
+                    print(f"Invalid: '{raw}' is not an integer.")
+                    continue
+                if val < min_val or val > max_val:
+                    print(f"Invalid: must be between {min_val} and {max_val}.")
+                    continue
+                return val
+
+        if seed is None:
+            if in_real_tty:
+                question_seed = [
+                    inquirer.Text(
+                        'seed_inq',
+                        message="Enter integer seed for reproducibility",
+                        validate=IntegerRangeValidator(SEED_MIN, SEED_MAX)
+                    )
+                ]
+                seed = int(inquirer.prompt(question_seed, theme=GreenPassion())['seed_inq'])
+            elif in_jupyter:
+                seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
+            else:
+                seed = 192735
+
+    return draws, kfolds, oos_metric, n_cpu, seed
 
 
 def stouffer_method(
@@ -1144,7 +1192,7 @@ class OLSRobust(BaseRobust):
         kfold: int = None,
         oos_metric: str = None,
         n_cpu: Optional[int] = None,
-        seed: Optional[int] = 192735,
+        seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
         rescale_y: Optional[bool] = False,
         rescale_x: Optional[bool] = False,
@@ -1200,14 +1248,18 @@ class OLSRobust(BaseRobust):
             for column in controls:
                 self.data[column] = rescale(self.data[column])
 
-        draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
-                                                       self.y,
-                                                       self.data,
-                                                       draws,
-                                                       kfold,
-                                                       oos_metric,
-                                                       n_cpu
-                                                       )
+        draws, kfold, oos_metric, n_cpu, seed = make_inquiry(
+            self.model_name,
+            self.y,
+            self.data,
+            draws,
+            kfold,
+            oos_metric,
+            n_cpu,
+            seed
+        )
+        self.seed = seed
+        np.random.seed(self.seed)
 
         for col in controls:
             if self.data[col].nunique(dropna=False) == 1:
@@ -1219,7 +1271,6 @@ class OLSRobust(BaseRobust):
                     UserWarning
                 )
         self.composite_sample = composite_sample
-        self.seed             = seed
         combined = self.x + controls
         found_constant = any(
             self.data[col].nunique(dropna=False) == 1
@@ -1240,7 +1291,7 @@ class OLSRobust(BaseRobust):
             kfold=kfold,
             oos_metric=oos_metric,
             n_cpu=n_cpu,
-            seed=seed,
+            seed=self.seed,
             valid_oos_metrics=['pseudo-r2','rmse'],
             threshold=threshold
         )
@@ -1412,7 +1463,7 @@ class OLSRobust(BaseRobust):
             x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
                                                            SHAP_comb[self.y],
                                                            test_size=0.2,
-                                                           random_state=seed
+                                                           random_state=self.seed
                                                            )
             model = sklearn.linear_model.LinearRegression()
             model.fit(x_train, y_train)
@@ -1849,7 +1900,7 @@ class LRobust(BaseRobust):
         kfold: int = None,
         oos_metric: str = None,
         n_cpu: Optional[int] = None,
-        seed: Optional[int] = 192735,
+        seed: Optional[int] = None,
         rescale_x: Optional[bool] = False,
         rescale_y: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
@@ -1908,14 +1959,18 @@ class LRobust(BaseRobust):
             for column in controls:
                 self.data[column] = rescale(self.data[column])
 
-        draws, kfold, oos_metric, n_cpu = make_inquiry(self.model_name,
-                                                       self.y,
-                                                       self.data,
-                                                       draws,
-                                                       kfold,
-                                                       oos_metric,
-                                                       n_cpu
-                                                       )
+        draws, kfold, oos_metric, n_cpu, seed = make_inquiry(
+            self.model_name,
+            self.y,
+            self.data,
+            draws,
+            kfold,
+            oos_metric,
+            n_cpu,
+            seed
+        )
+        self.seed = seed
+        np.random.seed(self.seed)
 
         combined = self.x + controls
         found_constant = any(
@@ -1981,7 +2036,7 @@ class LRobust(BaseRobust):
             x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const']),
                                                            SHAP_comb[self.y],
                                                            test_size=0.2,
-                                                           random_state=seed
+                                                           random_state=self.seed
                                                            )
             model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
             model.fit(x_train, y_train.squeeze())
@@ -2007,6 +2062,7 @@ class LRobust(BaseRobust):
                 (b_all, p_all, r2_i, ll_i,
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
+
                 seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
                 (b_list, p_list, r2_list,
                  )= zip(*Parallel(n_jobs=n_cpu)
