@@ -1,7 +1,8 @@
 # Module containing utility functions for the library
-from typing import Optional, List, Tuple, Iterable, Sequence
+from typing import Optional, List, Tuple, Iterable, Sequence, Union
 import numpy as np
 import random
+import warnings
 import scipy
 import matplotlib
 import pandas as pd
@@ -9,6 +10,240 @@ from itertools import chain, combinations
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+
+
+def concat_results(objs: List["OLSResult"]) -> "OLSResult":
+    """
+     Core routine: take a list of OLSResult objects and stack them into one OLSResult.
+     All per‐spec fields (estimates, p_values, specs_names, etc.) are concatenated,
+     and any exact duplicates in (y_name, x_name, spec) are dropped in lockstep.
+
+     This function assumes each element of `objs` is already an OLSResult (not the wrapper class).
+     We defer the import of OLSResult until inside the function to avoid circular‐import errors.
+     """
+
+    # ───────────────────────────────────────────────────────────
+    # 1) Delay import of OLSResult until we actually need it
+    #    (avoids “partially initialized module” / circular‐import errors).
+    # ───────────────────────────────────────────────────────────
+    from robustipy.models import OLSResult
+
+    # 1a) Sanity‐check: each entry must be OLSResult
+    if not all(isinstance(o, OLSResult) for o in objs):
+        raise ValueError(
+            "`_merge_results` expects a list of OLSResult objects (no OLSRobust/LRobust wrappers)."
+        )
+    if len(objs) == 0:
+        raise ValueError("`_merge_results` got an empty list!")
+
+    # ───────────────────────────────────────────────────────────
+    # 2) Start by “copying” the first OLSResult into `merged`
+    # ───────────────────────────────────────────────────────────
+    merged: OLSResult = objs[0]
+
+    # Helper: for a given OLSResult `r`, build a list of length = number of specs
+    # that repeats r.y_name (whether scalar or list) once per spec.
+    def _expand_yx(field, n_specs):
+        """
+        If `field` is a list of length == n_specs, return it unchanged.
+        If `field` is a scalar (string), return [field] * n_specs.
+        Otherwise, error.
+        """
+        if isinstance(field, list):
+            if len(field) != n_specs:
+                raise ValueError(
+                    f"Length of list field {field!r} does not match number of specs ({n_specs})."
+                )
+            return field.copy()
+        else:
+            # assume scalar (e.g. "logpgp95"); repeat it once per spec
+            return [field] * n_specs
+
+    # 2a) “Number of specs” in the first object
+    n0 = len(merged.specs_names)
+
+    # 2b) Build y_list and x_list of length = n0
+    merged_y_list = _expand_yx(merged.y_name, n0)
+    merged_x_list = _expand_yx(merged.x_name, n0)
+
+    # 2c) Grab all the “per‐spec” fields from the first object
+    merged_specs = merged.specs_names.copy().reset_index(drop=True)
+    merged_draws = [merged.draws] * n0
+    merged_kfold = [merged.kfold] * n0
+    merged_estimates = merged.estimates.copy().reset_index(drop=True)
+    merged_estimates_ystar = merged.estimates_ystar.copy().reset_index(drop=True)
+    merged_p_values = merged.p_values.copy().reset_index(drop=True)
+    merged_p_values_ystar = merged.p_values_ystar.copy().reset_index(drop=True)
+    merged_r2_values = merged.r2_values.copy().reset_index(drop=True)
+    merged_all_b = list(merged.all_b)
+    merged_all_p = list(merged.all_p)
+    merged_all_predictors = list(merged.all_predictors)
+    merged_summary_df = merged.summary_df.copy().reset_index(drop=True)
+
+    # 2d) “Global” fields (just keep from the first object, but warn later if mismatch)
+    merged_controls = list(merged.controls)
+    merged_model_name = merged.model_name
+    merged_name_av_k = merged.name_av_k_metric
+    merged_shap_return = merged.shap_return
+    # (We do NOT merge `inference` here.  If the user wants fresh inference after merging,
+    #  they can call `merged._compute_inference()` manually.)
+
+    # ───────────────────────────────────────────────────────────
+    # 3) Append everything from the remaining OLSResult objects
+    # ───────────────────────────────────────────────────────────
+    for other in objs[1:]:
+        # 3a) Expand other.y_name / other.x_name to lists of length = len(other.specs_names)
+        n_o = len(other.specs_names)
+        other_y_expanded = _expand_yx(other.y_name, n_o)
+        other_x_expanded = _expand_yx(other.x_name, n_o)
+        merged_y_list.extend(other_y_expanded)
+        merged_x_list.extend(other_x_expanded)
+
+        # 3b) specs_names is a pd.Series of length = n_o; concatenate
+        merged_specs = pd.concat(
+            [merged_specs, other.specs_names.reset_index(drop=True)],
+            ignore_index=True
+        )
+
+        # 3c) draws and kfold become lists repeated once per spec
+        merged_draws.extend([other.draws] * n_o)
+        merged_kfold.extend([other.kfold] * n_o)
+
+        # 3d) concat all per‐spec DataFrames
+        merged_estimates = pd.concat(
+            [merged_estimates, other.estimates.reset_index(drop=True)],
+            ignore_index=True
+        )
+        merged_estimates_ystar = pd.concat(
+            [merged_estimates_ystar, other.estimates_ystar.reset_index(drop=True)],
+            ignore_index=True
+        )
+        merged_p_values = pd.concat(
+            [merged_p_values, other.p_values.reset_index(drop=True)],
+            ignore_index=True
+        )
+        merged_p_values_ystar = pd.concat(
+            [merged_p_values_ystar, other.p_values_ystar.reset_index(drop=True)],
+            ignore_index=True
+        )
+        merged_r2_values = pd.concat(
+            [merged_r2_values, other.r2_values.reset_index(drop=True)],
+            ignore_index=True
+        )
+
+        merged_all_b.extend(other.all_b)
+        merged_all_p.extend(other.all_p)
+        merged_all_predictors.extend(other.all_predictors)
+        merged_summary_df = pd.concat(
+            [merged_summary_df, other.summary_df.reset_index(drop=True)],
+            ignore_index=True
+        )
+
+        # 3e) If controls or model_name differ, warn (but keep the first)
+        if other.controls != merged_controls:
+            warnings.warn(
+                "Controls differ between merged OLSResult objects; keeping only the first set.",
+                UserWarning
+            )
+        if other.model_name != merged_model_name:
+            warnings.warn(
+                "model_name differs between merged OLSResult objects; keeping only the first.",
+                UserWarning
+            )
+
+    # ───────────────────────────────────────────────────────────
+    # 4) Overwrite `merged` fields with our stacked versions
+    # ───────────────────────────────────────────────────────────
+    merged.y_name = merged_y_list
+    merged.x_name = merged_x_list
+    merged.specs_names = merged_specs.reset_index(drop=True)
+    merged.draws = merged_draws
+    merged.kfold = merged_kfold
+
+    merged.estimates = merged_estimates
+    merged.estimates_ystar = merged_estimates_ystar
+    merged.p_values = merged_p_values
+    merged.p_values_ystar = merged_p_values_ystar
+    merged.r2_values = merged_r2_values
+
+    merged.all_b = merged_all_b
+    merged.all_p = merged_all_p
+    merged.all_predictors = merged_all_predictors
+    merged.summary_df = merged_summary_df.reset_index(drop=True)
+
+    merged.controls = merged_controls
+    merged.model_name = merged_model_name
+    merged.name_av_k_metric = merged_name_av_k
+    merged.shap_return = merged_shap_return
+
+    # ───────────────────────────────────────────────────────────
+    # 5) Drop any exact‐duplicate (y_name, x_name, spec) triplets
+    #    so that each unique combination survives only once.
+    # ───────────────────────────────────────────────────────────
+    n_specs_total = len(merged.specs_names)
+
+    # 5a) Build a tiny DataFrame of length = number of specs
+    Ys = merged.y_name
+    Xs = merged.x_name
+    df_dup = pd.DataFrame({
+        "y": Ys,
+        "x": Xs,
+        "spec": merged.specs_names.values  # e.g. frozenset([...])
+    })
+
+    # 5b) Reset index → the old row‐indices land in a column called "index"
+    temp = df_dup.reset_index()  # columns = ["index", "y", "x", "spec"]
+
+    # 5c) Drop duplicates by (“y”, “x”, “spec”), keep only the first appearance
+    dedup = temp.drop_duplicates(subset=["y", "x", "spec"], keep="first")
+
+    # 5d) The “index” column in dedup tells us which rows we keep
+    keep_idx = sorted(dedup["index"].tolist())
+
+    # 5e) Now slice every per‐spec attribute by keep_idx → remove exact duplicates
+    merged.specs_names = merged.specs_names.iloc[keep_idx].reset_index(drop=True)
+
+    # y_name and x_name are lists; keep only those at indices in keep_idx
+    merged.y_name = [merged.y_name[i] for i in keep_idx]
+    merged.x_name = [merged.x_name[i] for i in keep_idx]
+
+    merged.draws = [merged.draws[i] for i in keep_idx]
+    merged.kfold = [merged.kfold[i] for i in keep_idx]
+
+    merged.estimates = merged.estimates.iloc[keep_idx].reset_index(drop=True)
+    merged.estimates_ystar = merged.estimates_ystar.iloc[keep_idx].reset_index(drop=True)
+    merged.p_values = merged.p_values.iloc[keep_idx].reset_index(drop=True)
+    merged.p_values_ystar = merged.p_values_ystar.iloc[keep_idx].reset_index(drop=True)
+    merged.r2_values = merged.r2_values.iloc[keep_idx].reset_index(drop=True)
+
+    merged.all_b = [merged.all_b[i] for i in keep_idx]
+    merged.all_p = [merged.all_p[i] for i in keep_idx]
+    merged.all_predictors = [merged.all_predictors[i] for i in keep_idx]
+
+    merged.summary_df = merged.summary_df.iloc[keep_idx].reset_index(drop=True)
+
+    if isinstance(merged.y_name, list):
+        merged.y_name = [
+            t if isinstance(t, tuple) else (t,)
+            for t in merged.y_name
+        ]
+    else:
+        # If it ended up as a single string (or something else), wrap it once:
+        if not isinstance(merged.y_name, tuple):
+            merged.y_name = (merged.y_name,)
+
+    # ----------------- ENSURE EACH x_name IS A ONE‐ELEMENT TUPLE -----------------
+    if isinstance(merged.x_name, list):
+        merged.x_name = [
+            t if isinstance(t, tuple) else (t,)
+            for t in merged.x_name
+        ]
+    else:
+        if not isinstance(merged.x_name, tuple):
+            merged.x_name = (merged.x_name,)
+
+    return merged
+
 
 def space_size(iterable) -> int:
     """
