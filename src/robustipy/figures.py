@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Union, Optional, List, Sequence, Tuple
 
 import matplotlib
@@ -1178,6 +1179,19 @@ def plot_results(
       `_R2hexbin`, `_OOS`, `_curve`, `_LLhexbin`, `_SHAP`, `_BMA`, `_IC`, `_bdist`.
       for the case when len(y_name) == 1, and a subset for when >1.
     """
+
+    # If 'draws' or 'kfold' is a list/tuple, assume this is a merged‐results object:
+    if isinstance(results_object.draws, (list, tuple)) or isinstance(results_object.kfold, (list, tuple)):
+        warnings.warn(
+            "plot_results was passed a *merged* results object (draws/kfold are lists).  "
+            "This function does not support plotting a merged‐results object.  "
+            "This is because it's difficult to know exactly what you want to do.  "
+            "It's much safer for you to extract individual result objects and plot them separately.  "
+            "Please raise an issue on GitHub.com/robustipy/ and we can discuss!"
+            "Exiting without plotting.",
+            UserWarning
+        )
+        return
 
     ext = ext.strip()
     specs = _sanitize_specs(specs, max_len=6)
