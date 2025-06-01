@@ -42,6 +42,118 @@ from robustipy.utils import (
 )
 
 
+import warnings
+from typing import List, Tuple
+import pandas as pd
+
+def _ensure_single_constant(
+    dataframe: pd.DataFrame,
+    x_list: List[str],
+    controls_list: List[str],
+) -> Tuple[List[str], List[str]]:
+    """
+    1) If there’s already a column literally named "const" (perhaps left over from a prior fit),
+       drop it now (and remove it from x_list/controls_list).
+    2) Look at whatever columns remain in dataframe; find which truly have zero variance.
+    3) If none exist, create a brand‐new "const" = 1.0, and append it to x_list.
+    4) If one or more exist, pick exactly one to keep (prefer any in x_list, then any in controls_list,
+       otherwise the alphabetically first), warn if there were >1, drop the others, rename the chosen one to
+       "const", and remove from controls_list if it also lived in x_list.
+    5) Return the updated (x_list, controls_list).
+    """
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 1) Drop any previously created "const" to avoid stale duplicates:
+    # ──────────────────────────────────────────────────────────────────────────
+    if "const" in dataframe.columns:
+        # drop the old “const”
+        dataframe.drop(columns=["const"], inplace=True)
+        if "const" in x_list:
+            x_list.remove("const")
+        if "const" in controls_list:
+            controls_list.remove("const")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 2) Find all truly zero‐variance columns among what remains:
+    # ──────────────────────────────────────────────────────────────────────────
+    zero_var_cols = [
+        col
+        for col in dataframe.columns
+        if dataframe[col].nunique(dropna=False) == 1
+    ]
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 3) If none exist, create a new "const" and put it into x_list:
+    # ──────────────────────────────────────────────────────────────────────────
+    if len(zero_var_cols) == 0:
+        dataframe.loc[:, "const"] = 1.0
+        x_list.append("const")
+        return x_list, controls_list
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 4) If one or more do exist, choose exactly one to keep:
+    #    a) Prefer any that live in x_list
+    #    b) Otherwise prefer any that live in controls_list
+    #    c) Otherwise pick the first alphabetically
+    # ──────────────────────────────────────────────────────────────────────────
+    in_x = [c for c in zero_var_cols if c in x_list]
+    if in_x:
+        keep = in_x[0]
+    else:
+        in_ctrl = [c for c in zero_var_cols if c in controls_list]
+        if in_ctrl:
+            keep = in_ctrl[0]
+        else:
+            keep = sorted(zero_var_cols)[0]
+
+    # Warn if there were actually multiple zero‐variance columns
+    if len(zero_var_cols) > 1:
+        warnings.warn(
+            f"More than one constant-valued column detected: {zero_var_cols!r}. "
+            f"Keeping only '{keep}' and dropping the others.",
+            UserWarning
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 5) Drop all the other zero-variance columns except `keep`,
+    #    and remove them from whichever list they appeared in:
+    # ──────────────────────────────────────────────────────────────────────────
+    for c in zero_var_cols:
+        if c == keep:
+            continue
+        # drop from the DataFrame itself
+        if c in dataframe.columns:
+            dataframe.drop(columns=[c], inplace=True)
+        # remove from x_list / controls_list if present
+        if c in x_list:
+            x_list.remove(c)
+        if c in controls_list:
+            controls_list.remove(c)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 6) If `keep` was listed in both x_list and controls_list, remove it from controls_list
+    # ──────────────────────────────────────────────────────────────────────────
+    if keep in x_list and keep in controls_list:
+        controls_list.remove(keep)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 7) Now rename `keep` to "const" (unless it already is "const"):
+    #    - If "const" already existed (it was dropped in step 1), no conflict remains.
+    #    - Finally, update whichever list contained `keep`.
+    # ──────────────────────────────────────────────────────────────────────────
+    if keep != "const":
+        # (By step 1 we already removed any old "const", so it cannot clash here.)
+        dataframe.rename(columns={keep: "const"}, inplace=True)
+
+        if keep in x_list:
+            x_list[x_list.index(keep)] = "const"
+        elif keep in controls_list:
+            controls_list[controls_list.index(keep)] = "const"
+
+    return x_list, controls_list
+
+
+
 def rescale(variable):
     variable = np.asarray(variable, dtype=np.float64)
     mean = np.nanmean(variable, axis=0, keepdims=True)
@@ -1260,41 +1372,21 @@ class OLSRobust(BaseRobust):
         )
         self.seed = seed
         np.random.seed(self.seed)
-
-        for col in controls:
-            if self.data[col].nunique(dropna=False) == 1:
-                warnings.warn(
-                    f"The control variable '{col}' has the same value for all observations. "
-                    "This means it acts like a constant (intercept) term. "
-                    "Since it's in `controls`, it will only be included in some model specifications. "
-                    "If you want all models to include an intercept, move this variable to `x` instead of `controls`.",
-                    UserWarning
-                )
         self.composite_sample = composite_sample
-        combined = self.x + controls
-        found_constant = any(
-            self.data[col].nunique(dropna=False) == 1
-            for col in combined
-        )
-        if not found_constant:
-            self.data = self.data.copy()
-            self.data.loc[:, 'const'] = 1.0
-            self.x = self.x + ['const']
-
-
+        self.x, controls = _ensure_single_constant(self.data, self.x, controls)
         if len(self.y) > 1:
             self.multiple_y()
-            self._validate_fit_args(
-            controls=controls,
-            group=group,
-            draws=draws,
-            kfold=kfold,
-            oos_metric=oos_metric,
-            n_cpu=n_cpu,
-            seed=self.seed,
-            valid_oos_metrics=['pseudo-r2','rmse'],
-            threshold=threshold
-        )
+        self._validate_fit_args(
+        controls=controls,
+        group=group,
+        draws=draws,
+        kfold=kfold,
+        oos_metric=oos_metric,
+        n_cpu=n_cpu,
+        seed=self.seed,
+        valid_oos_metrics=['pseudo-r2','rmse'],
+        threshold=threshold
+    )
         print(
             f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, "
             f"folds={kfold}, seed={seed}.\n"
@@ -1971,28 +2063,20 @@ class LRobust(BaseRobust):
         )
         self.seed = seed
         np.random.seed(self.seed)
-
-        combined = self.x + controls
-        found_constant = any(
-            self.data[col].nunique(dropna=False) == 1
-            for col in combined
+        self.data = self.data.copy()
+        self.x, controls = _ensure_single_constant(self.data, self.x, controls)
+        self._validate_fit_args(
+        controls=controls,
+        group=group,
+        draws=draws,
+        kfold=kfold,
+        oos_metric=oos_metric,
+        n_cpu=n_cpu,
+        seed=seed,
+        valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
+        threshold=threshold
         )
-        if not found_constant:
-            self.data = self.data.copy()
-            self.data.loc[:, 'const'] = 1.0
-            self.x = self.x + ['const']
-
-            self._validate_fit_args(
-            controls=controls,
-            group=group,
-            draws=draws,
-            kfold=kfold,
-            oos_metric=oos_metric,
-            n_cpu=n_cpu,
-            seed=seed,
-            valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
-            threshold=threshold
-        )
+        self.oos_metric_name = oos_metric
         print(
             f"LRobust is running with n_cpu={n_cpu}, draws={draws}, "
             f"folds={kfold}, seed={seed}.\n"
@@ -2001,8 +2085,6 @@ class LRobust(BaseRobust):
             f"The target variable of interest is {self.x[0]}. "
             f"Let's begin the calculations..."
         )
-
-        self.oos_metric_name = oos_metric
 
         if sample_size is None:
             sample_size = self.data.shape[0]
