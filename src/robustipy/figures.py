@@ -566,7 +566,8 @@ def plot_curve(
         oddsratio: bool = False,
         specs: Optional[List[List[str]]] = None,
         ax: Optional[plt.Axes] = None,
-        colormap: str = 'Spectral_r',
+        highlights: bool = False,
+        inset: bool = True,
         title: str = ''
 ) -> plt.Axes:
     """
@@ -590,7 +591,10 @@ def plot_curve(
         Colormap for the main curve.
     title : str, optional
         Title text for the axes.
-
+    highlights : bool, default=False
+        If True, highlights the full model and the null model in the plot.
+    inset  : bool, default=True
+        If True, adds an inset with the full model and null model highlights.
     Returns
     -------
     matplotlib.axes.Axes
@@ -619,10 +623,11 @@ def plot_curve(
     df['q_high'] = qs.iloc[1].values
 
     # Flag specs
-    full_spec, null_spec = (list(results_object.specs_names.iloc[-1]),
-                            list(results_object.specs_names.iloc[0]))
-    df['full_spec_idx'] = results_object.specs_names.isin(get_selection_key([full_spec]))
-    df['null_spec_idx'] = results_object.specs_names.isin(get_selection_key([null_spec]))
+    if highlights:
+        full_spec, null_spec = (list(results_object.specs_names.iloc[-1]),
+                                list(results_object.specs_names.iloc[0]))
+        df['full_spec_idx'] = results_object.specs_names.isin(get_selection_key([full_spec]))
+        df['null_spec_idx'] = results_object.specs_names.isin(get_selection_key([null_spec]))
     if specs:
         df['idx'] = results_object.specs_names.isin(get_selection_key(specs))
         df['specs_names'] = results_object.specs_names
@@ -681,37 +686,38 @@ def plot_curve(
             handles.append(Line2D([0], [0], marker='o', color=col, markerfacecolor='w', markersize=10, label=lbl))
 
     # Full model
-    pos_full = df.index[df['full_spec_idx']].item()
-    low_f = lo_low[pos_full, 1] if loess else df.at[pos_full, 'q_low']
-    high_f = lo_high[pos_full, 1] if loess else df.at[pos_full, 'q_high']
-    ax.vlines(pos_full, ymin=low_f, ymax=high_f, color=full_color)
-    arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f), arrowstyle='<|-|>', color=full_color,
-                              mutation_scale=20, shrinkA=0, shrinkB=0)
-    ax.add_artist(arrow_f)
-    ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
-    if max(len(t) for t in results_object.y_name) == 1:
-        handles.append(
-            Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
-    else:
-        handles.append(
-            Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='All Data Used'))
-
-    # Null model
-    pos_null = df.index[df['null_spec_idx']].item()
-    low_n = lo_low[pos_null, 1] if loess else df.at[pos_null, 'q_low']
-    high_n = lo_high[pos_null, 1] if loess else df.at[pos_null, 'q_high']
-    ax.vlines(pos_null, ymin=low_n, ymax=high_n, color=null_color)
-    arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n), arrowstyle='<|-|>', color=null_color,
-                              mutation_scale=20, shrinkA=0, shrinkB=0)
-    ax.add_artist(arrow_n)
-    ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
-    if max(len(t) for t in results_object.y_name) == 1:
-        handles.append(
-            Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
-    else:
-        handles.append(
-            Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
-    # Legend and formatting
+    if highlights:
+        pos_full = df.index[df['full_spec_idx']].item()
+        low_f = lo_low[pos_full, 1] if loess else df.at[pos_full, 'q_low']
+        high_f = lo_high[pos_full, 1] if loess else df.at[pos_full, 'q_high']
+        ax.vlines(pos_full, ymin=low_f, ymax=high_f, color=full_color)
+        arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f), arrowstyle='<|-|>', color=full_color,
+                                  mutation_scale=20, shrinkA=0, shrinkB=0)
+        ax.add_artist(arrow_f)
+        ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
+        if max(len(t) for t in results_object.y_name) == 1:
+            handles.append(
+                Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
+        else:
+            handles.append(
+                Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='All Data Used'))
+    if highlights:
+        # Null model
+        pos_null = df.index[df['null_spec_idx']].item()
+        low_n = lo_low[pos_null, 1] if loess else df.at[pos_null, 'q_low']
+        high_n = lo_high[pos_null, 1] if loess else df.at[pos_null, 'q_high']
+        ax.vlines(pos_null, ymin=low_n, ymax=high_n, color=null_color)
+        arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n), arrowstyle='<|-|>', color=null_color,
+                                  mutation_scale=20, shrinkA=0, shrinkB=0)
+        ax.add_artist(arrow_n)
+        ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
+        if max(len(t) for t in results_object.y_name) == 1:
+            handles.append(
+                Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
+        else:
+            handles.append(
+                Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
+        # Legend and formatting
     ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
               loc='lower right', ncols=2, framealpha=1, facecolor='w')
     axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
@@ -720,16 +726,17 @@ def plot_curve(
     ax.set_ylim(y0 - pad, y1 + pad)
 
     # Summary inset
-    median_inf = results_object.inference['median']
-    z_score = results_object.inference['Stouffers'][0]
-    info_text = (
-        f'Specifications: {n}\n'
-        f'Bootstraps: {results_object.draws}\n'
-        f'Folds: {results_object.kfold}\n'
-        f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
-    )
-    ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
-            fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
+    if inset:
+        median_inf = results_object.inference['median']
+        z_score = results_object.inference['Stouffers'][0]
+        info_text = (
+            f'Specifications: {n}\n'
+            f'Bootstraps: {results_object.draws}\n'
+            f'Folds: {results_object.kfold}\n'
+            f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
+        )
+        ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
+                fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
 
     sns.despine(ax=ax)
     return ax
@@ -872,11 +879,11 @@ def plot_bdist(
         oddsratio: bool,
         specs: Optional[List[List[str]]] = None,
         ax: Optional[plt.Axes] = None,
-        colormap: str = 'Spectral_r',
         title: str = '',
         despine_left: bool = True,
         legend_bool: bool = False,
-        bw_adjust: float = 0.5
+        bw_adjust: float = 0.5,
+        highlights: bool = True
 ) -> plt.Axes:
     """
     Plot density‐scaled histograms and KDEs of coefficient distributions,
@@ -890,22 +897,31 @@ def plot_bdist(
     # flatten the spec‐names into strings
     spec_labels = [s for s in results_object.specs_names]
     draws_df.columns = spec_labels
-
-    # pick out the special ones
-    null_label = spec_labels[0]
-    full_label = spec_labels[-1]
+    if highlights:
+        # pick out the special ones
+        null_label = spec_labels[0]
+        full_label = spec_labels[-1]
     highlight = []
     if specs:
         requested: Set[frozenset] = {frozenset(sp) for sp in specs}
         highlight = [lab for lab in spec_labels if lab in requested]
 
     # define the order we'll plot (so colors map consistently)
-    order = [null_label] + highlight + [full_label]
-    # palette = get_colormap_colors(colormap, len(order))
-    palette = get_colormap_colors(len(order))
-
-    # melt into long form
-    df_long = draws_df[order].melt(var_name='spec', value_name='coef')
+    if highlights:
+        order = [null_label] + highlight + [full_label]
+    else:
+        order = highlight
+    if specs is None and highlights is False:
+        df_long = draws_df.melt(var_name='spec', value_name='coef')
+        print(df_long)
+        # ensure the order is preserved
+        palette = get_colormap_colors(1)
+        hue=None
+    else:
+        df_long = draws_df[order].melt(var_name='spec', value_name='coef')
+        # ensure the order is preserved
+        palette = get_colormap_colors(len(order))
+        hue='spec'
 
     if ax is None:
         ax = plt.gca()
@@ -913,7 +929,7 @@ def plot_bdist(
     sns.kdeplot(
         data=df_long,
         x='coef',
-        hue='spec',
+        hue=hue,
         common_norm=False,  # each group integrates to 1
         bw_adjust=bw_adjust,  # controls smoothness (h ∝ bw_adjust)
         palette=palette,  # line colours for each 'spec'
@@ -941,14 +957,13 @@ def plot_bdist(
                   frameon=True, loc='upper right')
 
     # 4. Final formatting
-    axis_formatter(ax, 'Density', 'Estimand of Interest', title)
+    axis_formatter(ax, 'Density', 'Bootstrapped Estimand', title)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
     if despine_left:
         ax.yaxis.set_label_position("right")
         sns.despine(ax=ax, right=False, left=True)
     else:
         sns.despine(ax=ax)
-
     return ax
 
 
@@ -1233,12 +1248,13 @@ def plot_results(
         plot_kfolds(results_object, colormap, ax5,
                     title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci,
-                   specs=specs, ax=ax6, colormap=colormap,
-                   title='f.', oddsratio=oddsratio)
+                   specs=specs, ax=ax6,
+                   title='f.', oddsratio=oddsratio,
+                   highlights=False)
         plot_ic(results_object=results_object, ic=ic, specs=specs,
                 ax=ax7, colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax8, oddsratio=oddsratio, colormap=colormap,
+                   ax=ax8, oddsratio=oddsratio,
                    title='h.', despine_left=True)
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
     else:
@@ -1248,14 +1264,13 @@ def plot_results(
         ax2 = fig.add_subplot(gs[0:3, 17:24])
         ax3 = fig.add_subplot(gs[3:6, 17:24])
         plot_curve(results_object=results_object, loess=loess,
-                   ci=ci, specs=specs, ax=ax1, colormap=colormap,
+                   ci=ci, specs=specs, ax=ax1,
                    title='a.', oddsratio=oddsratio)
         plot_hexbin_r2(results_object, ax2, fig, oddsratio,
                        colormap, title='b.', side='right')
         plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax3, oddsratio=oddsratio, colormap=colormap,
+                   ax=ax3, oddsratio=oddsratio,
                    title='c.', despine_left=True)
-        print(ext)
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
@@ -1264,13 +1279,13 @@ def plot_results(
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bdist(results_object=results_object, specs=specs, ax=ax,
-               oddsratio=oddsratio, colormap=colormap,
+               oddsratio=oddsratio,
                despine_left=False)
     plt.savefig(os.path.join(outdir, project_name + '_OOS.' + ext), bbox_inches='tight')
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci,
-               oddsratio=oddsratio, colormap=colormap,
+               oddsratio=oddsratio,
                specs=specs, ax=ax)
     plt.savefig(os.path.join(outdir, project_name + '_curve.' + ext), bbox_inches='tight')
     plt.close(fig)
@@ -1295,7 +1310,7 @@ def plot_results(
         plt.close(fig)
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax,
-                   oddsratio=oddsratio, colormap=colormap,
+                   oddsratio=oddsratio,
                    despine_left=False,
                    legend_bool=False)
         plt.savefig(os.path.join(outdir, project_name + '_bdist.' + ext), bbox_inches='tight')
