@@ -1418,7 +1418,7 @@ class OLSRobust(BaseRobust):
             f"folds={kfold}, seed={seed}.\n"
             f"We're evaluating our out-of-sample predictions with the "
             f"{oos_metric} metric.\n"
-            f"The target variable of interest is {self.x[0]}. "
+            f"The estimand of interest is {self.x[0]}. "
             f"Let's begin the calculations..."
         )
 
