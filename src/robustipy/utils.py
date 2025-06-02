@@ -12,12 +12,13 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 
-def concat_results(objs: List["OLSResult"]) -> "OLSResult":
+def concat_results(objs: List["OLSResult"], de_dupe=True) -> "OLSResult":
     """
      Core routine: take a list of OLSResult objects and stack them into one OLSResult.
      All per‐spec fields (estimates, p_values, specs_names, etc.) are concatenated,
      and any exact duplicates in (y_name, x_name, spec) are dropped in lockstep.
-
+     accepts: de_dupe: bool, default True
+        If True, drop exact duplicates in (y_name, x_name, spec) triplets.
      This function assumes each element of `objs` is already an OLSResult (not the wrapper class).
      We defer the import of OLSResult until inside the function to avoid circular‐import errors.
      """
@@ -176,51 +177,52 @@ def concat_results(objs: List["OLSResult"]) -> "OLSResult":
     merged.name_av_k_metric = merged_name_av_k
     merged.shap_return = merged_shap_return
 
-    # ───────────────────────────────────────────────────────────
-    # 5) Drop any exact‐duplicate (y_name, x_name, spec) triplets
-    #    so that each unique combination survives only once.
-    # ───────────────────────────────────────────────────────────
-    n_specs_total = len(merged.specs_names)
+    if de_dupe:
+        # ───────────────────────────────────────────────────────────
+        # 5) Drop any exact‐duplicate (y_name, x_name, spec) triplets
+        #    so that each unique combination survives only once.
+        # ───────────────────────────────────────────────────────────
+        n_specs_total = len(merged.specs_names)
 
-    # 5a) Build a tiny DataFrame of length = number of specs
-    Ys = merged.y_name
-    Xs = merged.x_name
-    df_dup = pd.DataFrame({
-        "y": Ys,
-        "x": Xs,
-        "spec": merged.specs_names.values  # e.g. frozenset([...])
-    })
+        # 5a) Build a tiny DataFrame of length = number of specs
+        Ys = merged.y_name
+        Xs = merged.x_name
+        df_dup = pd.DataFrame({
+            "y": Ys,
+            "x": Xs,
+            "spec": merged.specs_names.values  # e.g. frozenset([...])
+        })
 
-    # 5b) Reset index → the old row‐indices land in a column called "index"
-    temp = df_dup.reset_index()  # columns = ["index", "y", "x", "spec"]
+        # 5b) Reset index → the old row‐indices land in a column called "index"
+        temp = df_dup.reset_index()  # columns = ["index", "y", "x", "spec"]
 
-    # 5c) Drop duplicates by (“y”, “x”, “spec”), keep only the first appearance
-    dedup = temp.drop_duplicates(subset=["y", "x", "spec"], keep="first")
+        # 5c) Drop duplicates by (“y”, “x”, “spec”), keep only the first appearance
+        dedup = temp.drop_duplicates(subset=["y", "x", "spec"], keep="first")
 
-    # 5d) The “index” column in dedup tells us which rows we keep
-    keep_idx = sorted(dedup["index"].tolist())
+        # 5d) The “index” column in dedup tells us which rows we keep
+        keep_idx = sorted(dedup["index"].tolist())
 
-    # 5e) Now slice every per‐spec attribute by keep_idx → remove exact duplicates
-    merged.specs_names = merged.specs_names.iloc[keep_idx].reset_index(drop=True)
+        # 5e) Now slice every per‐spec attribute by keep_idx → remove exact duplicates
+        merged.specs_names = merged.specs_names.iloc[keep_idx].reset_index(drop=True)
 
-    # y_name and x_name are lists; keep only those at indices in keep_idx
-    merged.y_name = [merged.y_name[i] for i in keep_idx]
-    merged.x_name = [merged.x_name[i] for i in keep_idx]
+        # y_name and x_name are lists; keep only those at indices in keep_idx
+        merged.y_name = [merged.y_name[i] for i in keep_idx]
+        merged.x_name = [merged.x_name[i] for i in keep_idx]
 
-    merged.draws = [merged.draws[i] for i in keep_idx]
-    merged.kfold = [merged.kfold[i] for i in keep_idx]
+        merged.draws = [merged.draws[i] for i in keep_idx]
+        merged.kfold = [merged.kfold[i] for i in keep_idx]
 
-    merged.estimates = merged.estimates.iloc[keep_idx].reset_index(drop=True)
-    merged.estimates_ystar = merged.estimates_ystar.iloc[keep_idx].reset_index(drop=True)
-    merged.p_values = merged.p_values.iloc[keep_idx].reset_index(drop=True)
-    merged.p_values_ystar = merged.p_values_ystar.iloc[keep_idx].reset_index(drop=True)
-    merged.r2_values = merged.r2_values.iloc[keep_idx].reset_index(drop=True)
+        merged.estimates = merged.estimates.iloc[keep_idx].reset_index(drop=True)
+        merged.estimates_ystar = merged.estimates_ystar.iloc[keep_idx].reset_index(drop=True)
+        merged.p_values = merged.p_values.iloc[keep_idx].reset_index(drop=True)
+        merged.p_values_ystar = merged.p_values_ystar.iloc[keep_idx].reset_index(drop=True)
+        merged.r2_values = merged.r2_values.iloc[keep_idx].reset_index(drop=True)
 
-    merged.all_b = [merged.all_b[i] for i in keep_idx]
-    merged.all_p = [merged.all_p[i] for i in keep_idx]
-    merged.all_predictors = [merged.all_predictors[i] for i in keep_idx]
+        merged.all_b = [merged.all_b[i] for i in keep_idx]
+        merged.all_p = [merged.all_p[i] for i in keep_idx]
+        merged.all_predictors = [merged.all_predictors[i] for i in keep_idx]
 
-    merged.summary_df = merged.summary_df.iloc[keep_idx].reset_index(drop=True)
+        merged.summary_df = merged.summary_df.iloc[keep_idx].reset_index(drop=True)
 
     if isinstance(merged.y_name, list):
         merged.y_name = [
