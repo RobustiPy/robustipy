@@ -718,8 +718,9 @@ def plot_curve(
             handles.append(
                 Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
         # Legend and formatting
-    ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
-              loc='lower right', ncols=2, framealpha=1, facecolor='w')
+    if not highlights and specs is None:
+        ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
+                  loc='lower right', ncols=2, framealpha=1, facecolor='w')
     axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
     ax.set_xlim(0, n - 1)
     pad = (y1 - y0) * 0.1
@@ -913,7 +914,6 @@ def plot_bdist(
         order = highlight
     if specs is None and highlights is False:
         df_long = draws_df.melt(var_name='spec', value_name='coef')
-        print(df_long)
         # ensure the order is preserved
         palette = get_colormap_colors(1)
         hue=None
