@@ -40,11 +40,14 @@ from robustipy.utils import (
     pseudo_r2,
     calculate_imv_score
 )
-
-
 import warnings
 from typing import List, Tuple
 import pandas as pd
+
+
+import warnings
+import pandas as pd
+from typing import List, Tuple
 
 def _ensure_single_constant(
     dataframe: pd.DataFrame,
@@ -53,24 +56,39 @@ def _ensure_single_constant(
     controls: List[str],
 ) -> Tuple[List[str], List[str]]:
     """
-    1) If there’s already a column literally named "const" (perhaps from a prior fit),
-       drop it now (and remove it from y_list, x_list, and controls).
-    2) Look only at the columns in (y_list + x_list + controls);
-       find which of those truly have zero variance.
-    3) If none exist, create a brand‐new "const" = 1.0, and append it to x_list.
-    4) If one or more exist, choose exactly one to keep (prefer any in x_list,
-       then any in controls, then anything in y_list, otherwise alphabetically first),
-       warn if there were >1, drop the others, rename the chosen one to "const",
-       and remove it from any list that is not meant to hold constants.
-    5) Return the updated (x_list, controls).
+    Revised version: if a zero‐variance column appears in both x_list and controls,
+    it will be kept in 'controls' (not moved into x_list).  More precisely:
+
+    1) If there is already a column literally named "const", drop it and remove it
+       from y_list, x_list, and controls (to avoid stale duplicates).
+    2) Among the columns in (y_list ∪ x_list ∪ controls) ∩ dataframe.columns,
+       identify those with zero variance.
+    3) If none exist, create a brand‐new "const" column (all 1.0) and append it to x_list.
+    4) If one or more exist, choose exactly one to keep according to the new priority:
+         (a) Any zero‐variance column in controls
+         (b) Otherwise any zero‐variance column in x_list
+         (c) Otherwise any zero‐variance column in y_list
+         (d) Otherwise the alphabetically first among them
+       If there are multiple, warn that only one will be kept and the others dropped.
+    5) Drop all zero‐variance columns except the chosen one, and remove them from
+       whichever of y_list, x_list, controls they appeared in.
+    6) For the chosen column "keep":
+       • If it was originally in controls (regardless of whether also in x_list), then
+         after renaming it to "const" it stays in controls and is removed from x_list (if present).
+       • Else if it was originally only in x_list, then after renaming it to "const" it stays in x_list.
+       • Else if it was originally only in y_list, then after renaming it to "const", it is moved into x_list.
+       In all cases, remove "keep" from any list where it does not belong post‐rename.
+    7) Return the updated (x_list, controls).
+
+    This ensures that if a constant was specified as a control, it remains a control
+    (now called "const") rather than being moved into x_list.
     """
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 1) Drop any pre‐existing "const" to avoid stale duplicates:
+    # 1) Drop any pre‐existing "const" column:
     # ──────────────────────────────────────────────────────────────────────────
     if "const" in dataframe.columns:
         dataframe.drop(columns=["const"], inplace=True)
-        # Remove it from any of the lists if it exists there:
         if "const" in y_list:
             y_list.remove("const")
         if "const" in x_list:
@@ -79,17 +97,12 @@ def _ensure_single_constant(
             controls.remove("const")
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Build the set of “relevant” columns to check (only those we explicitly care about):
+    # 2) Identify zero‐variance columns among the “relevant” ones:
     # ──────────────────────────────────────────────────────────────────────────
-    # We only consider columns that actually exist in `dataframe`.
     relevant_cols = [
         col for col in (y_list + x_list + controls)
         if col in dataframe.columns
     ]
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # 2) Among those relevant columns, find which truly have zero variance:
-    # ──────────────────────────────────────────────────────────────────────────
     zero_var_cols = [
         col
         for col in relevant_cols
@@ -97,7 +110,7 @@ def _ensure_single_constant(
     ]
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 3) If none exist, create a new "const" column (all 1.0) and put it into x_list:
+    # 3) If no zero‐variance column, create "const" = 1.0 and append to x_list:
     # ──────────────────────────────────────────────────────────────────────────
     if len(zero_var_cols) == 0:
         dataframe.loc[:, "const"] = 1.0
@@ -105,26 +118,22 @@ def _ensure_single_constant(
         return x_list, controls
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 4) If one or more zero‐variance columns exist, choose exactly one to keep:
-    #
-    #    a) Prefer any that live in x_list
-    #    b) Otherwise prefer any that live in controls
-    #    c) Otherwise prefer any that live in y_list
-    #    d) Otherwise pick the first alphabetically (just in case)
+    # 4) Choose exactly one zero‐variance column to keep with new priority:
+    #    (controls > x_list > y_list > alphabetical)
     # ──────────────────────────────────────────────────────────────────────────
-    in_x       = [c for c in zero_var_cols if c in x_list]
-    in_ctrl    = [c for c in zero_var_cols if (c not in in_x) and (c in controls)]
-    in_y       = [c for c in zero_var_cols if (c not in in_x) and (c not in in_ctrl) and (c in y_list)]
-    if in_x:
-        keep = in_x[0]
-    elif in_ctrl:
+    in_ctrl = [c for c in zero_var_cols if c in controls]
+    in_x    = [c for c in zero_var_cols if (c not in in_ctrl) and (c in x_list)]
+    in_y    = [c for c in zero_var_cols if (c not in in_ctrl) and (c not in in_x) and (c in y_list)]
+
+    if in_ctrl:
         keep = in_ctrl[0]
+    elif in_x:
+        keep = in_x[0]
     elif in_y:
         keep = in_y[0]
     else:
         keep = sorted(zero_var_cols)[0]
 
-    # Warn if there were actually multiple zero‐variance columns
     if len(zero_var_cols) > 1:
         warnings.warn(
             f"More than one constant‐valued column detected among {relevant_cols!r}: "
@@ -133,16 +142,20 @@ def _ensure_single_constant(
         )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 5) Drop all zero‐variance columns *except* the one chosen (`keep`),
-    #    and remove them from whichever list they appeared in:
+    # Record original membership of `keep`:
+    orig_in_ctrl = (keep in controls)
+    orig_in_x    = (keep in x_list)
+    orig_in_y    = (keep in y_list)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 5) Drop all zero‐variance columns except the one chosen (`keep`),
+    #    and remove them from y_list, x_list, controls:
     # ──────────────────────────────────────────────────────────────────────────
     for c in zero_var_cols:
         if c == keep:
             continue
-        # 5a) Drop from DataFrame, if still present:
         if c in dataframe.columns:
             dataframe.drop(columns=[c], inplace=True)
-        # 5b) Remove from any of the three lists if present:
         if c in y_list:
             y_list.remove(c)
         if c in x_list:
@@ -151,33 +164,54 @@ def _ensure_single_constant(
             controls.remove(c)
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 6) If `keep` appeared in multiple lists, remove it from any that should not hold it:
-    #    Specifically, once we rename `keep` to "const", it no longer belongs in y_list or controls.
+    # 6) Remove `keep` from any list it should no longer be in:
+    #    We will rename `keep` to "const" below.
     # ──────────────────────────────────────────────────────────────────────────
-    #    (We want "const" ultimately only in x_list—never in controls or y.)
-    if keep in y_list:
-        y_list.remove(keep)
-    if keep in controls:
-        controls.remove(keep)
+    #    If `keep` was originally in controls, we want it to remain a control after renaming.
+    #    So: remove it from x_list (if present) and from y_list. Do NOT remove from controls.
+    if orig_in_ctrl:
+        if keep in x_list:
+            x_list.remove(keep)
+        if keep in y_list:
+            y_list.remove(keep)
+        # `keep` remains in controls for now.
+    else:
+        # If `keep` was not originally in controls, remove it from controls if it somehow is there,
+        # so that after renaming "const" goes to the correct list.
+        if keep in controls:
+            controls.remove(keep)
+
+        # If `keep` was in x_list (but not in controls), we will keep it as a regressor.
+        # If `keep` was only in y_list, we remove it from y_list and later add "const" to x_list.
+        if keep in x_list:
+            # We will replace keep→"const" in x_list below.
+            pass
+        else:
+            # If it was in y_list only (and not in x_list or controls), remove it here.
+            if keep in y_list:
+                y_list.remove(keep)
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 7) Rename the single kept column (`keep`) to "const", unless it already was "const":
+    # 7) Rename the single kept column (`keep`) to "const" (unless it already was "const"):
     # ──────────────────────────────────────────────────────────────────────────
     if keep != "const":
-        # (By step 1 we removed any pre‐existing "const", so no naming collision now.)
+        # Rename the column in the DataFrame:
         dataframe.rename(columns={keep: "const"}, inplace=True)
 
-        # Update whichever list used to contain `keep`:
-        if keep in x_list:
-            x_list[x_list.index(keep)] = "const"
-        # If somehow `keep` still appeared in y_list (unlikely) or controls, remove it there:
-        # (but we already removed it in step 6, so this is just a safety check)
-        if keep in y_list:
-            y_list[y_list.index(keep)] = "const"
-        if keep in controls:
+        # Now place "const" into the correct list:
+        if orig_in_ctrl:
+            # The constant should remain in controls.  Replace `keep`→"const" in controls:
             controls[controls.index(keep)] = "const"
+        elif orig_in_x:
+            # The constant should remain among regressors.  Replace `keep`→"const" in x_list:
+            x_list[x_list.index(keep)] = "const"
+        else:
+            # `keep` was originally only in y_list.  Now we add "const" to x_list:
+            x_list.append("const")
+            # (No need to modify controls in this branch.)
 
     return x_list, controls
+
 
 
 def rescale(variable):
