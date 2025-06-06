@@ -789,8 +789,8 @@ import numpy as np
 from typing import Sequence
 
 def pseudo_r2(
-    y_pred: Sequence,
     y_true: Sequence,
+    y_pred: Sequence,
     mean_y_train: float
 ) -> float:
     """
