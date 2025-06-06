@@ -566,7 +566,7 @@ def plot_curve(
         oddsratio: bool = False,
         specs: Optional[List[List[str]]] = None,
         ax: Optional[plt.Axes] = None,
-        highlights: bool = False,
+        highlights: bool = True,
         inset: bool = True,
         title: str = ''
 ) -> plt.Axes:
@@ -718,7 +718,7 @@ def plot_curve(
             handles.append(
                 Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
         # Legend and formatting
-    if not highlights and specs is None:
+    if highlights and (specs is not None):
         ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
                   loc='lower right', ncols=2, framealpha=1, facecolor='w')
     axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
@@ -1156,6 +1156,7 @@ def plot_results(
         figsize: Tuple[int, int] = (16, 16),
         ext: str = 'pdf',
         figpath=None,
+        highlights = True,
         oddsratio=False,
         project_name: str = None
 ) -> None:
@@ -1187,6 +1188,8 @@ def plot_results(
         Directory and filename prefix under `./figures/`.
     oddsratio bool, default=False
         Whether to exponentiate the coefficients (e.g. for odds ratios).
+    highlights bool, default=True
+        Whether to highlight certain specifications.
 
     Notes
     -----
@@ -1248,13 +1251,12 @@ def plot_results(
         plot_kfolds(results_object, colormap, ax5,
                     title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci,
-                   specs=specs, ax=ax6,
-                   title='f.', oddsratio=oddsratio,
-                   highlights=False)
+                   specs=specs, ax=ax6, highlights=highlights,
+                   title='f.', oddsratio=oddsratio)
         plot_ic(results_object=results_object, ic=ic, specs=specs,
                 ax=ax7, colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax8, oddsratio=oddsratio,
+                   ax=ax8, oddsratio=oddsratio, highlights=highlights,
                    title='h.', despine_left=True)
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
     else:
@@ -1264,12 +1266,12 @@ def plot_results(
         ax2 = fig.add_subplot(gs[0:3, 17:24])
         ax3 = fig.add_subplot(gs[3:6, 17:24])
         plot_curve(results_object=results_object, loess=loess,
-                   ci=ci, specs=specs, ax=ax1,
+                   ci=ci, specs=specs, ax=ax1, highlights=highlights,
                    title='a.', oddsratio=oddsratio)
         plot_hexbin_r2(results_object, ax2, fig, oddsratio,
                        colormap, title='b.', side='right')
         plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax3, oddsratio=oddsratio,
+                   ax=ax3, oddsratio=oddsratio, highlights=highlights,
                    title='c.', despine_left=True)
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
 
@@ -1285,7 +1287,7 @@ def plot_results(
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci,
-               oddsratio=oddsratio,
+               oddsratio=oddsratio, highlights=highlights,
                specs=specs, ax=ax)
     plt.savefig(os.path.join(outdir, project_name + '_curve.' + ext), bbox_inches='tight')
     plt.close(fig)
@@ -1311,7 +1313,7 @@ def plot_results(
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax,
                    oddsratio=oddsratio,
-                   despine_left=False,
+                   despine_left=False, highlights=highlights,
                    legend_bool=False)
         plt.savefig(os.path.join(outdir, project_name + '_bdist.' + ext), bbox_inches='tight')
         plt.close(fig)

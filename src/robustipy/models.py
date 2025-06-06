@@ -611,6 +611,7 @@ class MergedResult(Protoresult):
         figsize: Tuple[int, int] = (16, 14),
         ext: str = 'pdf',
         figpath: str = None,
+        highlights: bool = True,
         project_name: str = None,
         oddsratio: bool = False,
     ) -> plt.Figure:
@@ -633,6 +634,8 @@ class MergedResult(Protoresult):
             Directory in which to save outputs; if None, uses current working dir.
         project_name : str
             Prefix for saved figure.
+        bighlights: bool
+            whether to highlight specs
         oddsratio bool, default=False
             Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
@@ -662,6 +665,7 @@ class MergedResult(Protoresult):
             ext=ext,
             figpath=figpath,
             project_name=project_name,
+            highlights=highlights,
             oddsratio=oddsratio
         )
         return fig
@@ -1139,6 +1143,7 @@ class OLSResult(Protoresult):
              ext: str = '   pdf',
              figpath = None,
              project_name: str = 'no_project_name',
+             highlights: bool = True,
              oddsratio: bool = False
              ) -> plt.Figure:
         """
@@ -1164,6 +1169,8 @@ class OLSResult(Protoresult):
             File extension if saving the figure (unused if not saving).
         project_name : str, default='no_project_name'
             Project identifier used in saved filename (unused if not saving).
+        highlights bool, default = True
+            Whether to highlight individual plots.
         oddsratio bool, default=False
             Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
@@ -1208,6 +1215,7 @@ class OLSResult(Protoresult):
                             ext=ext,
                             figpath=figpath,
                             project_name=project_name,
+                            highlights=highlights,
                             oddsratio=oddsratio)
 
     def _compute_summary(self):
