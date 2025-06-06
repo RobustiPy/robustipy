@@ -87,15 +87,12 @@ def _ensure_single_constant(
     # ──────────────────────────────────────────────────────────────────────────
     # 1) Drop any pre‐existing "const" column:
     # ──────────────────────────────────────────────────────────────────────────
-    if "const" in dataframe.columns:
+    if "const" in dataframe.columns and "const" not in controls:
         dataframe.drop(columns=["const"], inplace=True)
         if "const" in y_list:
             y_list.remove("const")
         if "const" in x_list:
             x_list.remove("const")
-        if "const" in controls:
-            controls.remove("const")
-
     # ──────────────────────────────────────────────────────────────────────────
     # 2) Identify zero‐variance columns among the “relevant” ones:
     # ──────────────────────────────────────────────────────────────────────────
