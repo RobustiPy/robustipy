@@ -1526,7 +1526,7 @@ class OLSRobust(BaseRobust):
                                                             group=group,
                                                             oos_metric_name=self.oos_metric_name)
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                    seeds = np.random.randint(0, 2**31, size=draws)
+                    seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
                     b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
                     (delayed(self._strap_OLS)
                      (comb,
@@ -1646,7 +1646,7 @@ class OLSRobust(BaseRobust):
                                                         group=group,
                                                         oos_metric_name=self.oos_metric_name)
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
+                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
                 b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_OLS)
                  (comb,
@@ -2210,7 +2210,7 @@ class LRobust(BaseRobust):
                  aic_i, bic_i, hqic_i,
                  av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
 
-                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws)
+                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
                 (b_list, p_list, r2_list,
                  )= zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_regression)
