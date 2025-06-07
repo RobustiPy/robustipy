@@ -372,8 +372,8 @@ class BaseRobust(Protomodel):
                 raise TypeError(f"'group' must be a string. Received types: {type(group).__name__}.")
 
         # K-fold & draws
-        if kfold < 2:
-            raise ValueError(f"kfold values must be 2 or above, current value is {kfold}.")
+        if (kfold < 2) or (kfold>len(self.data)-1):
+            raise ValueError(f"kfold values must be between 2 and {len(self.data)-1}, current value is {kfold}.")
         if draws < 1:
             raise ValueError(f"Draws value must be 1 or above, current value is {draws}.")
 
@@ -394,6 +394,8 @@ class BaseRobust(Protomodel):
         if seed is not None:
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
+            if (seed<0) or (seed>2 ** 31 - 1):
+                raise ValueError(f"seed must be between 0 and {seed>2 ** 31 - 1}, current value is {seed}.")
             np.random.seed(seed)
 
         # numeric columns check

@@ -443,42 +443,42 @@ def make_inquiry(
         # ───────────────────────────────────────────────────────────────
         #  9) If seed is missing, prompt the user (TTY, Jupyter, or fallback)
         # ───────────────────────────────────────────────────────────────
-        SEED_MIN = 0
-        SEED_MAX = 2 ** 31 - 1
-        in_jupyter = _running_in_jupyter()
-        in_real_tty = _is_real_tty()
-
-        def _ask_seed_input(prompt_text: str, min_val: int, max_val: int) -> int:
-            """
-            Repeatedly call input() until user enters a valid integer in [min_val, max_val].
-            """
-            while True:
-                raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
-                try:
-                    val = int(raw)
-                except ValueError:
-                    print(f"Invalid: '{raw}' is not an integer.")
-                    continue
-                if val < min_val or val > max_val:
-                    print(f"Invalid: must be between {min_val} and {max_val}.")
-                    continue
-                return val
-
-        if seed is None:
-            if in_real_tty:
-                question_seed = [
-                    inquirer.Text(
-                        'seed_inq',
-                        message="Enter integer seed for reproducibility",
-                        validate=IntegerRangeValidator(SEED_MIN, SEED_MAX)
-                    )
-                ]
-                seed = int(inquirer.prompt(question_seed, theme=GreenPassion())['seed_inq'])
-            elif in_jupyter:
-                seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
-            else:
-                seed = 192735
-
+    SEED_MIN = 0
+    SEED_MAX = 2 ** 31 - 1
+    in_jupyter = _running_in_jupyter()
+    in_real_tty = _is_real_tty()
+    def _ask_seed_input(prompt_text: str, min_val: int, max_val: int) -> int:
+        """
+        Repeatedly call input() until user enters a valid integer in [min_val, max_val].
+        """
+        while True:
+            raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
+            try:
+                val = int(raw)
+            except ValueError:
+                print(f"Invalid: '{raw}' is not an integer.")
+                continue
+            if val < min_val or val > max_val:
+                print(f"Invalid: must be between {min_val} and {max_val}.")
+                continue
+            return val
+    print(seed)
+    print('***')
+    if seed is None:
+        if in_real_tty:
+            question_seed = [
+                inquirer.Text(
+                    'seed_inq',
+                    message="Enter integer seed for reproducibility",
+                    validate=IntegerRangeValidator(SEED_MIN, SEED_MAX)
+                )
+            ]
+            seed = int(inquirer.prompt(question_seed, theme=GreenPassion())['seed_inq'])
+        elif in_jupyter:
+            seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
+        else:
+            seed = 192735
+    print(seed)
     return draws, kfolds, oos_metric, n_cpu, seed
 
 
@@ -1436,7 +1436,6 @@ class OLSRobust(BaseRobust):
             seed
         )
         self.seed = seed
-        np.random.seed(self.seed)
         self.composite_sample = composite_sample
         self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
         if len(self.y) > 1:
@@ -1452,6 +1451,7 @@ class OLSRobust(BaseRobust):
         valid_oos_metrics=['pseudo-r2','rmse'],
         threshold=threshold
     )
+        np.random.seed(self.seed)
         print(
             f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, "
             f"folds={kfold}, seed={seed}.\n"
@@ -2127,7 +2127,6 @@ class LRobust(BaseRobust):
             seed
         )
         self.seed = seed
-        np.random.seed(self.seed)
         self.data = self.data.copy()
         self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
         self._validate_fit_args(
@@ -2141,6 +2140,7 @@ class LRobust(BaseRobust):
         valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
         threshold=threshold
         )
+        np.random.seed(self.seed)
         self.oos_metric_name = oos_metric
         print(
             f"LRobust is running with n_cpu={n_cpu}, draws={draws}, "
