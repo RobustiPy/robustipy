@@ -462,8 +462,6 @@ def make_inquiry(
                 print(f"Invalid: must be between {min_val} and {max_val}.")
                 continue
             return val
-    print(seed)
-    print('***')
     if seed is None:
         if in_real_tty:
             question_seed = [
@@ -478,7 +476,6 @@ def make_inquiry(
             seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
         else:
             seed = 192735
-    print(seed)
     return draws, kfolds, oos_metric, n_cpu, seed
 
 
