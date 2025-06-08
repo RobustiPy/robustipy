@@ -83,7 +83,10 @@ def _ensure_single_constant(
     This ensures that if a constant was specified as a control, it remains a control
     (now called "const") rather than being moved into x_list.
     """
-
+    y_list = y_list.copy()
+    x_list = x_list.copy()
+    controls = controls.copy()
+    
     # ──────────────────────────────────────────────────────────────────────────
     # 1) Drop any pre‐existing "const" column:
     # ──────────────────────────────────────────────────────────────────────────
