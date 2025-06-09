@@ -210,6 +210,11 @@ def _ensure_single_constant(
             x_list.append("const")
             # (No need to modify controls in this branch.)
 
+    if "const" in x_list:
+        x_list = [c for c in x_list if c != "const"] + ["const"]
+    if "const" in controls:
+        controls = [c for c in controls if c != "const"] + ["const"]
+
     return x_list, controls
 
 
