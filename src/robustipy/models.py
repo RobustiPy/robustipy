@@ -1479,6 +1479,9 @@ class OLSRobust(BaseRobust):
             list_av_k_metric_array = []
             y_names = []
             specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
             for y, y_name in track(zip(self.y_composites,
                                  self.y_specs), total=len(self.y_composites)):
                 space_n = space_size(controls)
@@ -1492,9 +1495,6 @@ class OLSRobust(BaseRobust):
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
-                all_predictors = []
-                b_all_list = []
-                p_all_list = []
                 av_k_metric_array = np.empty([space_n])
                 for spec, index in zip(all_subsets(controls), range(0, space_n)):
                     if len(spec) == 0:
