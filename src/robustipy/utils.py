@@ -902,8 +902,8 @@ def calculate_imv_score(y_true, y_enhanced):
 
 
 def sample_y_masks(
-    n_y: int,                      # how many raw outcome variables
-    n_masks: int,                  # how many composites you want
+    n_y: int,
+    n_masks: int,
     seed: Optional[int] = None
 ) -> List[int]:
     """
@@ -915,7 +915,7 @@ def sample_y_masks(
     list[int]   each mask is an `int` whose binary representation tells
                 which outcomes enter the composite.
     """
-    full_space = (1 << n_y) - 1        # ignore the 0/empty mask
+    full_space = (1 << n_y) - 1
     if n_masks >= full_space:
         # exhaustive: 1 … (2^n_y − 1)
         return list(range(1, full_space + 1))
@@ -925,5 +925,23 @@ def sample_y_masks(
         full_space,
         size=n_masks,
         replace=False
-    ) + 1           # shift from 0..full_space-1 to 1..full_space
+    ) + 1
+    return masks.tolist()
+
+
+def sample_z_masks(
+        n_z: int,
+        n_masks: int,
+        seed: Optional[int] = None) -> List[int]:
+
+    full_space = (1 << n_z) - 1
+    if n_masks >= full_space:
+        return list(range(1, full_space + 1))
+
+    rng   = np.random.default_rng(seed)
+    masks = rng.choice(
+        full_space,
+        size=n_masks,
+        replace=False
+    ) + 1
     return masks.tolist()

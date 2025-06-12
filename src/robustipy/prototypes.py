@@ -5,7 +5,11 @@ from multiprocessing import cpu_count
 import numpy as np
 import pandas as pd
 
-from robustipy.utils import all_subsets, space_size, sample_y_masks
+from robustipy.utils import (
+    all_subsets,
+    space_size,
+    sample_y_masks,
+    sample_z_masks)
 
 
 class Protomodel(ABC):
@@ -140,25 +144,24 @@ class BaseRobust(Protomodel):
     def get_results(self):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-#    def multiple_y(self) -> None:
-#        """
-#        Build `self.y_composites` and `self.y_specs`.
-#
-#        If `self._selected_y_masks` is not None, restrict to those masks.
-#        """
-#        self.y_specs = []
-#        self.y_composites = []
-#        print("Calculating Composite Ys")
-#        subsets = list(all_subsets(self.y))
-#        iterator = subsets 
-#        for spec in iterator:
-#            if len(spec) > 0:
-#                subset = self.data[list(spec)]
-#                subset = (subset - subset.mean()) / subset.std()
-#                self.y_composites.append(subset.mean(axis=1))
-#                self.y_specs.append(spec)
-#        self.parameters['y_specs'] = self.y_specs
-#        self.parameters['y_composites'] = self.y_composites
+    def sample_z_specs(self) -> None:
+        z_cols = self.controls
+        n_z = len(z_cols)
+        if getattr(self, "z_specs_sample_size", None) and self.z_specs_sample_size > 0:
+            masks = sample_z_masks(
+                n_z = n_z,
+                n_masks = self.z_specs_sample_size,
+                seed = getattr(self, "seed", None)
+                )
+            z_specs_sample = [
+                tuple(z_cols[i] for i in range(n_z) if (m >> i) & 1)
+                for m in masks
+                ]
+            space_n_sample = len(z_specs_sample)
+        else:
+            z_specs_sample = all_subsets(z_cols)
+            space_n_sample = space_size(z_cols)
+        return space_n_sample, z_specs_sample
 
     def multiple_y(self) -> None:
         """

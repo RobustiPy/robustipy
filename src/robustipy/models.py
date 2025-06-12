@@ -31,11 +31,9 @@ from robustipy.bootstrap_utils import stripped_ols
 from robustipy.figures import plot_results
 from robustipy.prototypes import Protoresult, BaseRobust
 from robustipy.utils import (
-    all_subsets,
     group_demean,
     logistic_regression_sm,
     simple_ols,
-    space_size,
     mcfadden_r2,
     pseudo_r2,
     calculate_imv_score
@@ -1376,6 +1374,7 @@ class OLSRobust(BaseRobust):
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
+        z_specs_sample_size: Optional[int] = None,
         rescale_y: Optional[bool] = False,
         rescale_x: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
@@ -1442,20 +1441,21 @@ class OLSRobust(BaseRobust):
         )
         self.seed = seed
         self.composite_sample = composite_sample
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        self.z_specs_sample_size = z_specs_sample_size
+        self.x, self.controls = _ensure_single_constant(self.data, self.y, self.x, controls)
         if len(self.y) > 1:
             self.multiple_y()
         self._validate_fit_args(
-        controls=controls,
-        group=group,
-        draws=draws,
-        kfold=kfold,
-        oos_metric=oos_metric,
-        n_cpu=n_cpu,
-        seed=self.seed,
-        valid_oos_metrics=['pseudo-r2','rmse'],
-        threshold=threshold
-    )
+            controls = self.controls,
+            group = group,
+            draws = draws,
+            kfold = kfold,
+            oos_metric = oos_metric,
+            n_cpu = n_cpu,
+            seed = self.seed,
+            valid_oos_metrics = ['pseudo-r2','rmse'],
+            threshold = threshold
+            )
         np.random.seed(self.seed)
         print(
             f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, "
@@ -1468,6 +1468,8 @@ class OLSRobust(BaseRobust):
 
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
+
+        space_n, z_specs = self.sample_z_specs()
 
         if len(self.y) > 1:
             list_all_predictors = []
@@ -1489,7 +1491,6 @@ class OLSRobust(BaseRobust):
             p_all_list = []
             for y, y_name in track(zip(self.y_composites,
                                  self.y_specs), total=len(self.y_composites)):
-                space_n = space_size(controls)
                 b_array = np.empty([space_n, draws])
                 p_array = np.empty([space_n, draws])
                 b_array_ystar = np.empty([space_n, draws])
@@ -1501,7 +1502,7 @@ class OLSRobust(BaseRobust):
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
                 av_k_metric_array = np.empty([space_n])
-                for spec, index in zip(all_subsets(controls), range(0, space_n)):
+                for spec, index in zip(z_specs, range(0, space_n)):
                     if len(spec) == 0:
                         comb = self.data[self.x]
                     else:
@@ -1599,7 +1600,6 @@ class OLSRobust(BaseRobust):
             )
             self.results = results
         else:
-            space_n = space_size(controls)
             specs = []
             all_predictors = []
             b_all_list = []
@@ -1631,7 +1631,7 @@ class OLSRobust(BaseRobust):
             model.fit(x_train, y_train)
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
-            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
                 if 0 == len(spec):
                     comb = self.data[self.y + self.x]
                 else:
@@ -2155,13 +2155,12 @@ class LRobust(BaseRobust):
             f"The target variable of interest is {self.x[0]}. "
             f"Let's begin the calculations..."
         )
-
         if sample_size is None:
             sample_size = self.data.shape[0]
         if len(self.y) > 1:
             raise NotImplementedError("Not implemented yet for logistic regression")
         else:
-            space_n = space_size(controls)
+            space_n, z_specs = self.sample_z_specs()
             specs = []
             all_predictors = []
             b_all_list = []
@@ -2194,7 +2193,7 @@ class LRobust(BaseRobust):
             model.fit(x_train, y_train.squeeze())
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
-            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
 
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
