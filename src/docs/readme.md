@@ -30,7 +30,6 @@ html_theme = 'sphinx_rtd_theme'
 
 5. Add the rst files that you want to display in the `index.rst` file
 
-
 6. run `make html`, with output path set in `docs/make.bat`:
 
 ```bash
