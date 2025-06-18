@@ -38,7 +38,8 @@ from robustipy.utils import (
     space_size,
     mcfadden_r2,
     pseudo_r2,
-    calculate_imv_score
+    calculate_imv_score,
+    sample_z_masks
 )
 import warnings
 from typing import List, Tuple
@@ -1364,6 +1365,49 @@ class OLSRobust(BaseRobust):
             The result object encapsulating all analysis outputs.
         """
         return self.results
+    
+    def sample_z_specs(self, controls, z_specs_sample_size):
+        """
+        Generate a sample of z specifications by randomly selecting subsets of control variables.
+
+        This method creates a set of binary masks to determine which subsets of the given `controls`
+        should be included in each z specification. The number of subsets sampled is controlled by
+        `z_specs_sample_size`.
+
+        Parameters
+        ----------
+        controls : list of str
+            A list of control variable names from which to build z specifications.
+        z_specs_sample_size : int
+            The number of z specifications to sample. Must be a positive integer.
+
+        Returns
+        -------
+        space_n_sample : int
+            The number of sampled z specifications.
+        z_specs_sample : list of tuple of str
+            A list where each element is a tuple of selected control variable names
+            representing one sampled z specification.
+
+        Notes
+        -----
+        - The method uses `sample_z_masks` to generate binary inclusion masks.
+        - If `self.seed` is defined, it is passed to `sample_z_masks` to ensure reproducibility.
+        - Each sampled mask determines a unique subset of `controls`.
+        """
+        z_cols = controls
+        n_z = len(z_cols)
+        masks = sample_z_masks(
+            n_z = n_z,
+            n_masks = z_specs_sample_size,
+            seed = getattr(self, "seed", None)
+            )
+        z_specs_sample = [
+            tuple(z_cols[i] for i in range(n_z) if (m >> i) & 1)
+            for m in masks
+            ]
+        space_n_sample = len(z_specs_sample)
+        return space_n_sample, z_specs_sample
 
     def fit(
         self,
@@ -1376,43 +1420,60 @@ class OLSRobust(BaseRobust):
         n_cpu: Optional[int] = None,
         seed: Optional[int] = None,
         composite_sample: Optional[int] = None,
+        z_specs_sample_size: Optional[int] = None,
         rescale_y: Optional[bool] = False,
         rescale_x: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
         threshold: int = 1000000
         ) -> 'OLSRobust':
         """
-        Fit the OLS models into the specification space as well as over the bootstrapped samples.
+        Fit the OLS models across the specification space and over bootstrap resamples.
+
+        This method explores a variety of control variable specifications by constructing
+        different combinations (z-specs) and optionally sampling from this space. It performs
+        bootstrap resampling and/or cross-validation depending on the arguments provided.
 
         Parameters
         ----------
         controls : list of str
             Candidate control variables to include in model specifications.
         group : str, optional
-            Column name for grouping fixed effects; de-meaned if provided.
-        draws : int, default=1000
-            Number of bootstrap resamples per specification.
-        kfold : int, default=10
-            Number of folds for out-of-sample evaluation; requires `oos_metric`.
-        oos_metric : {'pseudo-r2','rmse'}, default='pseudo-r2'
-            Metric for cross-validated performance.
+            Column name for grouping fixed effects. If provided, outcomes are de-meaned by group.
+        draws : int, optional
+            Number of bootstrap resamples per specification. If `None`, bootstrapping is skipped.
+        kfold : int, optional
+            Number of folds for out-of-sample evaluation. Requires `oos_metric` to be specified.
+        oos_metric : {'pseudo-r2', 'rmse'}, optional
+            Metric to evaluate out-of-sample performance when `kfold` is set.
         n_cpu : int, optional
-            Number of parallel jobs; defaults to all available cores minus one.
+            Number of parallel processes to use. Defaults to all available CPUs minus one if `None`.
         seed : int, optional
-            Random seed for reproducibility.
+            Random seed for reproducibility. Propagated to all random operations.
+        composite_sample : int, optional
+            If set, draw this many bootstrap samples **before** applying specification variation;
+            used to reduce total computation while capturing uncertainty in the full composite model.
+        z_specs_sample_size : int, optional
+            Number of z specifications to randomly sample from the full set of possible combinations.
+            If `None`, the full specification space is used.
         rescale_y : bool, default=False
-            rescale the dependent variable to have mean 0 and std 1.
+            If True, rescale the dependent variable to have mean 0 and standard deviation 1.
         rescale_x : bool, default=False
-            rescale the x variable to have mean 0 and std 1.
+            If True, rescale the x variable(s) to have mean 0 and standard deviation 1.
         rescale_z : bool, default=False
-            rescale the z variable to have mean 0 and std 1.
-        threshold : int, default=1000000
-            Warn if total model runs exceed this number.
+            If True, rescale the z variable(s) to have mean 0 and standard deviation 1.
+        threshold : int, default=1_000_000
+            If the total number of model fits (specs × draws × folds) exceeds this number, a warning is raised.
 
         Returns
         -------
         self : OLSRobust
-            The fitted model instance, with `.results` attached.
+            The fitted model instance. Results are stored in the `.results` attribute.
+
+        Notes
+        -----
+        - At least one of `draws` or `kfold` must be set to perform model fitting.
+        - If both `composite_sample` and `z_specs_sample_size` are set, the combination is applied in that order.
+        - This method may be computationally intensive; parallelisation is recommended via `n_cpu`.
         """
         if rescale_y is True:
             if len(self.y) > 1:
@@ -1469,6 +1530,15 @@ class OLSRobust(BaseRobust):
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
 
+        if z_specs_sample_size is not None and z_specs_sample_size > 0:
+            space_n, z_specs = self.sample_z_specs(
+                controls=controls,
+                z_specs_sample_size=z_specs_sample_size
+                )
+        else:
+            space_n = space_size(controls)
+            z_specs = all_subsets(controls)
+
         if len(self.y) > 1:
             list_all_predictors = []
             list_b_array = []
@@ -1489,7 +1559,7 @@ class OLSRobust(BaseRobust):
             p_all_list = []
             for y, y_name in track(zip(self.y_composites,
                                  self.y_specs), total=len(self.y_composites)):
-                space_n = space_size(controls)
+                
                 b_array = np.empty([space_n, draws])
                 p_array = np.empty([space_n, draws])
                 b_array_ystar = np.empty([space_n, draws])
@@ -1501,7 +1571,7 @@ class OLSRobust(BaseRobust):
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
                 av_k_metric_array = np.empty([space_n])
-                for spec, index in zip(all_subsets(controls), range(0, space_n)):
+                for spec, index in zip(z_specs, range(0, space_n)):
                     if len(spec) == 0:
                         comb = self.data[self.x]
                     else:
@@ -1599,7 +1669,6 @@ class OLSRobust(BaseRobust):
             )
             self.results = results
         else:
-            space_n = space_size(controls)
             specs = []
             all_predictors = []
             b_all_list = []
@@ -1631,7 +1700,7 @@ class OLSRobust(BaseRobust):
             model.fit(x_train, y_train)
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
-            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
                 if 0 == len(spec):
                     comb = self.data[self.y + self.x]
                 else:
