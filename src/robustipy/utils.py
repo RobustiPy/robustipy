@@ -927,3 +927,31 @@ def sample_y_masks(
         replace=False
     ) + 1           # shift from 0..full_space-1 to 1..full_space
     return masks.tolist()
+
+
+def sample_z_masks(
+    n_z: int,                      # how many raw outcome variables
+    n_masks: int,                  # how many composites you want
+    seed: Optional[int] = None
+) -> List[int]:
+    """
+    Uniformly sample `n_masks` bit-masks from the non-empty power-set of
+    `n_y` items **without** enumerating the 2^n_y possibilities.
+
+    Returns
+    -------
+    list[int]   each mask is an `int` whose binary representation tells
+                which outcomes enter the composite.
+    """
+    full_space = (1 << n_z)
+    if n_masks >= full_space:
+        # exhaustive: 1 … (2^n_y − 1)
+        return list(range(1, full_space))
+
+    rng   = np.random.default_rng(seed)
+    masks = rng.choice(
+        full_space,
+        size=n_masks,
+        replace=False
+    )
+    return masks.tolist()
