@@ -2,12 +2,13 @@
 
 ![coverage](https://img.shields.io/badge/Purpose-Research-yellow)
 [![Generic badge](https://img.shields.io/badge/Python-3.11-red.svg)](https://shields.io/)
-[![Generic badge](https://img.shields.io/badge/R-brightgreen.svg)](https://shields.io/)
 [![Generic badge](https://img.shields.io/badge/License-GNU3.0-purple.svg)](https://shields.io/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15700698.svg)](https://doi.org/10.5281/zenodo.15700698)
+
 
 Welcome to the home of `RobustiPy`, a Python library for the creation of a more robust and stable model space. RobustiPy does a large number of things, included but not limited to: high dimensional visualisation, Bayesian Model Averaging, bootstrapped resampling, (in- and)out-of-sample model evaluation, model selection via Information Criterion, explainable AI (via [SHAP](https://www.nature.com/articles/s42256-019-0138-9)), and joint inference tests (as per [Simonsohn et al. 2019](https://www.nature.com/articles/s41562-020-0912-z)).
 
-Full documentation is available on [Read the Docs](https://robustipy.readthedocs.io/en/latest/).
+Full documentation is available on [Read the Docs](https://robustipy.readthedocs.io/en/latest/). The first release is indexed onto Zenodo [here](https://zenodo.org/records/15700698).
 
 `RobustiPy` performs Multiversal/Specification Curve Analysis which attempts to compute most or all reasonable specifications of a statistical model, understanding a specification as a single attempt to create an estimand of interest, whether through a particular choice of covariates, hyperparameters, data cleaning decisions, and so forth.
 
