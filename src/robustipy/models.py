@@ -1539,6 +1539,14 @@ class OLSRobust(BaseRobust):
             space_n = space_size(controls)
             z_specs = all_subsets(controls)
 
+        n_y_comps = len(getattr(self, "y_specs", [None]))  # =1 if only single-y
+        self._warn_if_large_draws(
+            draws=draws,
+            n_control_specs=space_n,
+            n_y_composites=n_y_comps,
+            threshold=threshold,
+        )
+
         if len(self.y) > 1:
             list_all_predictors = []
             list_b_array = []

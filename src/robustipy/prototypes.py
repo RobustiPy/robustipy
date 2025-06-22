@@ -237,30 +237,27 @@ class BaseRobust(Protomodel):
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-    def _warn_if_large_draws(self, draws: int, controls: List[str], threshold: int = 10_000) -> None:
+    def _warn_if_large_draws(
+        self,
+        draws: int,
+        n_control_specs: int,
+        n_y_composites: int,
+        threshold: int = 10_000
+    ) -> None:
         """
-        Warn if the total number of bootstrap models exceeds a threshold.
-
-        Parameters
-        ----------
-        draws : int
-            Number of draws per specification.
-        controls : List[str]
-            Control variable names to define specification space.
-        threshold : int, default=10000
-            Maximum safe number of total model runs.
+        Emit a warning if the expected number of model fits
+        (draws × control-specs × y-composites) exceeds *threshold*.
         """
-        est_specs = space_size(controls)
-        y_space = len(getattr(self, "y_specs", [None]))  
-        total_models = est_specs * y_space * draws
-
-        if total_models > threshold:
+        total = draws * n_control_specs * n_y_composites
+        print(f"Total model runs: {total:,} (draws={draws}, control_specs={n_control_specs}, y_composites={n_y_composites})")
+        if total > threshold:
             warnings.warn(
-                f"You've requested {draws} bootstrap draws across {est_specs} control specs "
-                f"and {y_space} y-composites, which is roughly {total_models:,} total model runs.\n\n"
-                "This might lead to extended runtime or high memory usage.",
+                f"You've requested {draws} bootstrap draws across "
+                f"{n_control_specs} control specs and {n_y_composites} y-composites, "
+                f"≈ {total:,} total model runs. "
+                "This may cause long runtimes or high memory use.",
                 UserWarning,
-                stacklevel=2
+                stacklevel=2,
             )
 
     def _check_numeric_columns_for_fit(self, controls: List[str], group: Optional[str]) -> None:
@@ -401,9 +398,6 @@ class BaseRobust(Protomodel):
         # numeric columns check
         cols_to_check = self.y + self.x + ([group] if group else []) + controls
         _check_numeric_columns(self.data, cols_to_check)
-
-        # 9. warn if large draws
-        self._warn_if_large_draws(draws, controls, threshold)
         
         # Disallow overlap between x and controls
         overlap = set(self.x).intersection(controls)
