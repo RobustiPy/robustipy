@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Introducing RobustiPy: An efficient next generation multiversal library with model selection, averaging, resampling, and explainable artificial intelligence"
+authors:
+  - family-names: Valdenegro Ibarra
+    given-names: Daniel
+  - family-names: Yan
+    given-names: Jiani
+  - family-names: Dai
+    given-names: Duiyi
+  - family-names: Rahal
+    given-names: Charles
+date-released: 2025-06-25
+version: "1.0.0"
+identifiers:
+  - type: arXiv
+    value: 2506.19958
+url: https://arxiv.org/abs/2506.19958
+type: article
