@@ -38,6 +38,8 @@ Z = \{z_{1}, z_{2}, \dots, z_{n}\}
 
 In words, it creates a set contaning the aritmentic mean of the elements of the powerset $\mathcal{P}$ (all possible combination of any length) of $Y$, the set $X$ and the powerset of $Z$ to then produce the Cartesian product of these sets, creating the full set of possible model specifications $\Pi$. `RobustiPy` then takes these specifications, fits them against observable (tabular) data, and produces coefficients and relevant metrics for each version of the predictor $x$ in the set $X$.
 
+A paper which more fully describes RobustiPy and all of its examples can be found [here](https://arxiv.org/abs/2506.19958).
+
 ## Installation
 
 Installing `RobustiPy` is simple. To get our most stable current release, simply do:
@@ -77,9 +79,25 @@ There are ten empirical example notebooks [here](https://github.com/RobustiPy/ro
 
 ![Union dataset example](./figures/union_example/union_example_all.svg)
 
+## Citing
+
+To cite Robustipy, please consider this reference:
+
+```
+@misc{ibarra2025introducingrobustipyefficientgeneration,
+      title={Introducing RobustiPy: An efficient next generation multiversal library with model selection, averaging, resampling, and explainable artificial intelligence}, 
+      author={Daniel Valdenegro Ibarra and Jiani Yan and Duiyi Dai and Charles Rahal},
+      year={2025},
+      eprint={2506.19958},
+      archivePrefix={arXiv},
+      primaryClass={stat.ME},
+      url={https://arxiv.org/abs/2506.19958}, 
+}
+```
+
 ## Website
 
-We have a website made with [jekkyl-theme-minimal](https://github.com/pages-themes/minimal) that you can find [here](https://robustipy.github.io/). It also contains the most recent link to an academic paper related to `RobustiPy`, all recent news and updates, and information on a Hackathon we ran in 2024!
+We have a website made with [jekkyl-theme-minimal](https://github.com/pages-themes/minimal) that you can find [here](https://robustipy.github.io/). It also contains all recent news and updates, and information on a Hackathon we ran in 2024!
 
 ## Contributing and Code of Conduct
 
