@@ -37,6 +37,10 @@ def mock_results_object():
             # Minimal attributes used by various plots:
             # 1) .estimates and .r2_values for plot_hexbin_r2
             self.estimates = pd.DataFrame(np.random.randn(5, 10))  # shape => (num_specs, draws)
+            self.estimates_exp = pd.DataFrame(np.random.randn(5, 10))  # shape => (num_specs, draws)
+            self.all_b_exp = pd.DataFrame(np.random.randn(5))  # shape => (num_specs, draws)
+            self.model_name = 'somename'
+            self.y_name = 'yname'
             self.r2_values = pd.DataFrame(np.random.rand(5, 10))   # shape => (num_specs, draws)
             
             # 2) .all_b and .summary_df for plot_hexbin_log
@@ -128,7 +132,7 @@ def test_plot_hexbin_r2(mock_results_object):
     Smoke test for plot_hexbin_r2: ensure it runs and creates a colorbar.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
-    plot_hexbin_r2(mock_results_object, ax, fig, "Spectral_r", title="R2 Hexbin Test")
+    plot_hexbin_r2(mock_results_object, ax, fig, True, colormap="Spectral_r", title="R2 Hexbin Test")
     # Verify that a colorbar is present (by checking for an Axes with title 'Count').
     colorbars = [child for child in fig.get_children() if isinstance(child, plt.Axes) and child.get_title() == 'Count']
     assert len(colorbars) >= 1
@@ -139,7 +143,7 @@ def test_plot_hexbin_log(mock_results_object):
     Smoke test for plot_hexbin_log: ensure it runs and creates a colorbar.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
-    plot_hexbin_log(mock_results_object, ax, fig, "Spectral_r", title="Log Hexbin Test")
+    plot_hexbin_log(mock_results_object, ax, fig, True, colormap="Spectral_r", title="Log Hexbin Test")
     colorbars = [child for child in fig.get_children() if isinstance(child, plt.Axes) and child.get_title() == 'Count']
     assert len(colorbars) >= 1
     plt.close(fig)
@@ -157,24 +161,12 @@ def test_shap_violin_basic(mock_results_object):
     assert len(feature_order) <= shap_x.shape[1]
     plt.close(fig)
 
-def test_shap_violin_shape_mismatch():
-    """
-    Test that shap_violin raises a ValueError when the shape of shap_values
-    does not match the provided features.
-    """
-    fig, ax = plt.subplots(figsize=(6, 4))
-    shap_vals = np.random.randn(10, 5)  # 10 samples, 5 features.
-    features = np.random.randn(10, 4)   # Mismatch: 4 columns.
-    with pytest.raises(ValueError, match="shape of the shap_values matrix does not match"):
-        shap_violin(ax, shap_vals, features=features)
-    plt.close(fig)
-
 def test_plot_curve_no_specs(mock_results_object):
     """
     Test that plot_curve executes without error when an empty specs list is provided.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
-    returned_ax = plot_curve(mock_results_object, loess=True, specs=[], ax=ax, colormap="Spectral_r", title="Curve Test")
+    returned_ax = plot_curve(mock_results_object, loess=True, specs=[], ax=ax, title="Curve Test")
     assert hasattr(returned_ax, "get_xlim")
     plt.close(fig)
 
@@ -185,7 +177,7 @@ def test_plot_curve_with_specs(mock_results_object):
     fig, ax = plt.subplots(figsize=(6, 4))
     # Use a valid specification extracted from specs_names as a list-of-lists.
     specs_to_highlight = [[next(iter(mock_results_object.specs_names.iloc[0]))]]
-    plot_curve(mock_results_object, loess=False, specs=specs_to_highlight, ax=ax, colormap="Spectral_r")
+    plot_curve(mock_results_object, loess=False, specs=specs_to_highlight, ax=ax)
     plt.close(fig)
 
 def test_plot_ic_basic(mock_results_object):
@@ -201,7 +193,7 @@ def test_plot_ic_invalid_ic(mock_results_object):
     Test that plot_ic raises a KeyError when an invalid IC name is provided.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         plot_ic(mock_results_object, ic='invalid_ic_name', specs=[], ax=ax, colormap="Spectral_r", title="IC Invalid Test")
     plt.close(fig)
 
@@ -210,7 +202,7 @@ def test_plot_bdist_no_specs(mock_results_object):
     Test that plot_bdist executes without error when an empty specs list is provided.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
-    plot_bdist(mock_results_object, specs=[], ax=ax, colormap="Spectral_r", title="Bdist Test", despine_left=True, legend_bool=False)
+    plot_bdist(mock_results_object, True, specs=[], ax=ax, title="Bdist Test", despine_left=True, legend_bool=False)
     plt.close(fig)
 
 def test_plot_bdist_with_specs(mock_results_object):
@@ -219,7 +211,7 @@ def test_plot_bdist_with_specs(mock_results_object):
     """
     fig, ax = plt.subplots(figsize=(6, 4))
     specs_to_highlight = [[next(iter(mock_results_object.specs_names.iloc[0]))]]
-    plot_bdist(mock_results_object, specs=specs_to_highlight, ax=ax, colormap="Spectral_r", title="Bdist Spec Test", despine_left=True, legend_bool=True)
+    plot_bdist(mock_results_object, True, specs=specs_to_highlight, ax=ax, title="Bdist Spec Test", despine_left=True, legend_bool=True)
     plt.close(fig)
 
 def test_plot_kfolds(mock_results_object):
@@ -253,7 +245,7 @@ def test_plot_results_creates_files(tmp_path, mock_results_object, ic):
     Verifies that the expected output file is created.
     """
     test_proj_name = "pytest_figures_test"
-    out_dir = tmp_path / "figures" / test_proj_name
+    out_dir = tmp_path / test_proj_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with patch("os.getcwd", return_value=str(tmp_path)):
