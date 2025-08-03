@@ -1475,6 +1475,9 @@ class OLSRobust(BaseRobust):
         - If both `composite_sample` and `z_specs_sample_size` are set, the combination is applied in that order.
         - This method may be computationally intensive; parallelisation is recommended via `n_cpu`.
         """
+        if not isinstance(controls, list):
+            raise TypeError(f"'controls' must be a list. Received types: {type(controls).__name__}.")
+        
         if rescale_y is True:
             if len(self.y) > 1:
                 warnings.warn(

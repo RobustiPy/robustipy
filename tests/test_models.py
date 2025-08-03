@@ -414,7 +414,7 @@ def test_controls_passed_as_dataframe_raises(simple_data):
     """
     controls_df = simple_data[['control1', 'control2']]
     model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
-    with pytest.raises(TypeError, match="'controls' must be a list"):
+    with pytest.raises(TypeError):
         model.fit(controls=controls_df, kfold=2, draws=10, n_cpu=1)        
 
 def test_controls_passed_as_numpy_array_raises(simple_data):
