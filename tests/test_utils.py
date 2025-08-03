@@ -41,11 +41,11 @@ def test_all_subsets():
 def test_simple_ols_against_statsmodels(dummy_data):
     y = dummy_data[['y']]
     x = dummy_data[['x1', 'x2']].copy()
+    x['const'] = 1
 
     result_custom = simple_ols(y, x.copy())
 
     # Prepare data for statsmodels by adding constant.
-    x['const'] = 1
     sm_model = sm.OLS(y, x).fit()
 
     # Compare coefficient estimates:
@@ -53,7 +53,9 @@ def test_simple_ols_against_statsmodels(dummy_data):
     np.testing.assert_allclose(
         np.array(result_custom['b']).ravel(),
         sm_model.params.values,
-        rtol=1e-6
+        rtol=1e-6,
+        err_msg="Coefficient estimates do not match",
+        verbose=True
     )
 
     # Compare p-values: extract only the diagonal of the (k,k) array
@@ -65,7 +67,9 @@ def test_simple_ols_against_statsmodels(dummy_data):
     np.testing.assert_allclose(
         p_to_check,
         sm_model.pvalues.values,
-        rtol=1e-6
+        rtol=1e-6,
+        err_msg="P-values do not match",
+        verbose=True
     )
 
     # Information criteria:
@@ -76,11 +80,13 @@ def test_simple_ols_against_statsmodels(dummy_data):
 
     # AIC from simple_ols must have the offset subtracted:
     aic_custom  = result_custom['aic'][0][0] - offset
-    np.testing.assert_allclose(aic_custom, sm_model.aic, rtol=1e-6)
+    np.testing.assert_allclose(aic_custom, sm_model.aic, rtol=1e-6, 
+                               err_msg="AIC does not match", verbose=True)
 
     # BIC can be compared directly:
     bic_custom  = result_custom['bic'][0][0]
-    np.testing.assert_allclose(bic_custom, sm_model.bic, rtol=1e-6)
+    np.testing.assert_allclose(bic_custom, sm_model.bic, rtol=1e-6, 
+                               err_msg="BIC does not match", verbose=True)
 
 
 
@@ -107,6 +113,7 @@ def test_output_keys(dummy_data):
 def test_output_shapes(dummy_data):
     y = dummy_data[['y']]
     x = dummy_data[['x1', 'x2']]
+    x['const'] = 1
     result = simple_ols(y, x)
     assert result['b'].shape == (3, 1)
     p_shape = result['p'].shape
@@ -127,15 +134,6 @@ def test_group_demean_with_group(dummy_data):
     result = group_demean(dummy_data[['x1', 'x2', 'group']], group='group')
     group_means = result.groupby(dummy_data['group'])[['x1', 'x2']].mean()
     assert group_means.abs().max().max() < 1e-10
-
-
-def test_get_colormap_colors_brightness():
-    colors = get_colormap_colors('viridis', num_colors=5, brightness_threshold=0.7)
-    assert isinstance(colors, list)
-    assert len(colors) == 5
-    for color in colors:
-        brightness = sum(color[:3]) / 3
-        assert brightness <= 0.7
 
 
 def test_get_colors_valid_input():

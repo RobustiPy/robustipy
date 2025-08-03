@@ -457,7 +457,7 @@ def decorator_timer(func: callable) -> callable:
 
     def wrapper(*args, **kwargs):
         t1 = time()
-        result = callable(*args, **kwargs)
+        result = func(*args, **kwargs)
         end = time()-t1
         return result, end
     return wrapper
