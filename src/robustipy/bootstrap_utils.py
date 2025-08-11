@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+
 np.seterr(divide='ignore', invalid='ignore')
 
 
@@ -30,8 +31,9 @@ def stripped_ols(y, x) -> dict:
       unexpected results if there are missing values in the input data.
     - The function internally adds a constant column to the independent variables 
       matrix `x` to represent the intercept term in the regression equation.
+    - Constant terms are added to `x` by default.
     """
-    x['const'] = 1
+    x['const'] = 1  # Add constant term for intercept
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:

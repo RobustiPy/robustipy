@@ -102,6 +102,7 @@ class BaseRobust(Protomodel):
         TypeError, ValueError
             If inputs fail type or membership checks.
         """
+        
         super().__init__()
         if not isinstance(y, list) or not isinstance(x, list):
             raise TypeError(
@@ -140,25 +141,7 @@ class BaseRobust(Protomodel):
     def get_results(self):
         raise NotImplementedError("This method should be implemented in subclasses.")
     
-#    def multiple_y(self) -> None:
-#        """
-#        Build `self.y_composites` and `self.y_specs`.
-#
-#        If `self._selected_y_masks` is not None, restrict to those masks.
-#        """
-#        self.y_specs = []
-#        self.y_composites = []
-#        print("Calculating Composite Ys")
-#        subsets = list(all_subsets(self.y))
-#        iterator = subsets 
-#        for spec in iterator:
-#            if len(spec) > 0:
-#                subset = self.data[list(spec)]
-#                subset = (subset - subset.mean()) / subset.std()
-#                self.y_composites.append(subset.mean(axis=1))
-#                self.y_specs.append(spec)
-#        self.parameters['y_specs'] = self.y_specs
-#        self.parameters['y_composites'] = self.y_composites
+    
 
     def multiple_y(self) -> None:
         """
@@ -248,6 +231,7 @@ class BaseRobust(Protomodel):
         Emit a warning if the expected number of model fits
         (draws × control-specs × y-composites) exceeds *threshold*.
         """
+        
         total = draws * n_control_specs * n_y_composites
         print(f"Total model runs: {total:,} (draws={draws}, control_specs={n_control_specs}, y_composites={n_y_composites})")
         if total > threshold:
@@ -271,6 +255,7 @@ class BaseRobust(Protomodel):
         group : str or None
             Grouping variable name, if any.
         """
+        
         cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
         _check_numeric_columns(self.data, cols_to_check)
 
@@ -278,6 +263,7 @@ class BaseRobust(Protomodel):
         """
         Check for perfect multicollinearity in X. Warn about all involved columns.
         """
+        
         mat = X.values
         n_cols = mat.shape[1]
         rank  = np.linalg.matrix_rank(mat)

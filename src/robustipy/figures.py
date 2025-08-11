@@ -49,6 +49,7 @@ def _legend_side_from_hist(ax, *, tau: float = 0.6) -> str:
     bars = [p for p in ax.patches if isinstance(p, Rectangle) and p.get_height() > 0]
     if not bars:  # fall-back if no histogram rendered
         return 'upper left'
+    
     # Split bars at the sample median
     median_x = np.median([p.get_x() + p.get_width() / 2 for p in bars])
     left_max = max((p.get_height() for p in bars if (p.get_x() + p.get_width() / 2) < median_x), default=0.0)
@@ -127,6 +128,8 @@ def plot_hexbin_r2(
         Target axes.
     fig : matplotlib.figure.Figure
         Parent figure, needed for colour-bar geometry.
+    oddsratio : bool
+        If True, use exponentiated estimates for plotting.
     colormap : str | matplotlib.colors.Colormap
         Matplotlib-compatible colormap.
     title : str, optional
@@ -172,6 +175,7 @@ def plot_hexbin_r2(
             mincnt=1,
             edgecolor="k",
         )
+        
     # Place the colour-bar opposite the y-axis
     cb_location = "right" if side == "left" else "left"
     cb = fig.colorbar(
@@ -280,7 +284,6 @@ def plot_hexbin_r2(
     # ------------------------------------------------------------------ #
     # 5.  Void function – all graphics modified in-place                 #
     # ------------------------------------------------------------------ #
-    return None
 
 
 def plot_hexbin_log(
@@ -304,6 +307,8 @@ def plot_hexbin_log(
         The axes on which to draw the hex-bin.
     fig : matplotlib.figure.Figure
         Parent figure (needed to place the colorbar).
+    oddsratio : bool
+        If True, use exponentiated estimates for plotting.
     colormap : str or Colormap
         Name or object of a Matplotlib colormap.
     title : str, optional
@@ -334,12 +339,14 @@ def plot_hexbin_log(
     data = image.get_array()
     ticks = np.linspace(data.min(), data.max(), num=6)
     cb.set_ticks(ticks)
+    
     if (data.max() >= 1000) and (data.max() < 10000):
         cb.set_ticklabels([f'{tick / 1000:.1f}k' for tick in ticks])
     elif data.max() >= 10000:
         cb.set_ticklabels([f'{tick / 1000:.0f}k' for tick in ticks])
     else:
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
+    
     cb.ax.set_title('Count')
     axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
@@ -361,7 +368,8 @@ def shap_violin(
         title: str = '',
         clear_yticklabels: bool = False
 ) -> List[str]:
-    """Create a SHAP beeswarm plot, colored by feature values when they are provided.
+    """
+    Create a SHAP beeswarm plot, colored by feature values when they are provided.
 
     Parameters
     ----------
@@ -395,6 +403,7 @@ def shap_violin(
     List[str]
         Ordered list of feature names actually plotted.
     """
+    # If SHAP Explanation object is passed, extract values and related info 
     if str(type(shap_values)).endswith("Explanation'>"):
         shap_exp = shap_values
         shap_values = shap_exp.values
@@ -404,6 +413,7 @@ def shap_violin(
             feature_names = shap_exp.feature_names
         if len(shap_exp.base_values.shape) == 2 and shap_exp.base_values.shape[1] > 2:
             shap_values = [shap_values[:, :, i] for i in range(shap_exp.base_values.shape[1])]
+
     if isinstance(features, pd.DataFrame):
         if feature_names is None:
             feature_names = features.columns
@@ -416,47 +426,61 @@ def shap_violin(
         feature_names = features
         features = None
     num_features = shap_values.shape[1]
+    
+    # Drop SHAP bias column if present
     if features is not None:
         if shap_values.shape[1] == features.shape[1] + 1:
             shap_values = shap_values[:, :-1]   # drop bias
             num_features -= 1
         elif shap_values.shape[1] != features.shape[1]:
             raise ValueError(
-                f"shap_values has {shap_values.shape[1]} columns but "
-                f"features has {features.shape[1]} – shapes don’t match."
+                f"'shap_values' has {shap_values.shape[1]} columns but "
+                f"'features' has {features.shape[1]} – shapes don’t match."
             )
-
+    # Set default feature names if still missing
     if feature_names is None:
         feature_names = np.array([labels["FEATURE"] % str(i) for i in range(num_features)])
+        
+    # Set x-axis to symmetric log scale if requested
     if use_log_scale:
         ax.xscale("symlog")
+    
     if max_display is None:
         max_display = 20
+        
+    # Order features by mean(|SHAP|) importance
     feature_order = np.argsort(np.sum(np.abs(shap_values), axis=0))
     feature_order = feature_order[-min(max_display, len(feature_order)):]
+    
+    # Add horizontal lines for each feature row in the plot
     for pos in range(len(feature_order)):
         ax.axhline(y=pos, color="#cccccc", lw=0.5, dashes=(1, 5), zorder=-1)
 
+    # Main path: coloring by feature values is possible
     if features is not None:
+        # Compute global SHAP value range for noise scaling
         global_low = np.nanpercentile(shap_values[:, : len(feature_names)].flatten(), 1)
         global_high = np.nanpercentile(shap_values[:, : len(feature_names)].flatten(), 99)
+
         for pos, i in enumerate(feature_order):
             shaps = shap_values[:, i]
             shap_min, shap_max = np.min(shaps), np.max(shaps)
             rng = shap_max - shap_min
             xs = np.linspace(np.min(shaps) - rng * 0.2, np.max(shaps) + rng * 0.2, 100)
+
+            # Estimate density; add noise if nearly constant
             if np.std(shaps) < (global_high - global_low) / 100:
                 ds = gaussian_kde(shaps + np.random.randn(len(shaps)) * (global_high - global_low) / 100)(xs)
             else:
                 ds = gaussian_kde(shaps)(xs)
-            ds /= np.max(ds) * 3
+            ds /= np.max(ds) * 3  # Normalize for plot size
+
             values = features[:, i]
+
+            # Smooth feature values for color gradients
             smooth_values = np.zeros(len(xs) - 1)
             sort_inds = np.argsort(shaps)
-            trailing_pos = 0
-            leading_pos = 0
-            running_sum = 0
-            back_fill = 0
+            trailing_pos, leading_pos, running_sum, back_fill = 0, 0, 0, 0
             for j in range(len(xs) - 1):
                 while leading_pos < len(shaps) and xs[j] >= shaps[sort_inds[leading_pos]]:
                     running_sum += values[sort_inds[leading_pos]]
@@ -470,6 +494,8 @@ def shap_violin(
                         smooth_values[j - k - 1] = smooth_values[j]
                 else:
                     back_fill += 1
+
+            # Clip and normalize feature values for coloring
             vmin = np.nanpercentile(values, 5)
             vmax = np.nanpercentile(values, 95)
             if vmin == vmax:
@@ -479,6 +505,8 @@ def shap_violin(
                     vmin = np.min(values)
                     vmax = np.max(values)
             nan_mask = np.isnan(values)
+
+            # Plot SHAP values where feature values are NaN in gray
             ax.scatter(
                 shaps[nan_mask],
                 np.ones(shap_values[nan_mask].shape[0]) * pos,
@@ -489,11 +517,15 @@ def shap_violin(
                 zorder=1,
                 rasterized=True
             )
+
+            # Clip and prepare color values
             cvals = values[np.invert(nan_mask)].astype(np.float64)
             cvals_imp = cvals.copy()
             cvals_imp[np.isnan(cvals)] = (vmin + vmax) / 2.0
             cvals[cvals_imp > vmax] = vmax
             cvals[cvals_imp < vmin] = vmin
+
+            # Plot SHAP points colored by feature values
             ax.scatter(
                 shaps[np.invert(nan_mask)],
                 np.ones(shap_values[np.invert(nan_mask)].shape[0]) * pos,
@@ -507,6 +539,8 @@ def shap_violin(
                 zorder=1,
                 rasterized=True,
             )
+
+            # Normalize and color density envelope
             smooth_values -= vmin
             if vmax - vmin > 0:
                 smooth_values /= vmax - vmin
@@ -520,6 +554,7 @@ def shap_violin(
                         zorder=2,
                     )
     else:
+        # If no feature values, just plot plain violin plots
         parts = ax.violinplot(
             shap_values[:, feature_order],
             range(len(feature_order)),
@@ -536,6 +571,7 @@ def shap_violin(
             pc.set_edgecolor("none")
             pc.set_alpha(alpha)
 
+    # Add colorbar if using feature values
     m = cm.ScalarMappable(cmap=cmap)
     m.set_array([0, 1])
     cb = plt.colorbar(m, ax=ax, ticks=[0, 1], aspect=20)
@@ -545,17 +581,26 @@ def shap_violin(
     cb.ax.tick_params(labelsize=11, length=0)
     cb.set_alpha(1)
     cb.outline.set_visible(True)
+
+    # Configure axis appearance
     ax.xaxis.set_ticks_position("bottom")
     ax.spines["left"].set_visible(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+
+    # Set y-axis ticks and labels
     feature_name_order = [feature_names[i] for i in feature_order]
     ax.set_yticks(range(len(feature_order)), feature_name_order, fontsize=13)
     ax.set_ylim(-1, len(feature_order))
+
+    # Set axis labels and title
     axis_formatter(ax, r'', r'SHAP Values', title)
     title_setter(ax, title)
+
+    # Optionally clear y-tick labels
     if clear_yticklabels:
         ax.set_yticklabels([])
+
     return feature_name_order
 
 
@@ -583,6 +628,8 @@ def plot_curve(
         Whether to smooth the lower/upper CI bounds with LOESS.
     ci : float, default=1
         The confidence-level (e.g. 0.95 for a 95% interval).
+    oddsratio : bool, default=False
+        If True, exponentiate the estimates before plotting.
     specs : list of control-lists, optional
         Up to three specs to highlight. Default: None (no highlights).
     ax : matplotlib.axes.Axes, optional
@@ -619,10 +666,12 @@ def plot_curve(
                                                interpolation='nearest'
                                                )
         df['median'] = results_object.estimates.quantile(q=0.5, axis=1)
+    
+    # Store lower and upper quantiles
     df['q_low'] = qs.iloc[0].values
     df['q_high'] = qs.iloc[1].values
 
-    # Flag specs
+    # Identify and flag full and null specs for highlighting
     if highlights:
         full_spec, null_spec = (list(results_object.specs_names.iloc[-1]),
                                 list(results_object.specs_names.iloc[0]))
@@ -645,12 +694,10 @@ def plot_curve(
     full_color = colourset[-1]
 
     # Plot median
-    # median_color = get_colormap_colors(colormap, 100)[0]
     median_color = 'k'
     df['median'].plot(ax=ax, color=median_color, linestyle='-')
 
     # Plot CI bounds
-    # hi_color = get_colormap_colors(colormap, 100)[-1]
     hi_color = 'gray'
     if loess:
         frac = max(2 / n, 0.3)
@@ -669,8 +716,9 @@ def plot_curve(
     if y0 < 0 < y1:
         ax.axhline(0, color='k', ls='--')
 
-    # Highlights
+    # Prepare handles for legend
     handles = []
+    # Plot vertical intervals for user-specified highlighted specs
     if specs:
         idxs = df.index[df['idx']].tolist()
         for j, idx in enumerate(idxs):
@@ -685,7 +733,7 @@ def plot_curve(
             ax.plot(idx, df.at[idx, 'median'], 'o', markeredgecolor=col, markerfacecolor='w', markersize=12)
             handles.append(Line2D([0], [0], marker='o', color=col, markerfacecolor='w', markersize=10, label=lbl))
 
-    # Full model
+    # Plot full model highlight
     if highlights:
         pos_full = df.index[df['full_spec_idx']].item()
         low_f = lo_low[pos_full, 1] if loess else df.at[pos_full, 'q_low']
@@ -695,14 +743,16 @@ def plot_curve(
                                   mutation_scale=20, shrinkA=0, shrinkB=0)
         ax.add_artist(arrow_f)
         ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
+        # Add to legend depending on number of outcomes
         if max(len(t) for t in results_object.y_name) == 1:
             handles.append(
                 Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='Full Model'))
         else:
             handles.append(
                 Line2D([0], [0], marker='o', color=full_color, markerfacecolor='w', markersize=10, label='All Data Used'))
+    
+    # Plot null model highlight
     if highlights:
-        # Null model
         pos_null = df.index[df['null_spec_idx']].item()
         low_n = lo_low[pos_null, 1] if loess else df.at[pos_null, 'q_low']
         high_n = lo_high[pos_null, 1] if loess else df.at[pos_null, 'q_high']
@@ -711,16 +761,20 @@ def plot_curve(
                                   mutation_scale=20, shrinkA=0, shrinkB=0)
         ax.add_artist(arrow_n)
         ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
+        # Add to legend depending on number of outcomes
         if max(len(t) for t in results_object.y_name) == 1:
             handles.append(
                 Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label='No Controls'))
         else:
             handles.append(
                 Line2D([0], [0], marker='o', color=null_color, markerfacecolor='w', markersize=10, label=r'First y Only'))
-        # Legend and formatting
+    
+    # Display the legend if both highlights and specs are present
     if highlights and (specs is not None):
         ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
                   loc='lower right', ncols=2, framealpha=1, facecolor='w')
+    
+    # Format axes and apply limits
     axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
     ax.set_xlim(0, n - 1)
     pad = (y1 - y0) * 0.1
@@ -755,9 +809,10 @@ def plot_ic(
     """
     Plots the information criterion (IC) curve, colouring:
       • “No Controls” in the first colormap colour
-      • each user‐highlighted spec in the next colours
+      • Each user‐highlighted spec in the next colours
       • “Full Model” in the last colormap colour
     """
+    
     # Validate IC column
     if ic not in results_object.summary_df.columns:
         available_ics = [c for c in results_object.summary_df.columns
@@ -769,10 +824,9 @@ def plot_ic(
 
     # grab exactly len(specs)+2 colours
     n_specs = len(specs) if specs else 0
-    # colorset = get_colormap_colors(colormap, n_specs + 2)
     colorset = get_colormap_colors(n_specs + 2)
 
-    df = results_object.summary_df.copy()
+    df = results_object.summary_df.copy() # get a copy to avoid modifying the original summary_df from results_object
     df = df.sort_values(by=ic).reset_index(drop=True)
     axis_formatter(ax, f'{ic.upper()} curve', 'Ordered Specifications', title)
 
@@ -887,8 +941,35 @@ def plot_bdist(
         highlights: bool = True
 ) -> plt.Axes:
     """
-    Plot density‐scaled histograms and KDEs of coefficient distributions,
-    in a fully generalisable way.
+    
+    Plot density‐scaled histograms and KDEs of coefficient distributions, in a fully generalisable way.
+    KDE is smoothed with a bandwidth adjustment factor. 
+    
+    Parameters
+    ----------
+    results_object : object
+    oddsratio : bool
+        If True, exponentiate the coefficient estimates before plotting.
+    specs : list of control-lists, optional
+        Up to three specs to highlight. Default: None (no highlights).
+    ax : matplotlib.axes.Axes, optional
+        Axes on which to draw; if None a new (4×3) figure and axes are created.
+    title : str, default=''
+        Title to display above the plot.
+    despine_left : bool, default=True
+        If True, move y-axis ticks & label to the right spine; otherwise keep on the left.
+    legend_bool : bool, default=False
+        If True, draw a custom legend for the highlighted specifications.
+    bw_adjust : float, default=0.5
+        Bandwidth adjustment factor for the KDE; larger values make the curve smoother.
+    highlights : bool, default=True
+        If True, highlights the full model and the null model in the plot.
+        
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The axes containing the completed plot.
+    
     """
     # 1. Build a long‐form DataFrame with one row per (draw, spec)
     if oddsratio is True:
@@ -1125,6 +1206,14 @@ def _sanitize_specs(
 ) -> Optional[List[List[str]]]:
     """
     Truncate the specs list to at most `max_len`, warning if we had to cut.
+
+    Parameters
+    ----------
+    specs: List of lists,
+        Control names to highlight in the curve, IC, and distribution panels.
+    max_len: int, default=4
+        Maximum number of specs to keep; if more are provided, truncate and warn.
+
     """
     if specs is not None and len(specs) > max_len:
         warnings.warn(
@@ -1199,34 +1288,42 @@ def plot_results(
     """
 
     # If 'draws' or 'kfold' is a list/tuple, assume this is a merged‐results object:
+    # Handle merged results objects that are unsupported
     if isinstance(results_object.draws, (list, tuple)) or isinstance(results_object.kfold, (list, tuple)):
         warnings.warn(
             "plot_results was passed a *merged* results object (draws/kfold are lists).  "
             "This function does not support plotting a merged‐results object.  "
-            "This is because it's difficult to know exactly what you want to do.  "
-            "It's much safer for you to extract individual result objects and plot them separately.  "
-            "Please raise an issue on GitHub.com/robustipy/ and we can discuss!"
+            "Please extract individual result objects and plot them separately. "
             "Exiting without plotting.",
             UserWarning
         )
         return
 
+    # Clean up file extension and sanitize spec input
     ext = ext.strip()
     specs = _sanitize_specs(specs, max_len=6)
+
+    # Handle odds ratio transformation for logistic regression models
     if oddsratio is True:
-        if results_object.model_name=='Logistic Regression Robust':
+        if results_object.model_name == 'Logistic Regression Robust':
             results_object.all_b_exp = np.exp([arr[0][0] for arr in results_object.all_b.copy()])
             results_object.estimates_exp = np.exp(results_object.estimates.copy())
         else:
             raise ValueError("`oddsratio` option is only valid for logistic regression models.")
+
+    # Validate confidence interval value
     if not (0 <= ci <= 1):
         sys.exit(f"`ci` must lie strictly between 0 and 1; received ci={ci!r}")
 
+    # Prepare output directory for saving figures
     outdir = _prepare_output_dir(Path(figpath) if figpath else None, project_name)
 
+    # If y_name is univariate, plot full 8-panel grid
     if max(len(t) for t in results_object.y_name) == 1:
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(9, 24, wspace=0.5, hspace=1.5)
+
+        # Set up axes for subplots
         ax1 = fig.add_subplot(gs[0:3, 0:12])
         ax2 = fig.add_subplot(gs[0:3, 13:24])
         ax4 = fig.add_subplot(gs[3:5, 6:14])
@@ -1236,84 +1333,90 @@ def plot_results(
         ax7 = fig.add_subplot(gs[5:7, 13:23])
         ax8 = fig.add_subplot(gs[7:9, 13:23])
 
+        # Prepare SHAP values and input matrix
         shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
         shap_x = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").to_numpy()
         shap_cols = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").columns
-        plot_hexbin_r2(results_object, ax1, fig,
-                       oddsratio, colormap, title='a.')
-        plot_hexbin_log(results_object, ax2, fig,
-                        oddsratio, colormap, title='b.')
-        feature_order = shap_violin(ax4, shap_vals, shap_x,
-                                    shap_cols, title='d.',
-                                    clear_yticklabels=True)
-        plot_bma(results_object, colormap,
-                 ax3, feature_order, title='c.')
-        plot_kfolds(results_object, colormap, ax5,
-                    title='e.', despine_left=True)
-        plot_curve(results_object=results_object, loess=loess, ci=ci,
-                   specs=specs, ax=ax6, highlights=highlights,
-                   title='f.', oddsratio=oddsratio)
-        plot_ic(results_object=results_object, ic=ic, specs=specs,
-                ax=ax7, colormap=colormap, title='g.', despine_left=True)
-        plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax8, oddsratio=oddsratio, highlights=highlights,
+
+        # Generate plots in the grid
+        plot_hexbin_r2(results_object, ax1, fig, oddsratio, colormap, title='a.')
+        plot_hexbin_log(results_object, ax2, fig, oddsratio, colormap, title='b.')
+        feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
+        plot_bma(results_object, colormap, ax3, feature_order, title='c.')
+        plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
+        plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
+                   ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio)
+        plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7,
+                colormap=colormap, title='g.', despine_left=True)
+        plot_bdist(results_object=results_object, specs=specs, ax=ax8,
+                   oddsratio=oddsratio, highlights=highlights,
                    title='h.', despine_left=True)
+
+        # Save the full panel figure
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
+
     else:
+        # Plot reduced layout when y is multivariate
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(6, 24, wspace=-.25, hspace=5)
         ax1 = fig.add_subplot(gs[0:6, 0:16])
         ax2 = fig.add_subplot(gs[0:3, 17:24])
         ax3 = fig.add_subplot(gs[3:6, 17:24])
-        plot_curve(results_object=results_object, loess=loess,
-                   ci=ci, specs=specs, ax=ax1, highlights=highlights,
-                   title='a.', oddsratio=oddsratio)
-        plot_hexbin_r2(results_object, ax2, fig, oddsratio,
-                       colormap, title='b.', side='right')
-        plot_bdist(results_object=results_object, specs=specs,
-                   ax=ax3, oddsratio=oddsratio, highlights=highlights,
-                   title='c.', despine_left=True)
+
+        # Generate and save each plot
+        plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
+                   ax=ax1, highlights=highlights, title='a.', oddsratio=oddsratio)
+        plot_hexbin_r2(results_object, ax2, fig, oddsratio, colormap, title='b.', side='right')
+        plot_bdist(results_object=results_object, specs=specs, ax=ax3,
+                   oddsratio=oddsratio, highlights=highlights, title='c.', despine_left=True)
+
+        # Save the full panel figure
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
 
+    # Plot and save individual panels
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_r2(results_object, ax, fig, oddsratio, colormap)
     plt.savefig(os.path.join(outdir, project_name + '_R2hexbin.' + ext), bbox_inches='tight')
     plt.close(fig)
+
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bdist(results_object=results_object, specs=specs, ax=ax,
-               oddsratio=oddsratio,
-               despine_left=False)
+               oddsratio=oddsratio, despine_left=False)
     plt.savefig(os.path.join(outdir, project_name + '_OOS.' + ext), bbox_inches='tight')
     plt.close(fig)
+
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci,
-               oddsratio=oddsratio, highlights=highlights,
-               specs=specs, ax=ax)
+               oddsratio=oddsratio, highlights=highlights, specs=specs, ax=ax)
     plt.savefig(os.path.join(outdir, project_name + '_curve.' + ext), bbox_inches='tight')
     plt.close(fig)
 
+    # Additional subplots only if y is univariate
     if max(len(t) for t in results_object.y_name) == 1:
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_hexbin_log(results_object, ax, fig, oddsratio, colormap)
         plt.savefig(os.path.join(outdir, project_name + '_LLhexbin.' + ext), bbox_inches='tight')
         plt.close(fig)
+
         fig, ax = plt.subplots(figsize=(8.5, 5))
         feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
         plt.savefig(os.path.join(outdir, project_name + '_SHAP.' + ext), bbox_inches='tight')
         plt.close(fig)
+
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bma(results_object, colormap, ax, feature_order)
         plt.savefig(os.path.join(outdir, project_name + '_BMA.' + ext), bbox_inches='tight')
         plt.close(fig)
+
         fig, ax = plt.subplots(figsize=(8.5, 5))
-        plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax, colormap=colormap, title='g.',
-                despine_left=False)
+        plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax,
+                colormap=colormap, title='g.', despine_left=False)
         plt.savefig(os.path.join(outdir, project_name + '_IC.' + ext), bbox_inches='tight')
         plt.close(fig)
+
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax,
-                   oddsratio=oddsratio,
-                   despine_left=False, highlights=highlights,
-                   legend_bool=False)
+                   oddsratio=oddsratio, despine_left=False,
+                   highlights=highlights, legend_bool=False)
         plt.savefig(os.path.join(outdir, project_name + '_bdist.' + ext), bbox_inches='tight')
         plt.close(fig)

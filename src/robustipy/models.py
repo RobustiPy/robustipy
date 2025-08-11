@@ -84,6 +84,7 @@ def _ensure_single_constant(
     This ensures that if a constant was specified as a control, it remains a control
     (now called "const") rather than being moved into x_list.
     """
+    
     y_list = y_list.copy()
     x_list = x_list.copy()
     controls = controls.copy()
@@ -221,6 +222,24 @@ def _ensure_single_constant(
 
 
 def rescale(variable):
+    """
+    Rescales the input variable to have zero mean and unit standard deviation.
+
+    Parameters
+    ----------
+    variable : array-like
+        Input data to be rescaled. Can be a list, NumPy array, or similar structure.
+
+    Returns
+    -------
+    out : ndarray
+        The rescaled array with mean 0 and standard deviation 1 along the specified axis.
+        NaN values are ignored in the computation of mean and standard deviation.
+
+    Notes
+    -----
+    This function uses `np.nanmean` and `np.nanstd` to ignore NaN values during scaling.
+    """
     variable = np.asarray(variable, dtype=np.float64)
     mean = np.nanmean(variable, axis=0, keepdims=True)
     std = np.nanstd(variable, axis=0, keepdims=True)
@@ -229,6 +248,20 @@ def rescale(variable):
 
 
 class IntegerRangeValidator:
+    """
+    Validator that checks if an input value is an integer within a specified range.
+
+    Args:
+        min_value (int): The minimum allowed integer value (inclusive).
+        max_value (int): The maximum allowed integer value (inclusive).
+
+    Raises:
+        ValidationError: If the input is not an integer or is outside the specified range.
+
+    Usage:
+        validator = IntegerRangeValidator(1, 10)
+        validator(_, current_value)  # Returns True if valid, raises ValidationError otherwise.
+    """
     def __init__(self, min_value, max_value):
         self.min_value = min_value
         self.max_value = max_value
@@ -513,6 +546,7 @@ def stouffer_method(
     p_combined : float
         Combined p-value.
     """
+    
     p = np.asarray(p_values, dtype=float)
 
     if eps is None:
@@ -526,7 +560,7 @@ def stouffer_method(
     else:
         w = np.asarray(weights, dtype=float)
         if w.shape != z.shape:
-            raise ValueError("weights and p_values must have same length")
+            raise ValueError("Weights and p_values must have same length")
         Z = np.dot(w, z) / np.linalg.norm(w)
 
     p_combined = norm.sf(Z)
@@ -638,7 +672,7 @@ class MergedResult(Protoresult):
         project_name : str
             Prefix for saved figure.
         bighlights: bool
-            whether to highlight specs
+            Whether to highlight specs
         oddsratio bool, default=False
             Whether to exponentiate the coefficients (e.g. for odds ratios).
         Returns
@@ -646,6 +680,7 @@ class MergedResult(Protoresult):
         matplotlib.figure.Figure:
             Plot showing the regression results.
         """
+        
         fig, ax = plt.subplots(figsize=figsize)
 
         if specs is not None and len(specs) == 0:
@@ -932,6 +967,7 @@ class OLSResult(Protoresult):
             - ci_up : float
                 97.5th percentile coefficient (upper 95% bound).
         """
+        
         df_model_result = pd.DataFrame({
             'betas': [b[0][0] for b in self.all_b],
             'p_values': [p[0][0] for p in self.all_p],
@@ -940,6 +976,7 @@ class OLSResult(Protoresult):
         df_model_result['positive_beta'] = df_model_result['betas'].apply(lambda x: 1 if x > 0 else 0)
         df_model_result['negative_beta'] = df_model_result['betas'].apply(lambda x: 1 if x < 0 else 0)
         df_model_result['significant'] = df_model_result['p_values'].apply(lambda x: 1 if x < 0.05 else 0)
+        
         self.inference = {}
         self.inference['median_ns'] = df_model_result['betas'].median() # note: ns for 'no sampling'
         self.inference['median'] = self.estimates.stack().median()
@@ -1030,6 +1067,7 @@ class OLSResult(Protoresult):
                 print("=" * 30)
 
         inference = not self.estimates_ystar.isna().all().all()
+        
         # Display basic model information
         print_separator("1. Model Summary")
         print(f"Model: {self.model_name}")
@@ -1100,6 +1138,7 @@ class OLSResult(Protoresult):
 
         print_separator()
 
+        # print in-sample metrics
         if max(len(t) for t in self.y_name) == 1:
             print('2.2 In-Sample Metrics (Full Sample)')
             print_separator()
@@ -1161,7 +1200,7 @@ class OLSResult(Protoresult):
         ic : {'bic', 'aic', 'hqic'}, default='aic'
             Which information criterion to display.
         ci: float, default=1
-            confidence interval.
+            Confidence interval.
         colormap : str, default='Spectral_r'
             Name of the matplotlib colormap for the plot.
         figpath : str or Path, optional
@@ -1185,9 +1224,9 @@ class OLSResult(Protoresult):
         ------
         ValueError
             If `ic` is not one of {'bic', 'aic', 'hqic'}.
+            or if more than three specs are given,
         TypeError
             If `specs` is provided but is not a list of lists of str,
-            or if more than three specs are given,
             or any spec is not in the computed specifications.
         """
 
@@ -1243,41 +1282,56 @@ class OLSResult(Protoresult):
         """
         Performs Bayesian Model Averaging (BMA) using BIC-implied priors.
 
-        Returnsnt
+        Returns
         -------
-            pd.DataFrame: DataFrame containing BMA results.
+        pd.DataFrame
+            DataFrame containing BMA results with control variable inclusion
+            probabilities and average coefficients.
         """
         likelihood_per_var = []
-        weigthed_coefs = []
+        weighted_coefs = []
+
+        # Compute model likelihoods using BIC-implied log posterior
         max_ll = np.max(-self.summary_df.bic / 2)
         shifted_ll = (-self.summary_df.bic / 2) - max_ll
         models_likelihood = np.exp(shifted_ll)
         sum_likelihoods = np.nansum(models_likelihood)
+
+        # Flatten list of coefficient arrays and variable names
         coefs = [[i[0] for i in x] for x in self.all_b]
         coefs = [i for sl in coefs for i in sl]
         var_names = [i for sl in self.all_predictors for i in sl]
         coefs_df = pd.DataFrame({'coef': coefs, 'var_name': var_names})
+
+        # Compute weighted likelihood and average coefficients for each control variable
         for ele in self.controls:
             idx = [ele in spec for spec in self.specs_names]
             likelihood_per_var.append(np.nansum(models_likelihood[idx]))
+
             coefs = coefs_df[coefs_df.var_name == ele].coef.to_numpy()
             likelihood = models_likelihood[idx]
-            weigthed_coef = coefs * likelihood
-            weigthed_coefs.append(np.nansum(weigthed_coef))
+            weighted_coef = coefs * likelihood
+            weighted_coefs.append(np.nansum(weighted_coef))
+
+        # Normalize to get posterior inclusion probabilities and BMA-weighted coefficients
         probs = likelihood_per_var / sum_likelihoods
-        final_coefs = weigthed_coefs / sum_likelihoods
+        final_coefs = weighted_coefs / sum_likelihoods
+
+        # Return summary DataFrame
         summary_bma = pd.DataFrame({
             'control_var': self.controls,
             'probs': probs,
             'average_coefs': final_coefs
         })
+
         return summary_bma
 
-    def merge(self,
-              result_obj: "OLSResult",
-              left_prefix: str,
-              right_prefix: str
-              ) -> MergedResult:
+    def merge(
+        self,
+        result_obj: "OLSResult",
+        left_prefix: str,
+        right_prefix: str
+    ) -> MergedResult:
         """
         Merge this OLSResult with another, tagging each spec by prefix.
 
@@ -1303,22 +1357,37 @@ class OLSResult(Protoresult):
         ValueError
             If the dependent variable names do not match.
         """
+
+        # Validate input types
         if not isinstance(result_obj, OLSResult):
             raise TypeError("'result_obj' must be an instance of OLSResult.")
+        
         if not isinstance(left_prefix, str) or not isinstance(right_prefix, str):
             raise TypeError("'prefixes' must be of type 'str.'")
+
+        # Ensure dependent variables match before merging
         if self.y_name != result_obj.y_name:
             raise ValueError('Dependent variable names must match.')
+
+        # Apply prefixes to spec sets
         specs_original = [frozenset(list(s) + [left_prefix]) for s in self.specs_names]
         specs_new = [frozenset(list(s) + [right_prefix]) for s in result_obj.specs_names]
+
+        # Merge all relevant fields
         y = self.y_name
         specs = specs_original + specs_new
         estimates = pd.concat([self.estimates, result_obj.estimates], ignore_index=True)
         p_values = pd.concat([self.p_values, result_obj.p_values], ignore_index=True)
         r2_values = pd.concat([self.r2_values, result_obj.r2_values], ignore_index=True)
 
-        return MergedResult(y=y, specs=specs, estimates=estimates, p_values=p_values, r2_values=r2_values)
-
+        # Return a new MergedResult object
+        return MergedResult(
+            y=y,
+            specs=specs,
+            estimates=estimates,
+            p_values=p_values,
+            r2_values=r2_values
+        )
     def save_to_csv(self, path: str) -> None:
         """Function to save summary dataframe to a csv"""
         self.summary_df.to_csv(path)
@@ -1408,7 +1477,7 @@ class OLSRobust(BaseRobust):
             ]
         space_n_sample = len(z_specs_sample)
         return space_n_sample, z_specs_sample
-
+    
     def fit(
         self,
         *,
@@ -1425,7 +1494,7 @@ class OLSRobust(BaseRobust):
         rescale_x: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
         threshold: int = 1000000
-        ) -> 'OLSRobust':
+    ) -> 'OLSRobust':
         """
         Fit the OLS models across the specification space and over bootstrap resamples.
 
@@ -1440,21 +1509,21 @@ class OLSRobust(BaseRobust):
         group : str, optional
             Column name for grouping fixed effects. If provided, outcomes are de-meaned by group.
         draws : int, optional
-            Number of bootstrap resamples per specification. If `None`, bootstrapping is skipped.
+            Number of bootstrap resamples per specification. If None, bootstrapping is skipped.
         kfold : int, optional
-            Number of folds for out-of-sample evaluation. Requires `oos_metric` to be specified.
+            Number of folds for out-of-sample evaluation. Requires oos_metric to be specified.
         oos_metric : {'pseudo-r2', 'rmse'}, optional
-            Metric to evaluate out-of-sample performance when `kfold` is set.
+            Metric to evaluate out-of-sample performance when kfold is set.
         n_cpu : int, optional
-            Number of parallel processes to use. Defaults to all available CPUs minus one if `None`.
-        seed : int, optional
+            Number of parallel processes to use. Defaults to all available CPUs minus one if None.
+                seed : int, optional
             Random seed for reproducibility. Propagated to all random operations.
         composite_sample : int, optional
             If set, draw this many bootstrap samples **before** applying specification variation;
             used to reduce total computation while capturing uncertainty in the full composite model.
         z_specs_sample_size : int, optional
             Number of z specifications to randomly sample from the full set of possible combinations.
-            If `None`, the full specification space is used.
+            If None, the full specification space is used.
         rescale_y : bool, default=False
             If True, rescale the dependent variable to have mean 0 and standard deviation 1.
         rescale_x : bool, default=False
@@ -1467,322 +1536,123 @@ class OLSRobust(BaseRobust):
         Returns
         -------
         self : OLSRobust
-            The fitted model instance. Results are stored in the `.results` attribute.
+            The fitted model instance. Results are stored in the .results attribute.
 
         Notes
         -----
-        - At least one of `draws` or `kfold` must be set to perform model fitting.
-        - If both `composite_sample` and `z_specs_sample_size` are set, the combination is applied in that order.
-        - This method may be computationally intensive; parallelisation is recommended via `n_cpu`.
+        - At least one of draws or kfold must be set to perform model fitting.
+        - If both composite_sample and z_specs_sample_size are set, the combination is applied in that order.
+        - This method may be computationally intensive; parallelisation is recommended via n_cpu.
         """
+
+        # Validate control variable input
         if not isinstance(controls, list):
             raise TypeError(f"'controls' must be a list. Received types: {type(controls).__name__}.")
-        
-        if rescale_y is True:
+
+        # Validate z_specs_sample_size input
+        if z_specs_sample_size is not None:
+            if not isinstance(z_specs_sample_size, int) or z_specs_sample_size <= 0:
+                raise ValueError("'z_specs_sample_size' must be an integer greater than 0 if provided.")
+
+
+        # Optionally rescale y, x, and z variables
+        if rescale_y:
             if len(self.y) > 1:
-                warnings.warn(
-                    "Rescaling of the dependent variable already occurs with multiple "
-                    "y variables. Skipping additional rescaling.",
-                    UserWarning
-                )
+                warnings.warn("Rescaling of the dependent variable already occurs with multiple y variables. Skipping additional rescaling.", UserWarning)
             else:
                 self.data[self.y] = rescale(self.data[self.y])
-        if rescale_x is True:
+
+        if rescale_x:
             for column in self.x:
                 self.data[column] = rescale(self.data[column])
-        if rescale_z is True:
+
+        if rescale_z:
             for column in controls:
                 self.data[column] = rescale(self.data[column])
 
+        # Standardize and propagate user arguments
         draws, kfold, oos_metric, n_cpu, seed = make_inquiry(
-            self.model_name,
-            self.y,
-            self.data,
-            draws,
-            kfold,
-            oos_metric,
-            n_cpu,
-            seed
-        )
-        self.seed = seed
-        self.composite_sample = composite_sample
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
-        if len(self.y) > 1:
-            self.multiple_y()
-        self._validate_fit_args(
-        controls=controls,
-        group=group,
-        draws=draws,
-        kfold=kfold,
-        oos_metric=oos_metric,
-        n_cpu=n_cpu,
-        seed=self.seed,
-        valid_oos_metrics=['pseudo-r2','rmse'],
-        threshold=threshold
-    )
-        np.random.seed(self.seed)
-        print(
-            f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, "
-            f"folds={kfold}, seed={seed}.\n"
-            f"We're evaluating our out-of-sample predictions with the "
-            f"{oos_metric} metric.\n"
-            f"The estimand of interest is {self.x[0]}. "
-            f"Let's begin the calculations..."
+            self.model_name, self.y, self.data, draws, kfold, oos_metric, n_cpu, seed
         )
 
+        self.seed = seed
+        self.composite_sample = composite_sample
+
+        # Ensure constant term and prepare x, controls
+        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+
+        # Handle multiple y case
+        if len(self.y) > 1:
+            self.multiple_y()
+
+        # Check that provided arguments are valid
+        self._validate_fit_args(
+            controls=controls,
+            group=group,
+            draws=draws,
+            kfold=kfold,
+            oos_metric=oos_metric,
+            n_cpu=n_cpu,
+            seed=self.seed,
+            valid_oos_metrics=['pseudo-r2', 'rmse'],
+            threshold=threshold
+        )
+
+        # Set global seed
+        np.random.seed(self.seed)
+
+        # Inform user of configuration
+        print(
+            f"OLSRobust is running with n_cpu={n_cpu}, draws={draws}, folds={kfold}, seed={seed}.\n"
+            f"We're evaluating our out-of-sample predictions with the {oos_metric} metric.\n"
+            f"The estimand of interest is {self.x[0]}. Let's begin the calculations..."
+        )
+
+        # Determine sample size and metric
         sample_size = self.data.shape[0]
         self.oos_metric_name = oos_metric
 
-        if z_specs_sample_size is not None and z_specs_sample_size > 0:
-            space_n, z_specs = self.sample_z_specs(
-                controls=controls,
-                z_specs_sample_size=z_specs_sample_size
-                )
+        # Optionally sample from the specification space
+        if z_specs_sample_size:
+            space_n, z_specs = self.sample_z_specs(controls=controls, z_specs_sample_size=z_specs_sample_size)
         else:
             space_n = space_size(controls)
             z_specs = all_subsets(controls)
 
-        n_y_comps = len(getattr(self, "y_specs", [None]))  # =1 if only single-y
+        # Count y-composite specifications (1 if single y)
+        n_y_comps = len(getattr(self, "y_specs", [None]))
+
+        # Warn if model fit will be too large
         self._warn_if_large_draws(
             draws=draws,
             n_control_specs=space_n,
             n_y_composites=n_y_comps,
-            threshold=threshold,
+            threshold=threshold
         )
 
+        # Delegate to single or multiple y logic
         if len(self.y) > 1:
-            list_all_predictors = []
-            list_b_array = []
-            list_p_array = []
-            list_b_array_ystar = []
-            list_p_array_ystar = []
-            list_r2_array = []
-            list_r2i_array = []
-            list_ll_array = []
-            list_aic_array = []
-            list_bic_array = []
-            list_hqic_array = []
-            list_av_k_metric_array = []
-            y_names = []
-            specs = []
-            all_predictors = []
-            b_all_list = []
-            p_all_list = []
-            for y, y_name in track(zip(self.y_composites,
-                                 self.y_specs), total=len(self.y_composites)):
-                
-                b_array = np.empty([space_n, draws])
-                p_array = np.empty([space_n, draws])
-                b_array_ystar = np.empty([space_n, draws])
-                p_array_ystar = np.empty([space_n, draws])
-                r2_array = np.empty([space_n, draws])
-                r2i_array = np.empty([space_n])
-                ll_array = np.empty([space_n])
-                aic_array = np.empty([space_n])
-                bic_array = np.empty([space_n])
-                hqic_array = np.empty([space_n])
-                av_k_metric_array = np.empty([space_n])
-                for spec, index in zip(z_specs, range(0, space_n)):
-                    if len(spec) == 0:
-                        comb = self.data[self.x]
-                    else:
-                        comb = self.data[self.x + list(spec)]
-                    if group:
-                        comb = self.data[self.x + [group] + list(spec)]
-
-                    comb = pd.concat([y, comb], axis=1)
-                    comb = comb.dropna()
-                    comb = comb.reset_index(drop=True).copy()
-
-                    if group:
-                        comb = group_demean(comb, group=group)
-                    X_design = comb.drop(columns=comb.columns[0])
-                    try:
-                        self._check_colinearity(X_design)
-                    except ValueError as e:
-                        warnings.warn(
-                            f"[OLSRobust] Spec {spec!r} may be unstable due to perfect collinearity:\n{e}\n"
-                            "Proceeding with pseudoinverse; coefficients may not be uniquely identified.",
-                            UserWarning
-                        )
-                    (b_all, p_all, r2_i, ll_i,
-                     aic_i, bic_i, hqic_i,
-                     av_k_metric_i) = self._full_sample_OLS(comb,
-                                                            kfold=kfold,
-                                                            group=group,
-                                                            oos_metric_name=self.oos_metric_name)
-                    y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                    seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
-                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
-                    (delayed(self._strap_OLS)
-                     (comb,
-                      group,
-                      sample_size,
-                      seed,
-                      y_star
-                      )
-                     for seed in seeds))
-                    y_names.append(y_name)
-                    specs.append(frozenset(list(y_name) + list(spec)))
-                    all_predictors.append(self.x + list(spec))
-                    b_array[index, :] = b_list
-                    p_array[index, :] = p_list
-                    b_array_ystar[index, :] = b_list_ystar
-                    p_array_ystar[index, :] = p_list_ystar
-                    r2_array[index, :] = r2_list
-                    r2i_array[index] = r2_i
-                    ll_array[index] = ll_i
-                    aic_array[index] = aic_i
-                    bic_array[index] = bic_i
-                    hqic_array[index] = hqic_i
-                    av_k_metric_array[index] = av_k_metric_i
-                    b_all_list.append(b_all)
-                    p_all_list.append(p_all)
-
-                list_all_predictors.append(all_predictors)
-                list_b_array.append(b_array)
-                list_p_array.append(p_array)
-                list_b_array_ystar.append(b_array_ystar)
-                list_p_array_ystar.append(p_array_ystar)
-                list_r2_array.append(r2_array)
-                list_r2i_array.append(r2i_array)
-                list_ll_array.append(ll_array)
-                list_aic_array.append(aic_array)
-                list_bic_array.append(bic_array)
-                list_hqic_array.append(hqic_array)
-                list_av_k_metric_array.append(av_k_metric_array)
-
-            results = OLSResult(
-                y=y_names,
-                x=self.x,
-                data=self.data,
-                specs=specs,
-                all_predictors=list_all_predictors,
+            return self._fit_multiple_y(
+                z_specs=z_specs,
+                space_n=space_n,
                 controls=controls,
+                group=group,
                 draws=draws,
                 kfold=kfold,
-                all_b=b_all_list,
-                all_p=p_all_list,
-                estimates=np.vstack(list_b_array),
-                p_values=np.vstack(list_p_array),
-                estimates_ystar=np.vstack(list_b_array_ystar),
-                p_values_ystar=np.vstack(list_p_array_ystar),
-                r2_values=np.vstack(list_r2_array),
-                r2i_array=np.hstack(list_r2i_array),
-                ll_array=np.hstack(list_ll_array),
-                aic_array=np.hstack(list_aic_array),
-                bic_array=np.hstack(list_bic_array),
-                hqic_array=np.hstack(list_hqic_array),
-                av_k_metric_array=np.hstack(list_av_k_metric_array),
-                model_name=self.model_name,
-                name_av_k_metric=self.oos_metric_name,
-                shap_return=None
+                n_cpu=n_cpu,
+                sample_size=sample_size
             )
-            self.results = results
         else:
-            specs = []
-            all_predictors = []
-            b_all_list = []
-            p_all_list = []
-            b_array = np.empty([space_n, draws])
-            p_array = np.empty([space_n, draws])
-            b_array_ystar = np.empty([space_n, draws])
-            p_array_ystar = np.empty([space_n, draws])
-            r2_array = np.empty([space_n, draws])
-            r2i_array = np.empty([space_n])
-            ll_array = np.empty([space_n])
-            aic_array = np.empty([space_n])
-            bic_array = np.empty([space_n])
-            hqic_array = np.empty([space_n])
-            av_k_metric_array = np.empty([space_n])
-            if group:
-                SHAP_comb = self.data[self.y + self.x + [group] + controls]
-                SHAP_comb = group_demean(SHAP_comb, group=group)
-            else:
-                SHAP_comb = self.data[self.y + self.x + controls]
-            SHAP_comb = SHAP_comb.dropna()
-            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
-            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
-                                                           SHAP_comb[self.y],
-                                                           test_size=0.2,
-                                                           random_state=self.seed
-                                                           )
-            model = sklearn.linear_model.LinearRegression()
-            model.fit(x_train, y_train)
-            explainer = shap.LinearExplainer(model, x_train)
-            shap_return = [explainer.shap_values(x_test), x_test]
-            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
-                if 0 == len(spec):
-                    comb = self.data[self.y + self.x]
-                else:
-                    comb = self.data[self.y + self.x + list(spec)]
-                if group:
-                    comb = self.data[self.y + self.x + [group] + list(spec)]
-
-                comb = comb.dropna()
-                comb = comb.reset_index(drop=True).copy()
-
-                if group:
-                    comb = group_demean(comb, group=group)
-                (b_all, p_all, r2_i, ll_i,
-                 aic_i, bic_i, hqic_i,
-                 av_k_metric_i) = self._full_sample_OLS(comb,
-                                                        kfold=kfold,
-                                                        group=group,
-                                                        oos_metric_name=self.oos_metric_name)
-                y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
-                b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
-                (delayed(self._strap_OLS)
-                 (comb,
-                  group,
-                  sample_size,
-                  seed,
-                  y_star)
-                 for seed in seeds))
-
-                specs.append(frozenset(spec))
-                all_predictors.append(self.x + list(spec))
-                b_array[index, :] = b_list
-                p_array[index, :] = p_list
-                b_array_ystar[index, :] = b_list_ystar
-                p_array_ystar[index, :] = p_list_ystar
-                r2_array[index, :] = r2_list
-                r2i_array[index] = r2_i
-                ll_array[index] = ll_i
-                aic_array[index] = aic_i
-                bic_array[index] = bic_i
-                hqic_array[index] = hqic_i
-                av_k_metric_array[index] = av_k_metric_i
-                b_all_list.append(b_all)
-                p_all_list.append(p_all)
-            results = OLSResult(y=self.y[0],
-                                x=self.x[0],
-                                data=self.data,
-                                specs=specs,
-                                all_predictors=all_predictors,
-                                controls=controls,
-                                draws=draws,
-                                kfold=kfold,
-                                all_b=b_all_list,
-                                all_p=p_all_list,
-                                estimates=b_array,
-                                p_values=p_array,
-                                estimates_ystar=b_array_ystar,
-                                p_values_ystar=p_array_ystar,
-                                r2_values=r2_array,
-                                r2i_array=r2i_array,
-                                ll_array=ll_array,
-                                aic_array=aic_array,
-                                bic_array=bic_array,
-                                hqic_array=hqic_array,
-                                av_k_metric_array=av_k_metric_array,
-                                model_name=self.model_name,
-                                name_av_k_metric=self.oos_metric_name,
-                                shap_return=shap_return)
-            self.results = results
-
-
+            return self._fit_single_y(
+                z_specs=z_specs,
+                space_n=space_n,
+                controls=controls,
+                group=group,
+                draws=draws,
+                kfold=kfold,
+                n_cpu=n_cpu,
+                sample_size=sample_size
+            )
     def _predict(
         self,
         x_test: np.ndarray,
@@ -1806,11 +1676,13 @@ class OLSRobust(BaseRobust):
         return np.dot(x_test, betas)
 
 
-    def _full_sample_OLS(self,
-                         comb_var,
-                         kfold,
-                         group,
-                         oos_metric_name):
+    def _full_sample_OLS(
+        self,
+        comb_var,
+        kfold,
+        group,
+        oos_metric_name
+    ):
         """
         Call stripped_ols() over the full data containing y, x, and controls.
 
@@ -1844,59 +1716,80 @@ class OLSRobust(BaseRobust):
         av_k_metric : float
             Average out-of-sample metric across folds.
         """
+
+        # Separate response and predictors
         y = comb_var.iloc[:, [0]]
         x_temp = comb_var.drop(comb_var.columns[0], axis=1)
+
+        # Drop group column if provided
         if group:
             x = x_temp.drop(columns=group)
         else:
             x = x_temp
-        out = simple_ols(y=y,
-                         x=x)
+
+        # Fit full sample OLS
+        out = simple_ols(y=y, x=x)
+
+        # Initialize cross-validated metric
         av_k_metric = None
+
+        # Cross-validation (with or without grouping)
         if kfold:
+
+            metric = []
+
             if group:
                 k_fold = GroupKFold(kfold)
-                metric = []
+
                 for k, (train, test) in enumerate(k_fold.split(x, y, groups=x_temp[group])):
-                    out_k = simple_ols(y=y.loc[train],
-                                       x=x.loc[train])
+                    out_k = simple_ols(y=y.loc[train], x=x.loc[train])
                     y_pred = self._predict(x.loc[test], out_k['b'])
                     y_true = y.loc[test]
+
                     if oos_metric_name == 'rmse':
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
+
                     elif oos_metric_name == 'pseudo-r2':
                         k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
+
                     else:
                         raise ValueError('No valid OOS metric provided.')
-                av_k_metric = np.mean(metric)
+
             else:
                 k_fold = KFold(kfold)
-                metric = []
+
                 for k, (train, test) in enumerate(k_fold.split(x, y)):
-                    out_k = simple_ols(y=y.loc[train],
-                                       x=x.loc[train])
+                    out_k = simple_ols(y=y.loc[train], x=x.loc[train])
                     y_pred = self._predict(x.loc[test], out_k['b'])
                     y_true = y.loc[test]
+
                     if oos_metric_name == 'rmse':
                         k_rmse = root_mean_squared_error(y_true, y_pred)
                         metric.append(k_rmse)
+
                     elif oos_metric_name == 'pseudo-r2':
                         k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                         metric.append(k_r2)
+
                     else:
                         raise ValueError('No valid OOS metric provided.')
-                av_k_metric = np.mean(metric)
-        return (out['b'],
-                out['p'],
-                out['r2'],
-                out['ll'][0][0],
-                out['aic'][0][0],
-                out['bic'][0][0],
-                out['hqic'][0][0],
-                av_k_metric)
 
+            av_k_metric = np.mean(metric)
+
+        # Return model fit statistics and OOS metric
+        return (
+            out['b'],
+            out['p'],
+            out['r2'],
+            out['ll'][0][0],
+            out['aic'][0][0],
+            out['bic'][0][0],
+            out['hqic'][0][0],
+            av_k_metric
+        )
+            
     def _strap_OLS(
         self,
         comb_var: pd.DataFrame,
@@ -1930,40 +1823,58 @@ class OLSRobust(BaseRobust):
         r2 : float
             In-sample R² for the bootstrap sample.
         """
+
         temp_data = comb_var.copy()
         temp_data['y_star'] = y_star
 
         if group is None:
+            # Sample randomly from full data (no group structure)
             samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
-            # @TODO generalize the frac to the function call
+
             y = samp_df.iloc[:, [0]]
             y_star = samp_df.iloc[:, [-1]]
-            x = samp_df.drop('y_star', axis=1)
+
+            x = samp_df.drop(['y_star'], axis=1)
             x = x.drop(samp_df.columns[0], axis=1)
+
         else:
+            # Stratified sampling at the group level
             np.random.seed(seed)
             idx = np.random.choice(temp_data[group].unique(), sample_size)
+
             select = temp_data[temp_data[group].isin(idx)]
+
+            # Remove singleton groups (with only one observation)
             no_singleton = select[select.groupby(group).transform('size') > 1]
+
             if len(no_singleton) < 5:
                 warnings.warn(
                     f"Bootstrap sample size is only {len(no_singleton)} after removing singleton groups "
                     f"(groups with a single observation). This may lead to unstable or unreliable estimates.",
                     UserWarning
                 )
+
+            # Drop grouping variable and extract y, y_star, and x
             no_singleton = no_singleton.drop(columns=[group])
+
             y = no_singleton.iloc[:, [0]]
-            y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')]
-            y_star = y_star.to_frame()
-            x = no_singleton.drop('y_star', axis=1)
+
+            y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')].to_frame()
+
+            x = no_singleton.drop(['y_star'], axis=1)
             x = x.drop(no_singleton.columns[0], axis=1)
+
+        # Fit standard OLS and y_star model
         output = stripped_ols(y=y, x=x)
         output_ystar = stripped_ols(y=y_star, x=x)
+
         b = output['b']
         p = output['p']
         r2 = output['r2']
+
         b_ystar = output_ystar['b']
         p_ystar = output_ystar['p']
+
         return b[0][0], p[0][0], r2, b_ystar[0][0], p_ystar[0][0]
 
 
@@ -2027,7 +1938,7 @@ class LRobust(BaseRobust):
 
     def multiple_y(self) -> None:
         raise NotImplementedError("Not implemented yet")
-
+    
     def _full_sample(
         self,
         comb_var: pd.DataFrame,
@@ -2036,78 +1947,114 @@ class LRobust(BaseRobust):
         oos_metric_name: str
     ) -> Tuple[np.ndarray, np.ndarray, float, float, float, float, float, Optional[float]]:
         """
-        Call logistic_regression_sm_stripped() over the full data containing y, x, and controls.
+        Run logistic regression over the full dataset (with y, x, controls), 
+        and optionally compute cross-validated out-of-sample metrics.
 
         Parameters
         ----------
         comb_var : pandas.DataFrame
             DataFrame with columns [y, x, controls...].
+
         kfold : int
             Number of folds for cross-validation.
-        group : str or None
-            Grouping variable name (for future FE support).
-        oos_metric_name : str
-            Out-of-sample metric: 'mcfadden-r2', 'pseudo-r2', 'rmse', or 'cross-entropy'.
 
+        group : str or None
+            Grouping variable name (reserved for future use with fixed effects).
+
+        oos_metric_name : str
+            Out-of-sample metric to compute (if kfold > 1). Options:
+            'mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy', or 'imv'.
 
         Returns
         -------
         beta : ndarray
-            Coefficient estimates.
+            Coefficient estimates from full sample regression.
+
         p : ndarray
-            P-value estimates.
+            P-value estimates from full sample regression.
+
         r2 : float
-            In-sample pseudo-R².
+            In-sample pseudo-R² from full model.
+
         ll : float
             Log-likelihood.
+
         aic : float
             Akaike Information Criterion.
+
         bic : float
             Bayesian Information Criterion.
+
         hqic : float
             Hannan-Quinn Information Criterion.
+
         av_k_metric : float or None
-            Average cross-validation metric, if `kfold>1`, else None.
+            Average k-fold cross-validation metric, or None if no cross-validation.
         """
-        # TODO Fixed effects Logistic Regression?
+
+        # TODO: Implement Fixed Effects Logistic Regression (FE)
+        
+        # Split into response (y) and predictors (x)
         y = comb_var.iloc[:, [0]]
         x = comb_var.drop(comb_var.columns[0], axis=1)
+
+        # Fit logistic regression on the full sample
         out = logistic_regression_sm(y=y, x=x)
+
+        # Initialize output for cross-validation metric
         av_k_metric = None
 
+        # Perform k-fold cross-validation if requested
         if kfold:
             k_fold = KFold(kfold)
             metric = []
+
             for k, (train, test) in enumerate(k_fold.split(x, y)):
+                # Fit model on training fold
                 out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
+
+                # Predict on test fold
                 y_pred = self._predict_LR(x.loc[test], out_k['b'])
                 y_true = y.loc[test]
+
+                # Evaluate prediction accuracy using selected OOS metric
                 if oos_metric_name == 'rmse':
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
+
                 elif oos_metric_name == 'mcfadden-r2':
                     k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.loc[train]))
                     metric.append(k_r2)
+
                 elif oos_metric_name == 'pseudo-r2':
                     k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
                     metric.append(k_r2)
+
                 elif oos_metric_name == 'cross-entropy':
                     k_cross_entropy = log_loss(y_true, y_pred)
                     metric.append(k_cross_entropy)
+
                 elif oos_metric_name == 'imv':
                     imv = calculate_imv_score(y_true, y_pred)
                     metric.append(imv)
+
                 else:
                     raise ValueError('No valid OOS metric provided.')
+
+            # Average metric across all folds
             av_k_metric = np.mean(metric)
-        return (out['b'],
-                out['p'],
-                out['r2'],
-                out['ll'],
-                out['aic'],
-                out['bic'],
-                out['hqic'],
-                av_k_metric)
+
+        # Return model statistics and cross-validation result
+        return (
+            out['b'],        # Coefficients
+            out['p'],        # P-values
+            out['r2'],       # In-sample pseudo-R²
+            out['ll'],       # Log-likelihood
+            out['aic'],      # AIC
+            out['bic'],      # BIC
+            out['hqic'],     # HQIC
+            av_k_metric      # Cross-validation metric (if any)
+        )
 
     def _predict_LR(
         self,
@@ -2184,7 +2131,7 @@ class LRobust(BaseRobust):
         self : LRobust
             Self, with `.results` populated as an `OLSResult`.
         """
-
+        # Rescale dependent variable (y) if needed
         if rescale_y is True:
             if len(self.y) > 1:
                 warnings.warn(
@@ -2194,13 +2141,18 @@ class LRobust(BaseRobust):
                 )
             else:
                 self.data[self.y] = rescale(self.data[self.y])
+
+        # Rescale independent variables (x)
         if rescale_x is True:
             for column in self.x:
                 self.data[column] = rescale(self.data[column])
+
+        # Rescale control variables (z)
         if rescale_z is True:
             for column in controls:
                 self.data[column] = rescale(self.data[column])
 
+        # Prepare modeling setup (includes seed, CPU count, metric, etc.)
         draws, kfold, oos_metric, n_cpu, seed = make_inquiry(
             self.model_name,
             self.y,
@@ -2211,22 +2163,33 @@ class LRobust(BaseRobust):
             n_cpu,
             seed
         )
+
         self.seed = seed
         self.data = self.data.copy()
+
+        # Ensure a constant term in the design matrix
         self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+
+        # Validate modeling parameters
         self._validate_fit_args(
-        controls=controls,
-        group=group,
-        draws=draws,
-        kfold=kfold,
-        oos_metric=oos_metric,
-        n_cpu=n_cpu,
-        seed=seed,
-        valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse','cross-entropy','imv'],
-        threshold=threshold
+            controls=controls,
+            group=group,
+            draws=draws,
+            kfold=kfold,
+            oos_metric=oos_metric,
+            n_cpu=n_cpu,
+            seed=seed,
+            valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse', 'cross-entropy', 'imv'],
+            threshold=threshold
         )
+
+        # Set seed for reproducibility
         np.random.seed(self.seed)
+
+        # Store the selected out-of-sample evaluation metric
         self.oos_metric_name = oos_metric
+
+        # Log model configuration
         print(
             f"LRobust is running with n_cpu={n_cpu}, draws={draws}, "
             f"folds={kfold}, seed={seed}.\n"
@@ -2236,16 +2199,22 @@ class LRobust(BaseRobust):
             f"Let's begin the calculations..."
         )
 
+        # Default to using the full dataset size if sample_size is not provided
         if sample_size is None:
             sample_size = self.data.shape[0]
+
+        # Currently only supports one dependent variable for logistic regression
         if len(self.y) > 1:
-            raise NotImplementedError("Not implemented yet for logistic regression")
+            raise NotImplementedError("Not implemented yet for logistic regression")  # TODO: Add multi-y logistic support
+
         else:
-            space_n = space_size(controls)
+            space_n = space_size(controls)  # Number of control variable combinations
             specs = []
             all_predictors = []
             b_all_list = []
             p_all_list = []
+
+            # Initialize arrays to store model statistics across all control sets
             b_array = np.empty([space_n, draws])
             p_array = np.empty([space_n, draws])
             b_array_ystar = np.empty([space_n, draws])
@@ -2257,25 +2226,34 @@ class LRobust(BaseRobust):
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
+
+            # Preprocess data for SHAP values
             if group:
                 SHAP_comb = self.data[self.y + self.x + [group] + controls]
                 SHAP_comb = group_demean(SHAP_comb, group=group)
             else:
                 SHAP_comb = self.data[self.y + self.x + controls]
-            SHAP_comb = SHAP_comb.dropna()
-            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
 
-            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const']),
-                                                           SHAP_comb[self.y],
-                                                           test_size=0.2,
-                                                           random_state=self.seed
-                                                           )
+            SHAP_comb = SHAP_comb.dropna().reset_index(drop=True).copy()
+
+            # Split data for training and testing
+            x_train, x_test, y_train, _ = train_test_split(
+                SHAP_comb[self.x + controls].drop(columns=['const']),
+                SHAP_comb[self.y],
+                test_size=0.2,
+                random_state=self.seed
+            )
+
+            # Train logistic regression for SHAP explainability
             model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
             model.fit(x_train, y_train.squeeze())
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
+
+            # Loop through all subsets of control variables
             for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
 
+                # Subset the data according to the current control combination
                 if len(spec) == 0:
                     comb = self.data[self.y + self.x]
                 else:
@@ -2284,34 +2262,43 @@ class LRobust(BaseRobust):
                 if group:
                     comb = self.data[self.y + self.x + [group] + list(spec)]
 
-                comb = comb.dropna()
-                comb = comb.reset_index(drop=True).copy()
+                comb = comb.dropna().reset_index(drop=True).copy()
 
                 if group:
                     comb = group_demean(comb, group=group)
-                X_design = comb.drop(columns=comb.columns[0])
+
+                X_design = comb.drop(columns=comb.columns[0])  # Drop y column
                 self._check_colinearity(X_design)
+
+                # Estimate full-sample model metrics
                 (b_all, p_all, r2_i, ll_i,
-                 aic_i, bic_i, hqic_i,
-                 av_k_metric_i) = self._full_sample(comb, kfold=kfold, group=group, oos_metric_name=self.oos_metric_name)
+                aic_i, bic_i, hqic_i,
+                av_k_metric_i) = self._full_sample(
+                    comb,
+                    kfold=kfold,
+                    group=group,
+                    oos_metric_name=self.oos_metric_name
+                )
 
-                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
-                (b_list, p_list, r2_list,
-                 )= zip(*Parallel(n_jobs=n_cpu)
-                (delayed(self._strap_regression)
-                 (comb,
-                  group,
-                  sample_size,
-                  seed
-                  )
-                 for seed in seeds))
+                # Bootstrap sampling (parallelized)
+                seeds = np.random.randint(0, 2**32 - 1, size=draws, dtype=np.int64)
+                (b_list, p_list, r2_list) = zip(*Parallel(n_jobs=n_cpu)(
+                    delayed(self._strap_regression)(
+                        comb,
+                        group,
+                        sample_size,
+                        seed
+                    )
+                    for seed in seeds
+                ))
 
+                # Save results
                 specs.append(frozenset(spec))
                 all_predictors.append(self.x + list(spec))
                 b_array[index, :] = b_list
                 p_array[index, :] = p_list
-                b_array_ystar[index, :] = np.nan*len(b_list)
-                p_array_ystar[index, :] = np.nan*len(p_list)
+                b_array_ystar[index, :] = np.nan * len(b_list)
+                p_array_ystar[index, :] = np.nan * len(p_list)
                 r2_array[index, :] = r2_list
                 r2i_array[index] = r2_i
                 ll_array[index] = ll_i
@@ -2322,31 +2309,33 @@ class LRobust(BaseRobust):
                 b_all_list.append(b_all)
                 p_all_list.append(p_all)
 
-            self.results = OLSResult(y=self.y[0],
-                                x=self.x,
-                                data=self.data,
-                                specs=specs,
-                                all_predictors=all_predictors,
-                                controls=controls,
-                                draws=draws,
-                                kfold=kfold,
-                                all_b=b_all_list,
-                                all_p=p_all_list,
-                                estimates=b_array,
-                                p_values=p_array,
-                                estimates_ystar=b_array_ystar,
-                                p_values_ystar=p_array_ystar,
-                                r2_values=r2_array,
-                                r2i_array=r2i_array,
-                                ll_array=ll_array,
-                                aic_array=aic_array,
-                                bic_array=bic_array,
-                                hqic_array=hqic_array,
-                                av_k_metric_array=av_k_metric_array,
-                                model_name=self.model_name,
-                                name_av_k_metric=self.oos_metric_name,
-                                shap_return = shap_return
-                                )
+            # Store all modeling results in an OLSResult object
+            self.results = OLSResult(
+                y=self.y[0],
+                x=self.x,
+                data=self.data,
+                specs=specs,
+                all_predictors=all_predictors,
+                controls=controls,
+                draws=draws,
+                kfold=kfold,
+                all_b=b_all_list,
+                all_p=p_all_list,
+                estimates=b_array,
+                p_values=p_array,
+                estimates_ystar=b_array_ystar,
+                p_values_ystar=p_array_ystar,
+                r2_values=r2_array,
+                r2i_array=r2i_array,
+                ll_array=ll_array,
+                aic_array=aic_array,
+                bic_array=bic_array,
+                hqic_array=hqic_array,
+                av_k_metric_array=av_k_metric_array,
+                model_name=self.model_name,
+                name_av_k_metric=self.oos_metric_name,
+                shap_return=shap_return
+            )
 
     def _strap_regression(
         self,
