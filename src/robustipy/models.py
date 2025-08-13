@@ -306,7 +306,7 @@ def is_interactive() -> bool:
     return _running_in_jupyter() or _is_real_tty()
 
 # ───────────────────────────────────────────────────────────────────────────────
-#  (2) Revised make_inquiry: use three‐way branching
+#  Revised make_inquiry: use three‐way branching
 # ───────────────────────────────────────────────────────────────────────────────
 
 def make_inquiry(
@@ -546,24 +546,31 @@ def stouffer_method(
     p_combined : float
         Combined p-value.
     """
-    
+
+    # Convert p-values to array and clip to avoid infinite z-scores
     p = np.asarray(p_values, dtype=float)
 
     if eps is None:
-        eps = np.finfo(float).eps  # 2**-52 ≈ 2.22e-16, big enough for safety
+        eps = np.finfo(float).eps  # Safely above 0 for machine precision
+
     p = np.clip(p, eps, 1.0 - eps)
 
+    # Convert p-values to z-scores using the inverse survival function (1 - cdf)
     z = norm.isf(p)
 
     if weights is None:
+        # Unweighted combination
         Z = z.sum() / np.sqrt(len(z))
     else:
+        # Weighted combination
         w = np.asarray(weights, dtype=float)
         if w.shape != z.shape:
             raise ValueError("Weights and p_values must have same length")
         Z = np.dot(w, z) / np.linalg.norm(w)
 
+    # Convert combined Z back to p-value
     p_combined = norm.sf(Z)
+
     return Z, p_combined
 
 
