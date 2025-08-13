@@ -1639,27 +1639,280 @@ class OLSRobust(BaseRobust):
 
         # Delegate to single or multiple y logic
         if len(self.y) > 1:
-            return self._fit_multiple_y(
-                z_specs=z_specs,
-                space_n=space_n,
+            # Initialize containers to collect results across all composite outcomes
+            list_all_predictors = []
+            list_b_array = []
+            list_p_array = []
+            list_b_array_ystar = []
+            list_p_array_ystar = []
+            list_r2_array = []
+            list_r2i_array = []
+            list_ll_array = []
+            list_aic_array = []
+            list_bic_array = []
+            list_hqic_array = []
+            list_av_k_metric_array = []
+            y_names = []
+            specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
+            
+            # Loop over each composite y variable
+            for y, y_name in track(zip(self.y_composites,
+                                 self.y_specs), total=len(self.y_composites)):
+                
+                # Initialize arrays to store draws for this y-spec
+                b_array = np.empty([space_n, draws])
+                p_array = np.empty([space_n, draws])
+                b_array_ystar = np.empty([space_n, draws])
+                p_array_ystar = np.empty([space_n, draws])
+                r2_array = np.empty([space_n, draws])
+                r2i_array = np.empty([space_n])
+                ll_array = np.empty([space_n])
+                aic_array = np.empty([space_n])
+                bic_array = np.empty([space_n])
+                hqic_array = np.empty([space_n])
+                av_k_metric_array = np.empty([space_n])
+                
+                # Loop over all z-specs (control combinations)
+                for spec, index in zip(z_specs, range(0, space_n)):
+                    
+                    # Build dataframe with x + spec + optional group
+                    if len(spec) == 0:
+                        comb = self.data[self.x]
+                    else:
+                        comb = self.data[self.x + list(spec)]
+                    if group:
+                        comb = self.data[self.x + [group] + list(spec)]
+                        
+                    # Add the outcome column and clean
+                    comb = pd.concat([y, comb], axis=1)
+                    comb = comb.dropna()
+                    comb = comb.reset_index(drop=True).copy()
+
+                    # Demean by group if required
+                    if group:
+                        comb = group_demean(comb, group=group)
+                    X_design = comb.drop(columns=comb.columns[0])
+                    try:
+                        self._check_colinearity(X_design)
+                    except ValueError as e:
+                        warnings.warn(
+                            f"[OLSRobust] Spec {spec!r} may be unstable due to perfect collinearity:\n{e}\n"
+                            "Proceeding with pseudoinverse; coefficients may not be uniquely identified.",
+                            UserWarning
+                        )
+                        
+                    # Fit the full sample OLS mode
+                    (b_all, p_all, r2_i, ll_i,
+                     aic_i, bic_i, hqic_i,
+                     av_k_metric_i) = self._full_sample_OLS(comb,
+                                                            kfold=kfold,
+                                                            group=group,
+                                                            oos_metric_name=self.oos_metric_name)
+                    # Calculate pseudo-outcome residuals for bootstrap
+                    y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                    seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
+                    # Run bootstrap regressions in parallel
+                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
+                    (delayed(self._strap_OLS)
+                     (comb,
+                      group,
+                      sample_size,
+                      seed,
+                      y_star
+                      )
+                     for seed in seeds))
+                    
+                    # Collect and store results for this spec
+                    y_names.append(y_name)
+                    specs.append(frozenset(list(y_name) + list(spec)))
+                    all_predictors.append(self.x + list(spec))
+                    b_array[index, :] = b_list
+                    p_array[index, :] = p_list
+                    b_array_ystar[index, :] = b_list_ystar
+                    p_array_ystar[index, :] = p_list_ystar
+                    r2_array[index, :] = r2_list
+                    r2i_array[index] = r2_i
+                    ll_array[index] = ll_i
+                    aic_array[index] = aic_i
+                    bic_array[index] = bic_i
+                    hqic_array[index] = hqic_i
+                    av_k_metric_array[index] = av_k_metric_i
+                    b_all_list.append(b_all)
+                    p_all_list.append(p_all)
+
+                # Store arrays across all y-specs
+                list_all_predictors.append(all_predictors)
+                list_b_array.append(b_array)
+                list_p_array.append(p_array)
+                list_b_array_ystar.append(b_array_ystar)
+                list_p_array_ystar.append(p_array_ystar)
+                list_r2_array.append(r2_array)
+                list_r2i_array.append(r2i_array)
+                list_ll_array.append(ll_array)
+                list_aic_array.append(aic_array)
+                list_bic_array.append(bic_array)
+                list_hqic_array.append(hqic_array)
+                list_av_k_metric_array.append(av_k_metric_array)
+
+            # Assemble final result object across all composite outcomes
+            results = OLSResult(
+                y=y_names,
+                x=self.x,
+                data=self.data,
+                specs=specs,
+                all_predictors=list_all_predictors,
                 controls=controls,
-                group=group,
                 draws=draws,
                 kfold=kfold,
-                n_cpu=n_cpu,
-                sample_size=sample_size
+                all_b=b_all_list,
+                all_p=p_all_list,
+                estimates=np.vstack(list_b_array),
+                p_values=np.vstack(list_p_array),
+                estimates_ystar=np.vstack(list_b_array_ystar),
+                p_values_ystar=np.vstack(list_p_array_ystar),
+                r2_values=np.vstack(list_r2_array),
+                r2i_array=np.hstack(list_r2i_array),
+                ll_array=np.hstack(list_ll_array),
+                aic_array=np.hstack(list_aic_array),
+                bic_array=np.hstack(list_bic_array),
+                hqic_array=np.hstack(list_hqic_array),
+                av_k_metric_array=np.hstack(list_av_k_metric_array),
+                model_name=self.model_name,
+                name_av_k_metric=self.oos_metric_name,
+                shap_return=None
             )
+            self.results = results
+            
         else:
-            return self._fit_single_y(
-                z_specs=z_specs,
-                space_n=space_n,
-                controls=controls,
-                group=group,
-                draws=draws,
-                kfold=kfold,
-                n_cpu=n_cpu,
-                sample_size=sample_size
-            )
+            # Initialize containers for storing results across z-specs
+            specs = []
+            all_predictors = []
+            b_all_list = []
+            p_all_list = []
+            
+            # Preallocate arrays for bootstrap and model stats
+            b_array = np.empty([space_n, draws])
+            p_array = np.empty([space_n, draws])
+            b_array_ystar = np.empty([space_n, draws])
+            p_array_ystar = np.empty([space_n, draws])
+            r2_array = np.empty([space_n, draws])
+            r2i_array = np.empty([space_n])
+            ll_array = np.empty([space_n])
+            aic_array = np.empty([space_n])
+            bic_array = np.empty([space_n])
+            hqic_array = np.empty([space_n])
+            av_k_metric_array = np.empty([space_n])
+            
+            # Prepare SHAP dataset (includes y, x, z, and optional group)
+            if group:
+                SHAP_comb = self.data[self.y + self.x + [group] + controls]
+                SHAP_comb = group_demean(SHAP_comb, group=group)
+            else:
+                SHAP_comb = self.data[self.y + self.x + controls]
+            SHAP_comb = SHAP_comb.dropna()
+            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
+            
+            # Fit linear model for SHAP values
+            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
+                                                           SHAP_comb[self.y],
+                                                           test_size=0.2,
+                                                           random_state=self.seed
+                                                           )
+            model = sklearn.linear_model.LinearRegression()
+            model.fit(x_train, y_train)
+            
+            # Explain model predictions with SHAP
+            explainer = shap.LinearExplainer(model, x_train)
+            shap_return = [explainer.shap_values(x_test), x_test]
+            
+            # Loop over all z-specs (combinations of control variables)
+            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
+                if 0 == len(spec):
+                    comb = self.data[self.y + self.x]
+                else:
+                    comb = self.data[self.y + self.x + list(spec)]
+                if group:
+                    comb = self.data[self.y + self.x + [group] + list(spec)]
+
+                 # Clean combined dataset
+                comb = comb.dropna()
+                comb = comb.reset_index(drop=True).copy()
+                
+                # Demean by group if required
+                if group:
+                    comb = group_demean(comb, group=group)
+                
+                # Fit model on full sample
+                (b_all, p_all, r2_i, ll_i,
+                 aic_i, bic_i, hqic_i,
+                 av_k_metric_i) = self._full_sample_OLS(comb,
+                                                        kfold=kfold,
+                                                        group=group,
+                                                        oos_metric_name=self.oos_metric_name)
+                 
+                # Calculate pseudo-outcome residuals for bootstrapping
+                y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
+                
+                # Bootstrap OLS model draws in parallel
+                b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
+                (delayed(self._strap_OLS)
+                 (comb,
+                  group,
+                  sample_size,
+                  seed,
+                  y_star)
+                 for seed in seeds))
+                
+                # Store results for current spec
+                specs.append(frozenset(spec))
+                all_predictors.append(self.x + list(spec))
+                b_array[index, :] = b_list
+                p_array[index, :] = p_list
+                b_array_ystar[index, :] = b_list_ystar
+                p_array_ystar[index, :] = p_list_ystar
+                r2_array[index, :] = r2_list
+                r2i_array[index] = r2_i
+                ll_array[index] = ll_i
+                aic_array[index] = aic_i
+                bic_array[index] = bic_i
+                hqic_array[index] = hqic_i
+                av_k_metric_array[index] = av_k_metric_i
+                b_all_list.append(b_all)
+                p_all_list.append(p_all)
+                
+            # Assemble final results object
+            results = OLSResult(y=self.y[0],
+                                x=self.x[0],
+                                data=self.data,
+                                specs=specs,
+                                all_predictors=all_predictors,
+                                controls=controls,
+                                draws=draws,
+                                kfold=kfold,
+                                all_b=b_all_list,
+                                all_p=p_all_list,
+                                estimates=b_array,
+                                p_values=p_array,
+                                estimates_ystar=b_array_ystar,
+                                p_values_ystar=p_array_ystar,
+                                r2_values=r2_array,
+                                r2i_array=r2i_array,
+                                ll_array=ll_array,
+                                aic_array=aic_array,
+                                bic_array=bic_array,
+                                hqic_array=hqic_array,
+                                av_k_metric_array=av_k_metric_array,
+                                model_name=self.model_name,
+                                name_av_k_metric=self.oos_metric_name,
+                                shap_return=shap_return)
+            self.results = results
+
+
+
     def _predict(
         self,
         x_test: np.ndarray,
