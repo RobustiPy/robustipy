@@ -1639,6 +1639,7 @@ class OLSRobust(BaseRobust):
 
         # Delegate to single or multiple y logic
         if len(self.y) > 1:
+            z_specs = list(z_specs)
             # Initialize containers to collect results across all composite outcomes
             list_all_predictors = []
             list_b_array = []
