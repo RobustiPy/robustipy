@@ -21,7 +21,7 @@ def sim1(project_name):
 
     # 4. Fit robust OLS with cross‐validation
     vanilla_obj = OLSRobust(y=["y1"], x=["x1"], data=df)
-    vanilla_obj.fit(controls=z, draws=1000, kfold=10, n_cpu=32, seed=192735)
+    vanilla_obj.fit(controls=z, draws=1000, kfold=10, seed=192735)
 
     # 5. Retrieve and plot results
     vanilla_res = vanilla_obj.get_results()
