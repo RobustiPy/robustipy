@@ -523,53 +523,125 @@ def make_inquiry(
 
 def stouffer_method(
     p_values: Sequence[float],
-    weights: Optional[Sequence[float]] = None,
-    eps: Optional[float] = None,
+    *,
+    two_sided: bool = True,
+    betas: Optional[Sequence[float]] = None,   # required if two_sided=True (for direction)
+    weights: Optional[Sequence[float]] = None, # optional Stouffer weights
+    rho: Optional[float] = None,               # optional common correlation among z's
+    Sigma: Optional[np.ndarray] = None,        # optional full covariance of z; overrides rho
+    clip_floor: Optional[float] = None,        # default: subnormal nextafter(0,1)
+    na_action: str = "omit"                    # {"omit","raise"} for invalid p’s
 ) -> Tuple[float, float]:
-    """
-    Combine p-values using Stouffer's Z-method, guarding against ±∞.
+    r"""
+    Combine p-values via Stouffer’s Z-method.
 
-    Parameters
-    ----------
-    p_values : sequence of float
-        Iterable of individual p-values.
-    weights : sequence of float, optional
-        Stouffer weights. If None, performs unweighted combination.
-    eps : float, optional
-        Positive clipping constant.  Default is the smallest positive
-        normal IEEE-754 double (≈2.22e-308).
+    Inputs
+    ------
+    p_values : array-like of shape (m,)
+        Individual p-values (typically two-sided from regression t-tests).
+    two_sided : bool, default True
+        If True, interpret `p_values` as two-sided and convert to directional
+        one-sided p-values using the signs of `betas`. If False, `p_values`
+        are treated as already one-sided (upper-tail).
+    betas : array-like, required if two_sided=True
+        Estimated coefficients; only their signs are used to orient direction.
+        For \hat\beta_i > 0, set p_i^{(1)} = p_i^{(2)}/2;
+        for \hat\beta_i < 0, set p_i^{(1)} = 1 - p_i^{(2)}/2.
+    weights : array-like, optional
+        Stouffer weights w. With independent tests,
+        Z = (w^T z) / sqrt(w^T w). If None, use unit weights.
+    rho : float in (-1/(m-1), 1), optional
+        Common correlation under an equal-correlation model. If provided,
+        Var(w^T z) = (1-ρ)||w||^2 + ρ(1^T w)^2.
+    Sigma : ndarray (m×m), optional
+        Full covariance of z; overrides `rho` if given.
+    clip_floor : float in (0, 1/2), optional
+        Probability floor to avoid ±∞ transforms. Default is the smallest
+        subnormal float > 0: np.nextafter(0.0, 1.0).
+    na_action : {"omit","raise"}, default "omit"
+        How to handle NaN/out-of-range p-values.
 
     Returns
     -------
     Z : float
         Combined Z-score.
     p_combined : float
-        Combined p-value.
+        One-sided combined p-value, p = sf(Z).
+
+    Notes
+    -----
+    - Mapping p -> z:
+        * one-sided: z_i = Φ^{-1}(1 - p_i)
+        * two-sided with direction (using sign(β_i)):
+              z_i = sign(β_i) * Φ^{-1}(1 - p_i/2).
+    - Independence corresponds to Σ = I. If tests are dependent and Σ or ρ
+      is known/estimated, the correct denominator is sqrt(w^T Σ w).
     """
+    p = np.asarray(p_values, dtype=np.float64)
 
-    # Convert p-values to array and clip to avoid infinite z-scores
-    p = np.asarray(p_values, dtype=float)
+    # 1) Validate and keep only finite in-range p’s (optionally raise)
+    valid = np.isfinite(p) & (0.0 <= p) & (p <= 1.0)
+    if not valid.all():
+        if na_action == "raise":
+            bad_idx = np.where(~valid)[0].tolist()
+            raise ValueError(f"Invalid p-values at indices {bad_idx}.")
+        p = p[valid]
+        if p.size == 0:
+            raise ValueError("No valid p-values to combine after omitting invalid entries.")
 
-    if eps is None:
-        eps = np.finfo(float).eps  # Safely above 0 for machine precision
+    m = p.size
 
-    p = np.clip(p, eps, 1.0 - eps)
+    # 2) Determine probability floor and clip away from {0,1}
+    if clip_floor is None:
+        # Smallest subnormal > 0 avoids ±inf z; more protective than np.finfo(float).tiny
+        clip_floor = np.nextafter(0.0, 1.0)
+    p = np.clip(p, clip_floor, 1.0 - clip_floor)
 
-    # Convert p-values to z-scores using the inverse survival function (1 - cdf)
-    z = norm.isf(p)
-
-    if weights is None:
-        # Unweighted combination
-        Z = z.sum() / np.sqrt(len(z))
+    # 3) Map to z-scores
+    if two_sided:
+        if betas is None:
+            raise ValueError("`betas` must be provided when two_sided=True to recover direction.")
+        s = np.asarray(betas, dtype=np.float64)
+        s = s[valid] if s.size != len(p_values) else s
+        if s.shape != p.shape:
+            raise ValueError("`betas` length must match the number of valid p-values.")
+        # sign in {+1, -1}; zeros get sign 0 → they contribute z=0 (conservative)
+        signs = np.sign(s)
+        z = signs * norm.isf(p / 2.0)  # directional two-sided → one-sided z
     else:
-        # Weighted combination
-        w = np.asarray(weights, dtype=float)
-        if w.shape != z.shape:
-            raise ValueError("Weights and p_values must have same length")
-        Z = np.dot(w, z) / np.linalg.norm(w)
+        z = norm.isf(p)  # already one-sided p’s (upper tail)
 
-    # Convert combined Z back to p-value
-    p_combined = norm.sf(Z)
+    # 4) Weights
+    if weights is None:
+        w = np.ones(m, dtype=np.float64)
+    else:
+        w = np.asarray(weights, dtype=np.float64)
+        w = w[valid] if w.size != len(p_values) else w
+        if w.shape != (m,):
+            raise ValueError("`weights` must have the same length as valid p-values.")
+        if not np.all(np.isfinite(w)):
+            raise ValueError("`weights` must be finite.")
+        if not np.any(w != 0):
+            raise ValueError("At least one weight must be nonzero.")
+
+    # 5) Denominator under dependence: sqrt(w^T Σ w)
+    if Sigma is not None:
+        Sigma = np.asarray(Sigma, dtype=np.float64)
+        if Sigma.shape != (m, m):
+            raise ValueError("`Sigma` must be an (m×m) covariance matrix for m valid p-values.")
+        denom2 = float(w @ (Sigma @ w))
+    elif rho is not None:
+        # Equal-correlation Σ = (1-ρ)I + ρ 11^T ⇒ w^T Σ w = (1-ρ)||w||^2 + ρ (1^T w)^2
+        denom2 = (1.0 - rho) * float(w @ w) + rho * float(np.sum(w))**2
+    else:
+        denom2 = float(w @ w)
+
+    if not np.isfinite(denom2) or denom2 <= 0.0:
+        raise ValueError("Nonpositive/nonfinite variance under supplied weights/covariance.")
+
+    # 6) Combined statistic and p-value
+    Z = float(np.dot(w, z) / np.sqrt(denom2))
+    p_combined = float(norm.sf(Z))  # one-sided combined p
 
     return Z, p_combined
 
@@ -1059,7 +1131,14 @@ class OLSResult(Protoresult):
             ((self.estimates_ystar.lt(0) & self.p_values_ystar.lt(0.05)).sum(axis=0) >
             (df_model_result['negative_beta'] & df_model_result['significant']).sum()).mean()
         )
-        self.inference['Stouffers'] = stouffer_method(df_model_result['p_values'])
+        Z, p_comb = stouffer_method(
+            df_model_result['p_values'].to_numpy(),
+            two_sided=True,
+            betas=df_model_result['betas'].to_numpy(),  # provides direction
+            # weights=...,                               # optional
+            # rho=... or Sigma=...,                      # optional dependence model
+        )
+        self.inference['Stouffers'] = (Z, p_comb)
 
 
     def summary(self, digits=3) -> None:
