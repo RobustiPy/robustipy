@@ -1022,6 +1022,22 @@ class OLSResult(Protoresult):
             return _pickle.load(f)
 
 
+    def _empirical_p_two_sided(null_samples: np.ndarray, observed: float) -> float:
+        """
+        Two-sided Monte Carlo p-value for scalar statistic T.
+        p = 2 * min( P(T* >= T_obs), P(T* <= T_obs) ), clipped at 1.
+
+        Uses the empirical distribution of null_samples (finite values only).
+        """
+        t = np.asarray(null_samples, dtype=float)
+        t = t[np.isfinite(t)]
+        if t.size == 0:
+            return np.nan
+        p_hi = np.mean(t >= observed)
+        p_lo = np.mean(t <= observed)
+        return float(min(1.0, 2.0 * min(p_hi, p_lo)))
+
+
     def _compute_inference(self) -> pd.DataFrame:
         """
         Compute summary statistics of the bootstrap coefficient distribution.
@@ -1072,10 +1088,12 @@ class OLSResult(Protoresult):
             else:
                 self.inference[ic + '_average'] = np.nan
 
-        self.inference['median_p'] = (
-            np.nan if not inference else
-            (self.estimates_ystar.median(axis=0) > df_model_result['betas'].median()).mean()
-        )
+        obs_med = float(df_model_result['betas'].median())
+        null_meds = self.estimates_ystar.median(axis=0).to_numpy()
+
+        # two-sided via absolute value
+        self.inference['median_p'] = float(np.mean(np.abs(null_meds) >= abs(obs_med)))
+
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
         self.inference['max_ns'] = df_model_result['betas'].max()
@@ -1085,26 +1103,31 @@ class OLSResult(Protoresult):
         self.inference['pos_prop_ns'] = df_model_result['positive_beta'].mean()
         self.inference['pos'] = (self.estimates > 0.0).sum().sum()
         self.inference['pos_prop'] = (self.estimates > 0.0).mean().mean()
-        self.inference['pos_p'] = (
-            np.nan if not inference else
-            ((self.estimates_ystar.gt(0).sum(axis=0) > df_model_result['positive_beta'].sum()).mean())
-        )
         self.inference['neg_ns'] = df_model_result['negative_beta'].sum()
         self.inference['neg_prop_ns'] = df_model_result['negative_beta'].mean()
         self.inference['neg'] = (self.estimates < 0.0).sum().sum()
         self.inference['neg_prop'] = (self.estimates < 0.0).mean().mean()
-        self.inference['neg_p'] = (
-            np.nan if not inference else
-            (self.estimates_ystar.lt(0).sum(axis=0) > df_model_result['negative_beta'].sum()).mean()
-        )
+
+        # observed counts
+        obs_pos = int((df_model_result['betas'] > 0).sum())
+        obs_neg = int((df_model_result['betas'] < 0).sum())
+
+        # null counts per null draw (across specs)
+        null_pos = self.estimates_ystar.gt(0).sum(axis=0).to_numpy()
+        null_neg = self.estimates_ystar.lt(0).sum(axis=0).to_numpy()
+
+        self.inference['pos_p'] = _empirical_p_two_sided(null_pos, obs_pos)
+        self.inference['neg_p'] = _empirical_p_two_sided(null_neg, obs_neg)
         self.inference['sig_ns'] = df_model_result['significant'].sum()
         self.inference['sig_prop_ns'] = df_model_result['significant'].mean()
         self.inference['sig'] = (self.p_values.stack() < 0.05).sum().sum()
         self.inference['sig_prop'] = (self.p_values.stack() < 0.05).mean().mean()
-        self.inference['sig_p'] = (
-            np.nan if not inference else
-            (self.p_values_ystar.lt(0.05).sum(axis=0) > df_model_result['significant'].sum()).mean()
-        )
+
+        alpha = 0.05
+        obs_sig = int((self.p_values.stack() < alpha).sum())
+        null_sig = self.p_values_ystar.lt(alpha).sum(axis=0).to_numpy()
+        self.inference['sig_p'] = _empirical_p_two_sided(null_sig, obs_sig)
+
         self.inference['pos_sig_ns'] = (df_model_result['positive_beta'] &
                                      df_model_result['significant']).sum()
         self.inference['pos_sig_prop_ns'] = (df_model_result['positive_beta'] &
@@ -1113,11 +1136,6 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['pos_sig_prop'] = ((self.estimates > 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        self.inference['pos_sig_p'] = (
-            np.nan if not inference else
-            ((self.estimates_ystar.gt(0) & self.p_values_ystar.lt(0.05)).sum(axis=0) >
-            (df_model_result['positive_beta'] & df_model_result['significant']).sum()).mean()
-        )
         self.inference['neg_sig_ns'] = (df_model_result['negative_beta'] &
                                         df_model_result['significant']).sum()
         self.inference['neg_sig_prop_ns'] = (df_model_result['negative_beta'] &
@@ -1126,12 +1144,17 @@ class OLSResult(Protoresult):
                                      (self.p_values < 0.05)).sum().sum()
         self.inference['neg_sig_prop'] = ((self.estimates < 0.0) &
                                           (self.p_values < 0.05)).mean().mean()
-        self.inference['neg_sig_p'] = (
-            np.nan if not inference else
-            ((self.estimates_ystar.lt(0) & self.p_values_ystar.lt(0.05)).sum(axis=0) >
-            (df_model_result['negative_beta'] & df_model_result['significant']).sum()).mean()
-        )
-        Z, p_comb = stouffer_method(
+
+        obs_pos_sig = int(((self.estimates > 0.0) & (self.p_values < alpha)).sum().sum())
+        obs_neg_sig = int(((self.estimates < 0.0) & (self.p_values < alpha)).sum().sum())
+        null_pos_sig = ((self.estimates_ystar.gt(0) & self.p_values_ystar.lt(alpha))
+                        .sum(axis=0).to_numpy())
+        null_neg_sig = ((self.estimates_ystar.lt(0) & self.p_values_ystar.lt(alpha))
+                        .sum(axis=0).to_numpy())
+        self.inference['pos_sig_p'] = _empirical_p_two_sided(null_pos_sig, obs_pos_sig)
+        self.inference['neg_sig_p'] = _empirical_p_two_sided(null_neg_sig, obs_neg_sig)
+
+Z, p_comb = stouffer_method(
             df_model_result['p_values'].to_numpy(),
             two_sided=True,
             betas=df_model_result['betas'].to_numpy(),  # provides direction
