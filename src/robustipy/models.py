@@ -522,128 +522,115 @@ def make_inquiry(
 
 
 def stouffer_method(
-    p_values: Sequence[float],
+    p_values,
     *,
-    two_sided: bool = True,
-    betas: Optional[Sequence[float]] = None,   # required if two_sided=True (for direction)
-    weights: Optional[Sequence[float]] = None, # optional Stouffer weights
-    rho: Optional[float] = None,               # optional common correlation among z's
-    Sigma: Optional[np.ndarray] = None,        # optional full covariance of z; overrides rho
-    clip_floor: Optional[float] = None,        # default: subnormal nextafter(0,1)
-    na_action: str = "omit"                    # {"omit","raise"} for invalid p’s
-) -> Tuple[float, float]:
-    r"""
-    Combine p-values via Stouffer’s Z-method.
-
-    Inputs
-    ------
-    p_values : array-like of shape (m,)
-        Individual p-values (typically two-sided from regression t-tests).
-    two_sided : bool, default True
-        If True, interpret `p_values` as two-sided and convert to directional
-        one-sided p-values using the signs of `betas`. If False, `p_values`
-        are treated as already one-sided (upper-tail).
-    betas : array-like, required if two_sided=True
-        Estimated coefficients; only their signs are used to orient direction.
-        For \hat\beta_i > 0, set p_i^{(1)} = p_i^{(2)}/2;
-        for \hat\beta_i < 0, set p_i^{(1)} = 1 - p_i^{(2)}/2.
-    weights : array-like, optional
-        Stouffer weights w. With independent tests,
-        Z = (w^T z) / sqrt(w^T w). If None, use unit weights.
-    rho : float in (-1/(m-1), 1), optional
-        Common correlation under an equal-correlation model. If provided,
-        Var(w^T z) = (1-ρ)||w||^2 + ρ(1^T w)^2.
-    Sigma : ndarray (m×m), optional
-        Full covariance of z; overrides `rho` if given.
-    clip_floor : float in (0, 1/2), optional
-        Probability floor to avoid ±∞ transforms. Default is the smallest
-        subnormal float > 0: np.nextafter(0.0, 1.0).
-    na_action : {"omit","raise"}, default "omit"
-        How to handle NaN/out-of-range p-values.
-
-    Returns
-    -------
-    Z : float
-        Combined Z-score.
-    p_combined : float
-        One-sided combined p-value, p = sf(Z).
-
-    Notes
-    -----
-    - Mapping p -> z:
-        * one-sided: z_i = Φ^{-1}(1 - p_i)
-        * two-sided with direction (using sign(β_i)):
-              z_i = sign(β_i) * Φ^{-1}(1 - p_i/2).
-    - Independence corresponds to Σ = I. If tests are dependent and Σ or ρ
-      is known/estimated, the correct denominator is sqrt(w^T Σ w).
+    two_sided=True,
+    betas=None,                 # required if two_sided=True (for direction)
+    weights=None,               # optional Stouffer weights
+    rho=None,                   # optional common correlation among z's
+    Sigma=None,                 # optional full covariance of z; overrides rho
+    clip_floor=1e-300,          # must be >= np.finfo(float).tiny
+    na_action="omit"
+):
     """
-    p = np.asarray(p_values, dtype=np.float64)
+    Combine p-values via Stouffer's Z-method with numerical safeguards.
+    Returns (Z, p_one_sided) where p_one_sided = sf(Z).
+    """
+    import numpy as np
+    from scipy.stats import norm
 
-    # 1) Validate and keep only finite in-range p’s (optionally raise)
-    valid = np.isfinite(p) & (0.0 <= p) & (p <= 1.0)
+    # ---- 0) inputs to arrays
+    p_all = np.asarray(p_values, dtype=np.float64)
+
+    # ---- 1) validate p and optionally omit invalid
+    valid = np.isfinite(p_all) & (p_all >= 0.0) & (p_all <= 1.0)
     if not valid.all():
         if na_action == "raise":
-            bad_idx = np.where(~valid)[0].tolist()
-            raise ValueError(f"Invalid p-values at indices {bad_idx}.")
-        p = p[valid]
+            bad = np.where(~valid)[0].tolist()
+            raise ValueError(f"Invalid p-values at indices {bad}.")
+        p = p_all[valid]
         if p.size == 0:
-            raise ValueError("No valid p-values to combine after omitting invalid entries.")
-
+            raise ValueError("No valid p-values after filtering.")
+    else:
+        p = p_all
     m = p.size
 
-    # 2) Determine probability floor and clip away from {0,1}
-    if clip_floor is None:
-        # Smallest subnormal > 0 avoids ±inf z; more protective than np.finfo(float).tiny
-        clip_floor = np.nextafter(0.0, 1.0)
-    p = np.clip(p, clip_floor, 1.0 - clip_floor)
-
-    # 3) Map to z-scores
+    # ---- 2) prepare aligned betas / weights (after omission)
     if two_sided:
         if betas is None:
-            raise ValueError("`betas` must be provided when two_sided=True to recover direction.")
-        s = np.asarray(betas, dtype=np.float64)
-        s = s[valid] if s.size != len(p_values) else s
-        if s.shape != p.shape:
+            raise ValueError("`betas` must be provided when two_sided=True.")
+        b_all = np.asarray(betas, dtype=np.float64)
+        b = b_all[valid] if b_all.shape != p_all.shape else b_all
+        if b.shape != p.shape:
             raise ValueError("`betas` length must match the number of valid p-values.")
-        # sign in {+1, -1}; zeros get sign 0 → they contribute z=0 (conservative)
-        signs = np.sign(s)
-        z = signs * norm.isf(p / 2.0)  # directional two-sided → one-sided z
+        signs = np.sign(b)  # zeros give sign 0 -> z=0
     else:
-        z = norm.isf(p)  # already one-sided p’s (upper tail)
+        signs = None
 
-    # 4) Weights
     if weights is None:
         w = np.ones(m, dtype=np.float64)
     else:
-        w = np.asarray(weights, dtype=np.float64)
-        w = w[valid] if w.size != len(p_values) else w
+        w_all = np.asarray(weights, dtype=np.float64)
+        w = w_all[valid] if w_all.shape != p_all.shape else w_all
         if w.shape != (m,):
             raise ValueError("`weights` must have the same length as valid p-values.")
         if not np.all(np.isfinite(w)):
             raise ValueError("`weights` must be finite.")
-        if not np.any(w != 0):
+        if not np.any(w != 0.0):
             raise ValueError("At least one weight must be nonzero.")
 
-    # 5) Denominator under dependence: sqrt(w^T Σ w)
+    # ---- 3) clip p away from {0,1} at a safe floor/ceiling
+    floor_min = np.finfo(float).tiny
+    if clip_floor is None or not np.isfinite(clip_floor) or clip_floor <= 0.0:
+        clip_floor = floor_min
+    else:
+        clip_floor = max(float(clip_floor), floor_min)
+    clip_ceiling = 1.0 - 1e-16
+
+    n_zeros = int(np.sum(p == 0.0))
+    n_ones  = int(np.sum(p == 1.0))
+    if n_zeros or n_ones:
+        print(f"WARNING: clipping {n_zeros} p=0 and {n_ones} p=1 to "
+              f"[{clip_floor:g}, {clip_ceiling:g}].")
+    p = np.clip(p, clip_floor, clip_ceiling)
+
+    # ---- 4) map to z-scores (two-sided with direction vs one-sided)
+    if two_sided:
+        z = signs * norm.isf(p / 2.0)
+    else:
+        z = norm.isf(p)
+
+    # Guard against any residual inf/-inf due to extreme p
+    if not np.all(np.isfinite(z)):
+        # Numerical cap: Φ^{-1}(1 - 5e-300) ≈ 37
+        Z_MAX = 37.0
+        print("WARNING: non-finite z encountered; clipping z to ±37.")
+        z = np.clip(z, -Z_MAX, Z_MAX)
+
+    # ---- 5) variance denominator under dependence
     if Sigma is not None:
         Sigma = np.asarray(Sigma, dtype=np.float64)
         if Sigma.shape != (m, m):
-            raise ValueError("`Sigma` must be an (m×m) covariance matrix for m valid p-values.")
+            raise ValueError("`Sigma` must be an (m×m) covariance for the valid tests.")
         denom2 = float(w @ (Sigma @ w))
     elif rho is not None:
-        # Equal-correlation Σ = (1-ρ)I + ρ 11^T ⇒ w^T Σ w = (1-ρ)||w||^2 + ρ (1^T w)^2
+        rho = float(rho)
+        if not (-1.0/(m-1) < rho < 1.0):
+            raise ValueError(f"`rho` must lie in (-1/(m-1), 1); got {rho}.")
+        # Equal-correlation Σ = (1-ρ)I + ρ 11^T
         denom2 = (1.0 - rho) * float(w @ w) + rho * float(np.sum(w))**2
     else:
         denom2 = float(w @ w)
 
     if not np.isfinite(denom2) or denom2 <= 0.0:
-        raise ValueError("Nonpositive/nonfinite variance under supplied weights/covariance.")
+        raise ValueError("Nonpositive or nonfinite variance under supplied Σ/ρ/weights.")
 
-    # 6) Combined statistic and p-value
+    # ---- 6) combined statistic and one-sided p
     Z = float(np.dot(w, z) / np.sqrt(denom2))
-    p_combined = float(norm.sf(Z))  # one-sided combined p
+    p_combined = float(norm.sf(Z))
 
     return Z, p_combined
+
 
 
 class MergedResult(Protoresult):
@@ -882,6 +869,22 @@ class OLSResult(Protoresult):
         Optional SHAP values and the matrix they came from.
     """
 
+    @staticmethod
+    def _empirical_p_two_sided(null_samples: np.ndarray, observed: float) -> float:
+        """
+        Two-sided Monte Carlo p-value for scalar statistic T.
+        p = 2 * min( P(T* >= T_obs), P(T* <= T_obs) ), clipped at 1.
+        Uses finite entries of null_samples.
+        """
+        t = np.asarray(null_samples, dtype=float)
+        t = t[np.isfinite(t)]
+        if t.size == 0:
+            return np.nan
+        p_hi = np.mean(t >= observed)
+        p_lo = np.mean(t <= observed)
+        return float(min(1.0, 2.0 * min(p_hi, p_lo)))
+
+
     def __init__(
         self,
         *,
@@ -1022,22 +1025,6 @@ class OLSResult(Protoresult):
             return _pickle.load(f)
 
 
-    def _empirical_p_two_sided(null_samples: np.ndarray, observed: float) -> float:
-        """
-        Two-sided Monte Carlo p-value for scalar statistic T.
-        p = 2 * min( P(T* >= T_obs), P(T* <= T_obs) ), clipped at 1.
-
-        Uses the empirical distribution of null_samples (finite values only).
-        """
-        t = np.asarray(null_samples, dtype=float)
-        t = t[np.isfinite(t)]
-        if t.size == 0:
-            return np.nan
-        p_hi = np.mean(t >= observed)
-        p_lo = np.mean(t <= observed)
-        return float(min(1.0, 2.0 * min(p_hi, p_lo)))
-
-
     def _compute_inference(self) -> pd.DataFrame:
         """
         Compute summary statistics of the bootstrap coefficient distribution.
@@ -1116,8 +1103,8 @@ class OLSResult(Protoresult):
         null_pos = self.estimates_ystar.gt(0).sum(axis=0).to_numpy()
         null_neg = self.estimates_ystar.lt(0).sum(axis=0).to_numpy()
 
-        self.inference['pos_p'] = _empirical_p_two_sided(null_pos, obs_pos)
-        self.inference['neg_p'] = _empirical_p_two_sided(null_neg, obs_neg)
+        self.inference['pos_p'] = self.__class__._empirical_p_two_sided(null_pos, obs_pos)
+        self.inference['neg_p'] = self.__class__._empirical_p_two_sided(null_neg, obs_neg)
         self.inference['sig_ns'] = df_model_result['significant'].sum()
         self.inference['sig_prop_ns'] = df_model_result['significant'].mean()
         self.inference['sig'] = (self.p_values.stack() < 0.05).sum().sum()
@@ -1126,7 +1113,7 @@ class OLSResult(Protoresult):
         alpha = 0.05
         obs_sig = int((self.p_values.stack() < alpha).sum())
         null_sig = self.p_values_ystar.lt(alpha).sum(axis=0).to_numpy()
-        self.inference['sig_p'] = _empirical_p_two_sided(null_sig, obs_sig)
+        self.inference['sig_p'] = self.__class__._empirical_p_two_sided(null_sig, obs_sig)
 
         self.inference['pos_sig_ns'] = (df_model_result['positive_beta'] &
                                      df_model_result['significant']).sum()
@@ -1151,16 +1138,16 @@ class OLSResult(Protoresult):
                         .sum(axis=0).to_numpy())
         null_neg_sig = ((self.estimates_ystar.lt(0) & self.p_values_ystar.lt(alpha))
                         .sum(axis=0).to_numpy())
-        self.inference['pos_sig_p'] = _empirical_p_two_sided(null_pos_sig, obs_pos_sig)
-        self.inference['neg_sig_p'] = _empirical_p_two_sided(null_neg_sig, obs_neg_sig)
+        self.inference['pos_sig_p'] = self.__class__._empirical_p_two_sided(null_pos_sig, obs_pos_sig)
+        self.inference['neg_sig_p'] = self.__class__._empirical_p_two_sided(null_neg_sig, obs_neg_sig)
 
-Z, p_comb = stouffer_method(
-            df_model_result['p_values'].to_numpy(),
-            two_sided=True,
-            betas=df_model_result['betas'].to_numpy(),  # provides direction
-            # weights=...,                               # optional
-            # rho=... or Sigma=...,                      # optional dependence model
-        )
+        Z, p_comb = stouffer_method(
+                    df_model_result['p_values'].to_numpy(),
+                    two_sided=True,
+                    betas=df_model_result['betas'].to_numpy(),  # provides direction
+                    # weights=...,                               # optional
+                    # rho=... or Sigma=...,                      # optional dependence model
+                )
         self.inference['Stouffers'] = (Z, p_comb)
 
 
