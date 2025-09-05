@@ -871,17 +871,13 @@ class OLSResult(Protoresult):
 
     @staticmethod
     def _empirical_p_two_sided(null_samples: np.ndarray, observed: float) -> float:
-        """
-        Two-sided Monte Carlo p-value for scalar statistic T.
-        p = 2 * min( P(T* >= T_obs), P(T* <= T_obs) ), clipped at 1.
-        Uses finite entries of null_samples.
-        """
         t = np.asarray(null_samples, dtype=float)
         t = t[np.isfinite(t)]
         if t.size == 0:
             return np.nan
-        p_hi = np.mean(t >= observed)
-        p_lo = np.mean(t <= observed)
+        n = t.size
+        p_hi = (np.sum(t >= observed) + 1) / (n + 1)
+        p_lo = (np.sum(t <= observed) + 1) / (n + 1)
         return float(min(1.0, 2.0 * min(p_hi, p_lo)))
 
 
@@ -1148,7 +1144,9 @@ class OLSResult(Protoresult):
                     # weights=...,                               # optional
                     # rho=... or Sigma=...,                      # optional dependence model
                 )
-        self.inference['Stouffers'] = (Z, p_comb)
+        log_p_two = np.log(2.0) + norm.logsf(abs(Z))
+        p_two = float(np.exp(log_p_two))  # identical to 2*sf(|Z|) but stable
+        self.inference['Stouffers'] = (Z, p_two)
 
 
     def summary(self, digits=3) -> None:
@@ -1182,55 +1180,71 @@ class OLSResult(Protoresult):
         print_separator("2.Model Robustness Metrics")
         print('2.1 Inference Metrics')
         print_separator()
+
+        # Medians / extrema
         if not inference:
-            print(f"Median beta (all specifications, no resampling): {round(self.inference['median_ns'], digits)}")
+            print(f"Median β (specs, no resampling): {self.inference['median_ns']:.{digits}f}")
         else:
-            print(f"Median beta (all specifications, no resampling): {round(self.inference['median_ns'], digits)} (p-value: {round(self.inference['median_p'], digits)})")
-        print(f"Median beta (all bootstraps and specifications): {round(self.inference['median'], digits)}")
+            print(f"Median β (specs, no resampling): {self.inference['median_ns']:.{digits}f} "
+                  f"(null-calibrated p: {self.inference['median_p']:.{digits}g})")
+        print(f"Median β (bootstraps × specs): {self.inference['median']:.{digits}f}")
 
-        print(f"Min beta (all specifications, no resampling): {round(self.inference['min_ns'], digits)}")
-        print(f"Min beta (all bootstraps and specifications): {round(self.inference['min'], digits)}")
+        print(f"Min β (specs, no resampling): {self.inference['min_ns']:.{digits}f}")
+        print(f"Min β (bootstraps × specs): {self.inference['min']:.{digits}f}")
 
-        print(f"Max beta (all specifications, no resampling): {round(self.inference['max_ns'], digits)}")
-        print(f"Max beta (all bootstraps and specifications): {round(self.inference['max'], digits)}")
-        if self.inference['aic_average'] is not np.nan:
-            print(f"AIC-weighted beta (all specifications, no resampling): {round(self.inference['aic_average'], digits)}")
-        if self.inference['bic_average'] is not np.nan:
-            print(f"BIC-weighted beta (all specifications, no resampling): {round(self.inference['bic_average'], digits)}")
-        if self.inference['hqic_average'] is not np.nan:
-            print(f"HQIC-weighted beta (all specifications, no resampling): {round(self.inference['hqic_average'], digits)}")
+        print(f"Max β (specs, no resampling): {self.inference['max_ns']:.{digits}f}")
+        print(f"Max β (bootstraps × specs): {self.inference['max']:.{digits}f}")
 
-        if not inference:
-            print(f"Significant portion of beta (all specifications, no resampling): {round(self.inference['sig_prop_ns'], digits)}")
-        else:
-            print(f"Significant portion of beta (all specifications, no resampling): {round(self.inference['sig_prop_ns'], digits)} (p-value: {round(self.inference['sig_p'], digits)})")
-        print(f"Significant portion of beta (all bootstraps and specifications): {round(self.inference['sig_prop'], digits)}")
+        # IC-weighted averages (fix NaN checks)
+        if not np.isnan(self.inference.get('aic_average', np.nan)):
+            print(f"AIC-weighted β (specs, no resampling): {self.inference['aic_average']:.{digits}f}")
+        if not np.isnan(self.inference.get('bic_average', np.nan)):
+            print(f"BIC-weighted β (specs, no resampling): {self.inference['bic_average']:.{digits}f}")
+        if not np.isnan(self.inference.get('hqic_average', np.nan)):
+            print(f"HQIC-weighted β (specs, no resampling): {self.inference['hqic_average']:.{digits}f}")
 
-        if not inference:
-            print(f"Positive portion of beta (all specifications, no resampling): {round(self.inference['pos_prop_ns'], digits)}")
-        else:
-            print(f"Positive portion of beta (all specifications, no resampling): {round(self.inference['pos_prop_ns'], digits)} (p-value: {round(self.inference['pos_p'], digits)})")
-        print(f"Positive portion of beta (all bootstraps and specifications): {round(self.inference['pos_prop'], digits)}")
+        # Descriptive shares + null-calibrated tests
+        label_share = lambda s: f"{s:.{digits}f}"
+        label_p = lambda p: f"{p:.{digits}g}"
 
-        if not inference:
-            print(f"Negative portion of beta (all specifications, no resampling): {round(self.inference['neg_prop_ns'], digits)}")
-        else:
-            print(f"Negative portion of beta (all specifications, no resampling): {round(self.inference['neg_prop_ns'], digits)} (p-value: {round(self.inference['neg_p'], digits)})")
-        print(f"Negative portion of beta (all bootstraps and specifications): {round(self.inference['neg_prop'], digits)}")
+        # Significant share
+        print(f"Share significant (specs, no resampling) [descriptive]: "
+              f"{label_share(self.inference['sig_prop_ns'])}")
+        print(f"Share significant (bootstraps × specs) [descriptive]: "
+              f"{label_share(self.inference['sig_prop'])}"
+              + ("" if not inference else f"  |  null-calibrated p: {label_p(self.inference['sig_p'])}"))
 
-        if not inference:
-            print(f"Positive and Significant portion of beta (all specifications, no resampling): {round(self.inference['pos_sig_prop_ns'], digits)}")
-        else:
-            print(f"Positive and Significant portion of beta (all specifications, no resampling): {round(self.inference['pos_sig_prop_ns'], digits)} (p-value: {round(self.inference['pos_sig_p'], digits)})")
-        print(f"Positive and Significant portion of beta (all bootstraps and specifications): {round(self.inference['pos_sig_prop'], digits)}")
+        # Positive share
+        print(f"Share β>0 (specs, no resampling) [descriptive]: "
+              f"{label_share(self.inference['pos_prop_ns'])}")
+        print(f"Share β>0 (bootstraps × specs) [descriptive]: "
+              f"{label_share(self.inference['pos_prop'])}"
+              + ("" if not inference else f"  |  null-calibrated p: {label_p(self.inference['pos_p'])}"))
 
-        if not inference:
-            print(f"Negative and Significant portion of beta (all specifications, no resampling): {round(self.inference['neg_sig_prop_ns'], digits)}")
-        else:
-            print(f"Negative and Significant portion of beta (all specifications, no resampling): {round(self.inference['neg_sig_prop_ns'], digits)} (p-value: {round(self.inference['neg_sig_p'], digits)})")
-        print(f"Negative and Significant portion of beta (all bootstraps and specifications): {round(self.inference['neg_sig_prop'], digits)}")
+        # Negative share
+        print(f"Share β<0 (specs, no resampling) [descriptive]: "
+              f"{label_share(self.inference['neg_prop_ns'])}")
+        print(f"Share β<0 (bootstraps × specs) [descriptive]: "
+              f"{label_share(self.inference['neg_prop'])}"
+              + ("" if not inference else f"  |  null-calibrated p: {label_p(self.inference['neg_p'])}"))
 
-        print(f"Stouffer's Z-score test: {round(self.inference['Stouffers'][0], digits)}, {round(self.inference['Stouffers'][1], digits)}")
+        # Positive & significant share
+        print(f"Share β>0 & significant (specs, no resampling) [descriptive]: "
+              f"{label_share(self.inference['pos_sig_prop_ns'])}")
+        print(f"Share β>0 & significant (bootstraps × specs) [descriptive]: "
+              f"{label_share(self.inference['pos_sig_prop'])}"
+              + ("" if not inference else f"  |  null-calibrated p: {label_p(self.inference['pos_sig_p'])}"))
+
+        # Negative & significant share
+        print(f"Share β<0 & significant (specs, no resampling) [descriptive]: "
+              f"{label_share(self.inference['neg_sig_prop_ns'])}")
+        print(f"Share β<0 & significant (bootstraps × specs) [descriptive]: "
+              f"{label_share(self.inference['neg_sig_prop'])}"
+              + ("" if not inference else f"  |  null-calibrated p: {label_p(self.inference['neg_sig_p'])}"))
+
+        # Stouffer’s
+        Z, p_two = self.inference['Stouffers']
+        print(f"Stouffer’s Z = {Z:.{digits}f}  (two-sided p = {p_two:.{digits}g})")
 
         print_separator()
 
