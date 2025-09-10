@@ -10,6 +10,479 @@ from itertools import chain, combinations
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from multiprocessing import cpu_count
+import sys
+
+
+class IntegerRangeValidator:
+    """
+    Validator that checks if an input value is an integer within a specified range.
+
+    Args:
+        min_value (int): The minimum allowed integer value (inclusive).
+        max_value (int): The maximum allowed integer value (inclusive).
+
+    Raises:
+        ValidationError: If the input is not an integer or is outside the specified range.
+
+    Usage:
+        validator = IntegerRangeValidator(1, 10)
+        validator(_, current_value)  # Returns True if valid, raises ValidationError otherwise.
+    """
+    def __init__(self, min_value, max_value):
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def __call__(self, _, current):
+        try:
+            value = int(current)
+        except ValueError:
+            raise ValidationError('', reason="Input must be an integer.")
+        if not (self.min_value <= value <= self.max_value):
+            raise ValidationError(
+                '',
+                reason=f"Input must be between {self.min_value} and {self.max_value} (inclusive)."
+            )
+        return True
+
+
+def _running_in_jupyter() -> bool:
+    """
+    Return True exactly if this process is running inside a Jupyter (ZMQInteractiveShell) kernel.
+    """
+    try:
+        from IPython import get_ipython
+        shell = get_ipython().__class__.__name__
+        return shell == "ZMQInteractiveShell"
+    except (ImportError, AttributeError):
+        return False
+
+def _is_real_tty() -> bool:
+    """
+    Return True exactly if both sys.stdin and sys.stdout are real TTYs.
+    (That is, neither has been redirected to a file, and we are not inside Jupyter.)
+    """
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+def is_interactive() -> bool:
+    """
+    Return True if either:
+      (a) we are inside a Jupyter notebook/lab, OR
+      (b) we are running from a real terminal (both stdin and stdout are TTYs).
+    """
+    return _running_in_jupyter() or _is_real_tty()
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Revised make_inquiry: use three‐way branching
+# ───────────────────────────────────────────────────────────────────────────────
+
+def make_inquiry(
+    model_name,
+    y,
+    data,
+    draws,
+    kfolds,
+    oos_metric,
+    n_cpu,
+    seed
+):
+    """
+    Prompt the user for missing inputs if in an interactive environment;
+    otherwise, silently fall back to default values.
+
+    Returns
+    -------
+    tuple[int, int, str, int, int]
+        (draws, kfolds, oos_metric, n_cpu, seed)
+    """
+
+    # 1) Determine which metrics apply to this model_name:
+    if model_name == 'OLS Robust':
+        oos_metric_choices = ['pseudo-r2', 'rmse']
+    elif model_name == 'Logistic Regression Robust':
+        oos_metric_choices = ['mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy']
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
+
+    # 2) Check interactive status:
+    in_jupyter = _running_in_jupyter()
+    in_real_tty = _is_real_tty()
+
+    # 3) Helper: pure‐Python loop for integer input in [min_val, max_val]:
+    def _ask_integer(prompt_text: str, min_val: int, max_val: int) -> int:
+        """
+        Repeatedly call input() until user enters a valid integer in [min_val, max_val].
+        Raise ValidationError otherwise. Return the integer once valid.
+        """
+        while True:
+            raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
+            try:
+                val = int(raw)
+            except ValueError:
+                print(f"Invalid: '{raw}' is not an integer.")
+                continue
+            if val < min_val or val > max_val:
+                print(f"Invalid: must be between {min_val} and {max_val}.")
+                continue
+            return val
+
+    # 4) Helper: pure‐Python loop for selecting one choice from choices list:
+    def _ask_choice(prompt_text: str, choices: list[str]) -> str:
+        """
+        Print all choices with numeric indices, then loop until the user types
+        either a valid index (1–len(choices)) or a choice name exactly.
+        Return the chosen string.
+        """
+        # Display a numbered list:
+        print(prompt_text)
+        for idx, choice in enumerate(choices, start=1):
+            print(f"  {idx}. {choice}")
+        while True:
+            raw = input(f"Type number (1–{len(choices)}) or exact choice: ").strip()
+            # Try interpreting as integer index:
+            if raw.isdigit():
+                idx = int(raw)
+                if 1 <= idx <= len(choices):
+                    return choices[idx - 1]
+                else:
+                    print(f"Number out of range. Must be 1–{len(choices)}.")
+                    continue
+            # Otherwise check if it exactly matches one of the choices:
+            if raw in choices:
+                return raw
+            print(f"Invalid: type one of {choices}, or a valid index.")
+
+    # ───────────────────────────────────────────────────────────────
+    # 5) If draws is missing, decide which prompt to run:
+    # ───────────────────────────────────────────────────────────────
+    if draws is None:
+        if in_real_tty:
+            # (a) Real TTY: use inquirer.Text with IntegerRangeValidator
+            question_draws = [
+                inquirer.Text(
+                    'draws_inq',
+                    message="Enter number of bootstrap draws",
+                    validate=IntegerRangeValidator(2, 1000000)
+                )
+            ]
+            # inquirer.prompt(...) returns a dict; we extract and convert to int
+            draws = int(inquirer.prompt(question_draws, theme=GreenPassion())['draws_inq'])
+        elif in_jupyter:
+            # (b) Jupyter: fall back to pure input() + validator
+            draws = _ask_integer("Enter number of bootstrap draws", 2, 1000000)
+        else:
+            # (c) Neither TTY nor Jupyter: use default
+            draws = 1000
+
+    # ───────────────────────────────────────────────────────────────
+    # 6) If kfolds is missing, prompt for number of folds:
+    # ───────────────────────────────────────────────────────────────
+    if kfolds is None:
+        # The maximum valid folds is len(data[y]); we compute it now:
+        max_k = len(data[y])
+        if in_real_tty:
+            question_kfolds = [
+                inquirer.Text(
+                    'kfolds_inq',
+                    message="Enter number of folds for cross-validation",
+                    validate=IntegerRangeValidator(2, max_k)
+                )
+            ]
+            kfolds = int(inquirer.prompt(question_kfolds, theme=GreenPassion())['kfolds_inq'])
+        elif in_jupyter:
+            kfolds = _ask_integer("Enter number of folds for cross-validation", 2, max_k)
+        else:
+            kfolds = 10
+
+    # ───────────────────────────────────────────────────────────────
+    # 7) If oos_metric is missing, prompt the user to choose one:
+    # ───────────────────────────────────────────────────────────────
+    if oos_metric is None:
+        if in_real_tty:
+            question_oos = [
+                inquirer.List(
+                    'oos_inq',
+                    message="Select the out-of-sample evaluation metric",
+                    choices=oos_metric_choices,
+                    carousel=True
+                )
+            ]
+            oos_metric = inquirer.prompt(question_oos, theme=GreenPassion())['oos_inq']
+        elif in_jupyter:
+            oos_metric = _ask_choice("Select the out-of-sample evaluation metric:", oos_metric_choices)
+        else:
+            oos_metric = 'pseudo-r2'
+
+    # ───────────────────────────────────────────────────────────────
+    # 8) If n_cpu is missing, ask about CPU count:
+    # ───────────────────────────────────────────────────────────────
+    if n_cpu is None:
+        default_cpus = max(1, cpu_count() - 1)
+        if in_real_tty:
+            question_ncpu = [
+                inquirer.List(
+                    'ncpu_inq',
+                    message=f"You haven’t specified the number of CPUs. Is {default_cpus} ok?",
+                    choices=['Yes', 'No'],
+                    carousel=True
+                )
+            ]
+            n_cpu_answer = inquirer.prompt(question_ncpu, theme=GreenPassion())['ncpu_inq']
+            if n_cpu_answer == 'Yes':
+                n_cpu = default_cpus
+            else:
+                question_ncpu2 = [
+                    inquirer.Text(
+                        'ncpu_inq',
+                        message="Enter number of CPUs to use",
+                        validate=IntegerRangeValidator(1, cpu_count())
+                    )
+                ]
+                n_cpu = int(inquirer.prompt(question_ncpu2, theme=GreenPassion())['ncpu_inq'])
+        elif in_jupyter:
+            # In Jupyter, ask via input() if default is OK:
+            ans = input(f"You haven’t specified the number of CPUs. Is {default_cpus} okay? (yes/no): ").strip().lower()
+            if ans in ('y', 'yes'):
+                n_cpu = default_cpus
+            else:
+                n_cpu = _ask_integer("Enter number of CPUs to use", 1, cpu_count())
+        else:
+            n_cpu = default_cpus
+
+        # ───────────────────────────────────────────────────────────────
+        #  9) If seed is missing, prompt the user (TTY, Jupyter, or fallback)
+        # ───────────────────────────────────────────────────────────────
+    SEED_MIN = 0
+    SEED_MAX = 2 ** 31 - 1
+    in_jupyter = _running_in_jupyter()
+    in_real_tty = _is_real_tty()
+    def _ask_seed_input(prompt_text: str, min_val: int, max_val: int) -> int:
+        """
+        Repeatedly call input() until user enters a valid integer in [min_val, max_val].
+        """
+        while True:
+            raw = input(f"{prompt_text} [{min_val}–{max_val}]: ").strip()
+            try:
+                val = int(raw)
+            except ValueError:
+                print(f"Invalid: '{raw}' is not an integer.")
+                continue
+            if val < min_val or val > max_val:
+                print(f"Invalid: must be between {min_val} and {max_val}.")
+                continue
+            return val
+    if seed is None:
+        if in_real_tty:
+            question_seed = [
+                inquirer.Text(
+                    'seed_inq',
+                    message="Enter integer seed for reproducibility",
+                    validate=IntegerRangeValidator(SEED_MIN, SEED_MAX)
+                )
+            ]
+            seed = int(inquirer.prompt(question_seed, theme=GreenPassion())['seed_inq'])
+        elif in_jupyter:
+            seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
+        else:
+            seed = 192735
+    return draws, kfolds, oos_metric, n_cpu, seed
+
+
+def rescale(variable):
+    """
+    Rescales the input variable to have zero mean and unit standard deviation.
+
+    Parameters
+    ----------
+    variable : array-like
+        Input data to be rescaled. Can be a list, NumPy array, or similar structure.
+
+    Returns
+    -------
+    out : ndarray
+        The rescaled array with mean 0 and standard deviation 1 along the specified axis.
+        NaN values are ignored in the computation of mean and standard deviation.
+
+    Notes
+    -----
+    This function uses `np.nanmean` and `np.nanstd` to ignore NaN values during scaling.
+    """
+    variable = np.asarray(variable, dtype=np.float64)
+    mean = np.nanmean(variable, axis=0, keepdims=True)
+    std = np.nanstd(variable, axis=0, keepdims=True)
+    out = (variable - mean) / std
+    return out
+
+
+def _ensure_single_constant(
+        dataframe: pd.DataFrame,
+        y_list: List[str],
+        x_list: List[str],
+        controls: List[str],
+) -> Tuple[List[str], List[str]]:
+    """
+    Revised version: if a zero‐variance column appears in both x_list and controls,
+    it will be kept in 'controls' (not moved into x_list).  More precisely:
+
+    1) If there is already a column literally named "const", drop it and remove it
+       from y_list, x_list, and controls (to avoid stale duplicates).
+    2) Among the columns in (y_list ∪ x_list ∪ controls) ∩ dataframe.columns,
+       identify those with zero variance.
+    3) If none exist, create a brand‐new "const" column (all 1.0) and append it to x_list.
+    4) If one or more exist, choose exactly one to keep according to the new priority:
+         (a) Any zero‐variance column in controls
+         (b) Otherwise any zero‐variance column in x_list
+         (c) Otherwise any zero‐variance column in y_list
+         (d) Otherwise the alphabetically first among them
+       If there are multiple, warn that only one will be kept and the others dropped.
+    5) Drop all zero‐variance columns except the chosen one, and remove them from
+       whichever of y_list, x_list, controls they appeared in.
+    6) For the chosen column "keep":
+       • If it was originally in controls (regardless of whether also in x_list), then
+         after renaming it to "const" it stays in controls and is removed from x_list (if present).
+       • Else if it was originally only in x_list, then after renaming it to "const" it stays in x_list.
+       • Else if it was originally only in y_list, then after renaming it to "const", it is moved into x_list.
+       In all cases, remove "keep" from any list where it does not belong post‐rename.
+    7) Return the updated (x_list, controls).
+
+    This ensures that if a constant was specified as a control, it remains a control
+    (now called "const") rather than being moved into x_list.
+    """
+
+    y_list = y_list.copy()
+    x_list = x_list.copy()
+    controls = controls.copy()
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 1) Drop any pre‐existing "const" column:
+    # ──────────────────────────────────────────────────────────────────────────
+    if "const" in dataframe.columns and "const" not in controls:
+        dataframe.drop(columns=["const"], inplace=True)
+        if "const" in y_list:
+            y_list.remove("const")
+        if "const" in x_list:
+            x_list.remove("const")
+    # ──────────────────────────────────────────────────────────────────────────
+    # 2) Identify zero‐variance columns among the “relevant” ones:
+    # ──────────────────────────────────────────────────────────────────────────
+    relevant_cols = [
+        col for col in (y_list + x_list + controls)
+        if col in dataframe.columns
+    ]
+    zero_var_cols = [
+        col
+        for col in relevant_cols
+        if dataframe[col].nunique(dropna=False) == 1
+    ]
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 3) If no zero‐variance column, create "const" = 1.0 and append to x_list:
+    # ──────────────────────────────────────────────────────────────────────────
+    if len(zero_var_cols) == 0:
+        dataframe.loc[:, "const"] = 1.0
+        x_list.append("const")
+        return x_list, controls
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 4) Choose exactly one zero‐variance column to keep with new priority:
+    #    (controls > x_list > y_list > alphabetical)
+    # ──────────────────────────────────────────────────────────────────────────
+    in_ctrl = [c for c in zero_var_cols if c in controls]
+    in_x = [c for c in zero_var_cols if (c not in in_ctrl) and (c in x_list)]
+    in_y = [c for c in zero_var_cols if (c not in in_ctrl) and (c not in in_x) and (c in y_list)]
+
+    if in_ctrl:
+        keep = in_ctrl[0]
+    elif in_x:
+        keep = in_x[0]
+    elif in_y:
+        keep = in_y[0]
+    else:
+        keep = sorted(zero_var_cols)[0]
+
+    if len(zero_var_cols) > 1:
+        warnings.warn(
+            f"More than one constant‐valued column detected among {relevant_cols!r}: "
+            f"{zero_var_cols!r}. Keeping only '{keep}' and dropping the others.",
+            UserWarning
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Record original membership of `keep`:
+    orig_in_ctrl = (keep in controls)
+    orig_in_x = (keep in x_list)
+    orig_in_y = (keep in y_list)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 5) Drop all zero‐variance columns except the one chosen (`keep`),
+    #    and remove them from y_list, x_list, controls:
+    # ──────────────────────────────────────────────────────────────────────────
+    for c in zero_var_cols:
+        if c == keep:
+            continue
+        if c in dataframe.columns:
+            dataframe.drop(columns=[c], inplace=True)
+        if c in y_list:
+            y_list.remove(c)
+        if c in x_list:
+            x_list.remove(c)
+        if c in controls:
+            controls.remove(c)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 6) Remove `keep` from any list it should no longer be in:
+    #    We will rename `keep` to "const" below.
+    # ──────────────────────────────────────────────────────────────────────────
+    #    If `keep` was originally in controls, we want it to remain a control after renaming.
+    #    So: remove it from x_list (if present) and from y_list. Do NOT remove from controls.
+    if orig_in_ctrl:
+        if keep in x_list:
+            x_list.remove(keep)
+        if keep in y_list:
+            y_list.remove(keep)
+        # `keep` remains in controls for now.
+    else:
+        # If `keep` was not originally in controls, remove it from controls if it somehow is there,
+        # so that after renaming "const" goes to the correct list.
+        if keep in controls:
+            controls.remove(keep)
+
+        # If `keep` was in x_list (but not in controls), we will keep it as a regressor.
+        # If `keep` was only in y_list, we remove it from y_list and later add "const" to x_list.
+        if keep in x_list:
+            # We will replace keep→"const" in x_list below.
+            pass
+        else:
+            # If it was in y_list only (and not in x_list or controls), remove it here.
+            if keep in y_list:
+                y_list.remove(keep)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 7) Rename the single kept column (`keep`) to "const" (unless it already was "const"):
+    # ──────────────────────────────────────────────────────────────────────────
+    if keep != "const":
+        # Rename the column in the DataFrame:
+        dataframe.rename(columns={keep: "const"}, inplace=True)
+
+        # Now place "const" into the correct list:
+        if orig_in_ctrl:
+            # The constant should remain in controls.  Replace `keep`→"const" in controls:
+            controls[controls.index(keep)] = "const"
+        elif orig_in_x:
+            # The constant should remain among regressors.  Replace `keep`→"const" in x_list:
+            x_list[x_list.index(keep)] = "const"
+        else:
+            # `keep` was originally only in y_list.  Now we add "const" to x_list:
+            x_list.append("const")
+            # (No need to modify controls in this branch.)
+
+    if "const" in x_list:
+        x_list = [c for c in x_list if c != "const"] + ["const"]
+    if "const" in controls:
+        controls = [c for c in controls if c != "const"] + ["const"]
+
+    return x_list, controls
+
 
 
 def concat_results(objs: List["OLSResult"], de_dupe=True) -> "OLSResult":
