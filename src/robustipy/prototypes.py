@@ -263,20 +263,21 @@ class BaseRobust(Protomodel):
         """
         Check for perfect multicollinearity in X. Warn about all involved columns.
         """
-        
         mat = X.values
         n_cols = mat.shape[1]
-        rank  = np.linalg.matrix_rank(mat)
+        rank = np.linalg.matrix_rank(mat)
 
         if rank < n_cols:
-            # Identify perfectly collinear pairs by checking correlation matrix
+            # Correlation matrix
             corr = np.corrcoef(mat.T)
-            problematic_pairs = []
-            for i in range(n_cols):
-                for j in range(i+1, n_cols):
-                    if np.isclose(abs(corr[i, j]), 1.0, atol=1e-10):
-                        problematic_pairs.append((X.columns[i], X.columns[j]))
 
+            # Mask strictly upper triangular part (i < j)
+            mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
+
+            # Get indices of perfectly collinear pairs
+            i_idx, j_idx = np.where(np.isclose(np.abs(corr), 1.0, atol=1e-10) & mask)
+
+            problematic_pairs = [(X.columns[i], X.columns[j]) for i, j in zip(i_idx, j_idx)]
             flat_problem_vars = sorted(set(var for pair in problematic_pairs for var in pair))
 
             raise ValueError(
