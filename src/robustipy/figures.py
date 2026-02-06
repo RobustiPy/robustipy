@@ -8,7 +8,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as mticker
-from matplotlib.gridspec import GridSpec
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, Patch, Rectangle
 
@@ -104,6 +104,17 @@ def axis_formatter(
     ax.set_ylabel(ylabel, fontsize=13)
     title_setter(ax, title, side)
     ax.set_xlabel(xlabel, fontsize=13)
+
+
+def _spec_order_idx(results_object, oddsratio: bool) -> np.ndarray:
+    """
+    Return the spec ordering index used by the specification curve (sorted by median).
+    """
+    if oddsratio and hasattr(results_object, "estimates_exp"):
+        medians = results_object.estimates_exp.quantile(q=0.5, axis=1)
+    else:
+        medians = results_object.estimates.quantile(q=0.5, axis=1)
+    return medians.sort_values().index.to_numpy()
 
 
 def plot_hexbin_r2(
@@ -681,8 +692,9 @@ def plot_curve(
         df['idx'] = results_object.specs_names.isin(get_selection_key(specs))
         df['specs_names'] = results_object.specs_names
 
-    # Sort by median
-    df = df.sort_values(by='median').reset_index(drop=True)
+    # Sort by median (shared ordering for curve + spec matrix)
+    order_idx = _spec_order_idx(results_object, oddsratio)
+    df = df.loc[order_idx].reset_index(drop=True)
     n = len(df)
 
     # Sample colours: first for null, next for highlights, last for full
@@ -771,7 +783,7 @@ def plot_curve(
     
     # Display the legend if both highlights and specs are present
     if highlights and (specs is not None):
-        ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=11,
+        ax.legend(handles=handles, frameon=True, edgecolor='black', fontsize=10,
                   loc='lower right', ncols=2, framealpha=1, facecolor='w')
     
     # Format axes and apply limits
@@ -791,9 +803,131 @@ def plot_curve(
             f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
         )
         ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
-                fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
+                fontsize=9, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
 
     sns.despine(ax=ax)
+    return ax
+
+
+def plot_spec_matrix(
+        results_object,
+        ax: Optional[plt.Axes] = None,
+        order_idx: Optional[Sequence[int]] = None,
+        controls: Optional[Sequence[str]] = None,
+        oddsratio: bool = False,
+        title: str = '',
+        bins: Optional[int] = None,
+        heatmap_threshold: int = 128
+) -> plt.Axes:
+    """
+    Plot a dot matrix indicating which controls are included in each specification.
+
+    Parameters
+    ----------
+    results_object : object
+        Must expose `.specs_names` and (optionally) `.controls`.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. Default: current axes.
+    order_idx : sequence of int, optional
+        Ordering of specifications along the x-axis. If None, uses the
+        specification-curve ordering (sorted by median).
+    controls : sequence of str, optional
+        Controls to show on the y-axis. Defaults to results_object.controls
+        if available; otherwise uses the union of spec controls.
+    oddsratio : bool, default=False
+        If True, use exponentiated estimates for ordering (to match plot_curve).
+    title : str, optional
+        Title text for the axes.
+    bins : int, optional
+        If provided, aggregate specifications into this many bins and plot
+        inclusion rates as a heatmap (0–1) instead of individual dots.
+    heatmap_threshold : int, default=128
+        Minimum number of specifications required to switch from dots to heatmap.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes containing the plot.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    if order_idx is None:
+        order_idx = _spec_order_idx(results_object, oddsratio)
+
+    specs_ordered = results_object.specs_names.iloc[order_idx].tolist()
+
+    if controls is None:
+        controls = getattr(results_object, "controls", None)
+
+    if controls is None:
+        controls = sorted({c for spec in specs_ordered for c in spec})
+    else:
+        controls = list(controls)
+
+    if len(controls) == 0 or len(specs_ordered) == 0:
+        axis_formatter(ax, '', 'Ordered Specifications', title)
+        ax.text(0.5, 0.5, 'No controls', transform=ax.transAxes,
+                ha='center', va='center', fontsize=11)
+        ax.set_yticks([])
+        ax.set_xlim(0, max(len(specs_ordered) - 1, 0))
+        sns.despine(ax=ax)
+        return ax
+
+    mask = np.zeros((len(controls), len(specs_ordered)), dtype=bool)
+    for i, ctrl in enumerate(controls):
+        mask[i, :] = [ctrl in spec for spec in specs_ordered]
+
+    dot_color = get_colormap_colors(1)[0]
+
+    n_specs = len(specs_ordered)
+    use_heatmap = bins is not None and bins > 0 and n_specs > heatmap_threshold
+    if use_heatmap:
+        bins = min(bins, n_specs)
+        idx_bins = np.array_split(np.arange(n_specs), bins)
+        heat = np.zeros((len(controls), bins), dtype=float)
+        for b, idxs in enumerate(idx_bins):
+            if idxs.size == 0:
+                continue
+            heat[:, b] = mask[:, idxs].mean(axis=1)
+        cmap = matplotlib.colormaps['viridis']
+        im = ax.imshow(
+            heat,
+            aspect='auto',
+            cmap=cmap,
+            vmin=0,
+            vmax=1,
+            origin='upper',
+            extent=[0, n_specs - 1, len(controls) - 0.5, -0.5],
+            interpolation='nearest'
+        )
+        cbar = ax.figure.colorbar(im, ax=ax, pad=0.02, fraction=0.05, aspect=25)
+        cbar.set_label('Inclusion Rate', fontsize=11)
+        cbar.ax.tick_params(labelsize=10)
+    else:
+        y_idx, x_idx = np.where(mask)
+        ax.scatter(
+            x_idx,
+            y_idx,
+            s=28,
+            marker='o',
+            color=dot_color,
+            edgecolors='white',
+            linewidths=0.6,
+            alpha=0.9
+        )
+
+    axis_formatter(ax, '', 'Ordered Specifications', title)
+    ax.set_yticks(range(len(controls)))
+    ax.set_yticklabels(controls, fontsize=11)
+    ax.set_ylim(-0.5, len(controls) - 0.5)
+    ax.invert_yaxis()
+    ax.set_xlim(0, len(specs_ordered) - 1)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
+
+    ax.grid(False)
+    ax.xaxis.grid(True, linestyle='--', color='k', alpha=0.1)
+    ax.yaxis.grid(True, linestyle='--', color='k', alpha=0.06)
     return ax
 
 
@@ -1247,7 +1381,9 @@ def plot_results(
         figpath=None,
         highlights = True,
         oddsratio=False,
-        project_name: str = None
+        project_name: str = None,
+        spec_matrix_bins: int = 128,
+        spec_matrix_threshold: int = 128
 ) -> None:
     """
     Plots the coefficient estimates, IC curve, and distribution plots for the given results object.
@@ -1275,6 +1411,10 @@ def plot_results(
         File extension to save each panel (e.g. 'png','pdf').
     project_name : str, default=None
         Directory and filename prefix under `./figures/`.
+    spec_matrix_bins : int, default=128
+        Number of bins to use for the binned spec matrix heatmap.
+    spec_matrix_threshold : int, default=128
+        Minimum number of specifications required to switch from dots to heatmap.
     oddsratio bool, default=False
         Whether to exponentiate the coefficients (e.g. for odds ratios).
     highlights bool, default=True
@@ -1329,7 +1469,11 @@ def plot_results(
         ax4 = fig.add_subplot(gs[3:5, 6:14])
         ax3 = fig.add_subplot(gs[3:5, 0:6])
         ax5 = fig.add_subplot(gs[3:5, 14:23])
-        ax6 = fig.add_subplot(gs[5:9, 0:13])
+        spec_gs = GridSpecFromSubplotSpec(
+            2, 1, subplot_spec=gs[5:9, 0:13], height_ratios=[2, 1], hspace=0.12
+        )
+        ax6 = fig.add_subplot(spec_gs[0, 0])
+        ax6m = fig.add_subplot(spec_gs[1, 0], sharex=ax6)
         ax7 = fig.add_subplot(gs[5:7, 13:23])
         ax8 = fig.add_subplot(gs[7:9, 13:23])
 
@@ -1346,6 +1490,19 @@ def plot_results(
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
                    ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio)
+        order_idx = _spec_order_idx(results_object, oddsratio)
+        plot_spec_matrix(results_object=results_object, ax=ax6m, order_idx=order_idx,
+                         oddsratio=oddsratio, controls=feature_order,
+                         bins=spec_matrix_bins, heatmap_threshold=spec_matrix_threshold)
+        locator = mticker.MaxNLocator(5)
+        ax6.xaxis.set_major_locator(locator)
+        ax6m.xaxis.set_major_locator(locator)
+        ax6.minorticks_off()
+        ax6m.minorticks_off()
+        ax6.xaxis.set_minor_locator(mticker.NullLocator())
+        ax6m.xaxis.set_minor_locator(mticker.NullLocator())
+        ax6.set_xlabel('')
+        ax6.tick_params(axis='x', which='major', bottom=True, labelbottom=False)
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7,
                 colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs, ax=ax8,
