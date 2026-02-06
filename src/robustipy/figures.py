@@ -363,7 +363,7 @@ def shap_violin(
         max_display: int = 10,
         color: Optional[Union[str, Sequence]] = None,
         alpha: float = 1.0,
-        cmap: str = 'Spectral_r',
+        cmap: str = 'viridis',
         use_log_scale: bool = False,
         title: str = '',
         clear_yticklabels: bool = False
@@ -389,7 +389,7 @@ def shap_violin(
         Single color for all points when no feature values given.
     alpha : float, default=1.0
         Opacity for scatter points.
-    cmap : str, default='Spectral_r'
+    cmap : str, default='viridis'
         Colormap for coloring points.
     use_log_scale : bool, default=False
         If True, use symlog x-axis scaling.
@@ -634,7 +634,7 @@ def plot_curve(
         Up to three specs to highlight. Default: None (no highlights).
     ax : matplotlib.axes.Axes, optional
         Axes to draw on.  Default: current axes.
-    colormap : str, default='Spectral_r'
+    colormap : str, default='viridis'
         Colormap for the main curve.
     title : str, optional
         Title text for the axes.
@@ -802,7 +802,7 @@ def plot_ic(
         ic: str,
         specs: Optional[List[List[str]]] = None,
         ax: Optional[plt.Axes] = None,
-        colormap: str = 'Spectral_r',
+        colormap: str = 'viridis',
         title: str = '',
         despine_left: bool = True
 ) -> plt.Axes:
@@ -1241,7 +1241,7 @@ def plot_results(
         ci: float = 0.95,
         specs: Optional[List[List[str]]] = None,
         ic: Optional[str] = None,
-        colormap: Union[str, matplotlib.colors.Colormap] = 'Spectral_r',
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis',
         figsize: Tuple[int, int] = (16, 16),
         ext: str = 'pdf',
         figpath=None,
@@ -1265,7 +1265,7 @@ def plot_results(
         Up to three specs (lists of control names) to highlight in the curve, IC, and distribution panels.
     ic : str, optional
         Information criterion name to plot (one of 'aic','bic','hqic').
-    colormap : str or Colormap, default='Spectral_r'
+    colormap : str or Colormap, default='viridis'
         Colormap used consistently for all panels.
     figsize : (width, height), default=(16,16)
         Size of the full figure in inches.
@@ -1341,7 +1341,7 @@ def plot_results(
         # Generate plots in the grid
         plot_hexbin_r2(results_object, ax1, fig, oddsratio, colormap, title='a.')
         plot_hexbin_log(results_object, ax2, fig, oddsratio, colormap, title='b.')
-        feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True)
+        feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True, cmap=colormap)
         plot_bma(results_object, colormap, ax3, feature_order, title='c.')
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
@@ -1399,7 +1399,7 @@ def plot_results(
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
-        feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False)
+        feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False, cmap=colormap)
         plt.savefig(os.path.join(outdir, project_name + '_SHAP.' + ext), bbox_inches='tight')
         plt.close(fig)
 
