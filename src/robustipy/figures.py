@@ -529,7 +529,7 @@ def shap_violin(
             ax.scatter(
                 shaps[np.invert(nan_mask)],
                 np.ones(shap_values[np.invert(nan_mask)].shape[0]) * pos,
-                cmap='Spectral_r',
+                cmap=cmap,
                 vmin=vmin,
                 vmax=vmax,
                 s=9,
