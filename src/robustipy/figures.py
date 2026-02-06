@@ -106,6 +106,17 @@ def axis_formatter(
     ax.set_xlabel(xlabel, fontsize=13)
 
 
+def _blue_palette(num_colors: int = 1) -> List[str]:
+    """
+    Return a consistent medium-blue tone for visual accents.
+    """
+    if num_colors < 1:
+        raise ValueError("num_colors must be >= 1")
+    cmap = matplotlib.colormaps['Blues']
+    mid = 0.72
+    return [matplotlib.colors.to_hex(cmap(mid), keep_alpha=False)] * num_colors
+
+
 def _spec_order_idx(results_object, oddsratio: bool) -> np.ndarray:
     """
     Return the spec ordering index used by the specification curve (sorted by median).
@@ -624,7 +635,8 @@ def plot_curve(
         ax: Optional[plt.Axes] = None,
         highlights: bool = True,
         inset: bool = True,
-        title: str = ''
+        title: str = '',
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
 ) -> plt.Axes:
     """
     Plot the specification-curve of median and CI for coefficient estimates.
@@ -645,8 +657,8 @@ def plot_curve(
         Up to three specs to highlight. Default: None (no highlights).
     ax : matplotlib.axes.Axes, optional
         Axes to draw on.  Default: current axes.
-    colormap : str, default='viridis'
-        Colormap for the main curve.
+    colormap : str or Colormap, default='viridis'
+        Colormap for highlights and related elements.
     title : str, optional
         Title text for the axes.
     highlights : bool, default=False
@@ -700,7 +712,7 @@ def plot_curve(
     # Sample colours: first for null, next for highlights, last for full
     n_hl = len(specs) if specs else 0
     # colourset = get_colormap_colors(colormap, n_hl + 2)
-    colourset = get_colormap_colors(n_hl + 2)
+    colourset = get_colormap_colors(n_hl + 2, colormap)
     null_color = colourset[0]
     spec_colors = colourset[1:-1]
     full_color = colourset[-1]
@@ -742,7 +754,7 @@ def plot_curve(
             arrow = FancyArrowPatch((idx, low), (idx, high), arrowstyle='<|-|>', color=col,
                                     mutation_scale=20, shrinkA=0, shrinkB=0)
             ax.add_artist(arrow)
-            ax.plot(idx, df.at[idx, 'median'], 'o', markeredgecolor=col, markerfacecolor='w', markersize=12)
+            ax.plot(idx, df.at[idx, 'median'], 'o', markeredgecolor='k', markerfacecolor='w', markersize=12)
             handles.append(Line2D([0], [0], marker='o', color=col, markerfacecolor='w', markersize=10, label=lbl))
 
     # Plot full model highlight
@@ -754,7 +766,7 @@ def plot_curve(
         arrow_f = FancyArrowPatch((pos_full, low_f), (pos_full, high_f), arrowstyle='<|-|>', color=full_color,
                                   mutation_scale=20, shrinkA=0, shrinkB=0)
         ax.add_artist(arrow_f)
-        ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor=full_color, markerfacecolor='w', markersize=12)
+        ax.plot(pos_full, df.at[pos_full, 'median'], 'o', markeredgecolor='k', markerfacecolor='w', markersize=12)
         # Add to legend depending on number of outcomes
         if max(len(t) for t in results_object.y_name) == 1:
             handles.append(
@@ -772,7 +784,7 @@ def plot_curve(
         arrow_n = FancyArrowPatch((pos_null, low_n), (pos_null, high_n), arrowstyle='<|-|>', color=null_color,
                                   mutation_scale=20, shrinkA=0, shrinkB=0)
         ax.add_artist(arrow_n)
-        ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor=null_color, markerfacecolor='w', markersize=12)
+        ax.plot(pos_null, df.at[pos_null, 'median'], 'o', markeredgecolor='k', markerfacecolor='w', markersize=12)
         # Add to legend depending on number of outcomes
         if max(len(t) for t in results_object.y_name) == 1:
             handles.append(
@@ -817,7 +829,8 @@ def plot_spec_matrix(
         oddsratio: bool = False,
         title: str = '',
         bins: Optional[int] = None,
-        heatmap_threshold: int = 128
+        heatmap_threshold: int = 128,
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
 ) -> plt.Axes:
     """
     Plot a dot matrix indicating which controls are included in each specification.
@@ -843,6 +856,8 @@ def plot_spec_matrix(
         inclusion rates as a heatmap (0–1) instead of individual dots.
     heatmap_threshold : int, default=128
         Minimum number of specifications required to switch from dots to heatmap.
+    colormap : str or Colormap, default='viridis'
+        Colormap used for dot color and heatmap shading.
 
     Returns
     -------
@@ -878,7 +893,7 @@ def plot_spec_matrix(
     for i, ctrl in enumerate(controls):
         mask[i, :] = [ctrl in spec for spec in specs_ordered]
 
-    dot_color = get_colormap_colors(1)[0]
+    dot_color = _blue_palette(1)[0]
 
     n_specs = len(specs_ordered)
     use_heatmap = bins is not None and bins > 0 and n_specs > heatmap_threshold
@@ -890,7 +905,7 @@ def plot_spec_matrix(
             if idxs.size == 0:
                 continue
             heat[:, b] = mask[:, idxs].mean(axis=1)
-        cmap = matplotlib.colormaps['viridis']
+        cmap = matplotlib.colormaps['Blues']
         im = ax.imshow(
             heat,
             aspect='auto',
@@ -911,9 +926,9 @@ def plot_spec_matrix(
             y_idx,
             s=28,
             marker='o',
-            color=dot_color,
-            edgecolors='white',
-            linewidths=0.6,
+            facecolors=dot_color,
+            edgecolors='w',
+            linewidths=0.8,
             alpha=0.9
         )
 
@@ -958,7 +973,7 @@ def plot_ic(
 
     # grab exactly len(specs)+2 colours
     n_specs = len(specs) if specs else 0
-    colorset = get_colormap_colors(n_specs + 2)
+    colorset = get_colormap_colors(n_specs + 2, colormap)
 
     df = results_object.summary_df.copy() # get a copy to avoid modifying the original summary_df from results_object
     df = df.sort_values(by=ic).reset_index(drop=True)
@@ -1072,7 +1087,8 @@ def plot_bdist(
         despine_left: bool = True,
         legend_bool: bool = False,
         bw_adjust: float = 0.5,
-        highlights: bool = True
+        highlights: bool = True,
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
 ) -> plt.Axes:
     """
     
@@ -1098,6 +1114,8 @@ def plot_bdist(
         Bandwidth adjustment factor for the KDE; larger values make the curve smoother.
     highlights : bool, default=True
         If True, highlights the full model and the null model in the plot.
+    colormap : str or Colormap, default='viridis'
+        Colormap used for highlighted specifications.
         
     Returns
     -------
@@ -1130,12 +1148,13 @@ def plot_bdist(
     if specs is None and highlights is False:
         df_long = draws_df.melt(var_name='spec', value_name='coef')
         # ensure the order is preserved
-        palette = get_colormap_colors(1)
+        cmap = matplotlib.colormaps[colormap] if isinstance(colormap, str) else colormap
+        palette = [matplotlib.colors.to_hex(cmap(0.95), keep_alpha=False)]
         hue=None
     else:
         df_long = draws_df[order].melt(var_name='spec', value_name='coef')
         # ensure the order is preserved
-        palette = get_colormap_colors(len(order))
+        palette = get_colormap_colors(len(order), colormap)
         hue='spec'
 
     if ax is None:
@@ -1223,9 +1242,10 @@ def plot_kfolds(
 
     # KDE & histogram
     data = results_object.summary_df['av_k_metric']
-    colors = get_colormap_colors(2)
-    sns.kdeplot(data, ax=ax, alpha=1, color=colors[1])
-    sns.histplot(data, ax=ax, alpha=1, color=colors[0], bins=30, stat='density')
+    hist_color = _blue_palette(1)[0]
+    density_color = get_colormap_colors(2, colormap)[-1]
+    sns.kdeplot(data, ax=ax, alpha=1, color=density_color)
+    sns.histplot(data, ax=ax, alpha=1, color=hist_color, bins=30, stat='density')
 
     # Symmetric x-padding
     val_range = data.max() - data.min()
@@ -1236,8 +1256,8 @@ def plot_kfolds(
     legend_loc = _legend_side_from_hist(ax, tau=tau)
 
     legend_elements = [
-        Line2D([0], [0], color=colors[1], lw=2, label='Density'),
-        Patch(facecolor=colors[0], edgecolor=(0, 0, 0, 1), label='Histogram')
+        Line2D([0], [0], color=density_color, lw=2, label='Density'),
+        Patch(facecolor=hist_color, edgecolor=(0, 0, 0, 1), label='Histogram')
     ]
     ax.legend(handles=legend_elements,
               loc=legend_loc,
@@ -1302,7 +1322,7 @@ def plot_bma(
     bma['probs'].plot(kind='barh',
                       ax=ax,
                       alpha=1,
-                      color=get_colormap_colors(1),
+                      color=_blue_palette(1)[0],
                       edgecolor='k',
                       )
     axis_formatter(ax, r'', 'BMA Probabilities', title)
@@ -1329,9 +1349,9 @@ def title_setter(
         - 'right': shifts the title so it doesn’t overlap a right-side y-axis.
     """
     if side == 'right':
-        return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26)
+        return ax.set_title(title, loc='left', fontsize=16, y=1, x=-.26, fontweight='bold')
     else:
-        return ax.set_title(title, loc='left', fontsize=16, y=1)
+        return ax.set_title(title, loc='left', fontsize=16, y=1, fontweight='bold')
 
 
 def _sanitize_specs(
@@ -1489,11 +1509,11 @@ def plot_results(
         plot_bma(results_object, colormap, ax3, feature_order, title='c.')
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
-                   ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio)
+                   ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio, colormap=colormap)
         order_idx = _spec_order_idx(results_object, oddsratio)
         plot_spec_matrix(results_object=results_object, ax=ax6m, order_idx=order_idx,
                          oddsratio=oddsratio, controls=feature_order,
-                         bins=spec_matrix_bins, heatmap_threshold=spec_matrix_threshold)
+                         bins=spec_matrix_bins, heatmap_threshold=spec_matrix_threshold, colormap=colormap)
         locator = mticker.MaxNLocator(5)
         ax6.xaxis.set_major_locator(locator)
         ax6m.xaxis.set_major_locator(locator)
@@ -1506,7 +1526,7 @@ def plot_results(
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax7,
                 colormap=colormap, title='g.', despine_left=True)
         plot_bdist(results_object=results_object, specs=specs, ax=ax8,
-                   oddsratio=oddsratio, highlights=highlights,
+                   oddsratio=oddsratio, highlights=highlights, colormap=colormap,
                    title='h.', despine_left=True)
 
         # Save the full panel figure
@@ -1522,10 +1542,11 @@ def plot_results(
 
         # Generate and save each plot
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
-                   ax=ax1, highlights=highlights, title='a.', oddsratio=oddsratio)
+                   ax=ax1, highlights=highlights, title='a.', oddsratio=oddsratio, colormap=colormap)
         plot_hexbin_r2(results_object, ax2, fig, oddsratio, colormap, title='b.', side='right')
         plot_bdist(results_object=results_object, specs=specs, ax=ax3,
-                   oddsratio=oddsratio, highlights=highlights, title='c.', despine_left=True)
+                   oddsratio=oddsratio, highlights=highlights, colormap=colormap,
+                   title='c.', despine_left=True)
 
         # Save the full panel figure
         plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
@@ -1538,13 +1559,13 @@ def plot_results(
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_bdist(results_object=results_object, specs=specs, ax=ax,
-               oddsratio=oddsratio, despine_left=False)
+               oddsratio=oddsratio, despine_left=False, colormap=colormap)
     plt.savefig(os.path.join(outdir, project_name + '_OOS.' + ext), bbox_inches='tight')
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci,
-               oddsratio=oddsratio, highlights=highlights, specs=specs, ax=ax)
+               oddsratio=oddsratio, highlights=highlights, specs=specs, ax=ax, colormap=colormap)
     plt.savefig(os.path.join(outdir, project_name + '_curve.' + ext), bbox_inches='tight')
     plt.close(fig)
 
@@ -1573,7 +1594,7 @@ def plot_results(
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax,
-                   oddsratio=oddsratio, despine_left=False,
+                   oddsratio=oddsratio, despine_left=False, colormap=colormap,
                    highlights=highlights, legend_bool=False)
         plt.savefig(os.path.join(outdir, project_name + '_bdist.' + ext), bbox_inches='tight')
         plt.close(fig)
