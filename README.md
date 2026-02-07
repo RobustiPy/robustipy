@@ -86,7 +86,7 @@ There are ten empirical example notebooks [here](https://github.com/RobustiPy/ro
 
 ## Citing
 
-To cite Robustipy, please consider this reference:
+To cite RobustiPy, please consider this reference:
 
 ```
 @misc{ibarra2025introducingrobustipyefficientgeneration,

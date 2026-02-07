@@ -1,10 +1,10 @@
-# Robustify Figure Interpretation Guide
+# RobustiPy Figure Interpretation Guide
 
-> A concise, subfigure-by-subfigure guide for reading the standard Robustify results panel.
+> A concise, subfigure-by-subfigure guide for reading the standard RobustiPy results panel.
 
 ## Figure
 
-![Robustify results panel](https://github.com/RobustiPy/robustipy/blob/main/figures/union_example/union_example_all.png)
+![RobustiPy results panel](./figures/union_example/union_example_all.png)
 
 ---
 
