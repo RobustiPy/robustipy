@@ -391,7 +391,8 @@ def shap_violin(
         title: str = '',
         clear_yticklabels: bool = False,
         cbar_ax: Optional[plt.Axes] = None,
-        cbar_width: float = 0.04
+        cbar_width: float = 0.04,
+        cbar_width_fig: Optional[float] = None
 ) -> List[str]:
     """
     Create a SHAP beeswarm plot, colored by feature values when they are provided.
@@ -428,6 +429,10 @@ def shap_violin(
     cbar_width : float, default=0.04
         Colorbar width as a fraction of the axes width (or the cbar axis width
         when `cbar_ax` is provided).
+    cbar_width_fig : float, optional
+        Absolute colorbar width as a fraction of the figure width. If provided,
+        this overrides `cbar_width` when `cbar_ax` is given, ensuring consistent
+        absolute thickness across panels.
 
     Returns
     -------
@@ -617,9 +622,18 @@ def shap_violin(
         )
     else:
         cbar_ax.set_axis_off()
+        cbar_pos = cbar_ax.get_position()
+        if cbar_width_fig is not None and cbar_pos.width > 0:
+            width_frac = min(1.0, cbar_width_fig / cbar_pos.width)
+        else:
+            ax_pos = ax.get_position()
+            if cbar_pos.width > 0:
+                width_frac = min(1.0, (cbar_width * ax_pos.width) / cbar_pos.width)
+            else:
+                width_frac = cbar_width
         cax = inset_axes(
             cbar_ax,
-            width=f"{cbar_width * 100:.1f}%",
+            width=f"{width_frac * 100:.1f}%",
             height="100%",
             loc="center",
             bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
@@ -867,7 +881,8 @@ def plot_spec_matrix(
         heatmap_threshold: int = 128,
         colormap: Union[str, matplotlib.colors.Colormap] = 'viridis',
         cbar_ax: Optional[plt.Axes] = None,
-        cbar_width: float = 0.04
+        cbar_width: float = 0.04,
+        cbar_width_fig: Optional[float] = None
 ) -> plt.Axes:
     """
     Plot a dot matrix indicating which controls are included in each specification.
@@ -901,6 +916,10 @@ def plot_spec_matrix(
     cbar_width : float, default=0.04
         Colorbar width as a fraction of the heatmap axes width (or the cbar axis
         width when `cbar_ax` is provided).
+    cbar_width_fig : float, optional
+        Absolute colorbar width as a fraction of the figure width. If provided,
+        this overrides `cbar_width` when `cbar_ax` is given, ensuring consistent
+        absolute thickness across panels.
 
     Returns
     -------
@@ -982,9 +1001,18 @@ def plot_spec_matrix(
             )
         else:
             cbar_ax.set_axis_off()
+            cbar_pos = cbar_ax.get_position()
+            if cbar_width_fig is not None and cbar_pos.width > 0:
+                width_frac = min(1.0, cbar_width_fig / cbar_pos.width)
+            else:
+                ax_pos = ax.get_position()
+                if cbar_pos.width > 0:
+                    width_frac = min(1.0, (cbar_width * ax_pos.width) / cbar_pos.width)
+                else:
+                    width_frac = cbar_width
             cax = inset_axes(
                 cbar_ax,
-                width=f"{cbar_width * 100:.1f}%",
+                width=f"{width_frac * 100:.1f}%",
                 height="100%",
                 loc="center",
                 bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
@@ -1598,7 +1626,8 @@ def plot_results(
         # Generate plots in the grid
         plot_hexbin_r2(results_object, ax1, fig, oddsratio, colormap, title='a.')
         plot_hexbin_log(results_object, ax2, fig, oddsratio, colormap, title='b.')
-        cbar_width = 0.6
+        cbar_width = 0.046
+        cbar_width_fig = cbar_width * ax1.get_position().width
         feature_order = shap_violin(
             ax4,
             shap_vals,
@@ -1608,7 +1637,8 @@ def plot_results(
             clear_yticklabels=True,
             cmap=colormap,
             cbar_ax=ax4_cbar,
-            cbar_width=cbar_width
+            cbar_width=cbar_width,
+            cbar_width_fig=cbar_width_fig
         )
         plot_bma(results_object, colormap, ax3, feature_order, title='c.')
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
@@ -1625,7 +1655,8 @@ def plot_results(
             heatmap_threshold=spec_matrix_threshold,
             colormap=colormap,
             cbar_ax=ax6m_cbar,
-            cbar_width=cbar_width
+            cbar_width=cbar_width,
+            cbar_width_fig=cbar_width_fig
         )
         locator = mticker.MaxNLocator(5)
         ax6.xaxis.set_major_locator(locator)
@@ -1643,7 +1674,10 @@ def plot_results(
                    title='h.', despine_left=True)
 
         # Save the full panel figure
-        plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
+        if ext == 'png':
+            plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight', dpi=800)
+        else:
+            plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
 
     else:
         # Plot reduced layout when y is multivariate
