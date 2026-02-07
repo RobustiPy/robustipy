@@ -157,4 +157,6 @@ test.py
 /empirical_examples/data
 /empirical_examples/figures
 /empirical_examples/figures
-/figures
+/figures/*
+!/figures/union_example/
+!/figures/union_example/union_example_all.png
