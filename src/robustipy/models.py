@@ -603,6 +603,32 @@ class OLSResult(Protoresult):
 
         # two-sided via absolute value
         self.inference['median_p'] = float(np.mean(np.abs(null_meds) >= abs(obs_med)))
+        
+        # Estimate rho from bootstrap p-values
+        # Convert p-values to z-scores across bootstrap draws
+        p_matrix = self.p_values.to_numpy()  # shape: (n_specs, n_draws)
+        if p_matrix.shape[1] > 1:  # Need multiple draws to estimate correlation
+            # Convert two-sided p-values to z-scores
+            z_matrix = np.zeros_like(p_matrix)
+            for i in range(p_matrix.shape[0]):
+                signs = np.sign(self.estimates.iloc[i, :].to_numpy())
+                z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
+            
+            # Calculate correlation matrix of z-scores across specifications
+            z_corr = np.corrcoef(z_matrix)
+            
+            # Extract mean off-diagonal correlation as rho estimate
+            n_specs = z_corr.shape[0]
+            if n_specs > 1:
+                off_diag_sum = np.sum(z_corr) - np.trace(z_corr)
+                rho_estimate = off_diag_sum / (n_specs * (n_specs - 1))
+                # Clip to valid range
+                rho_estimate = np.clip(rho_estimate, -1.0 / (n_specs - 1) + 0.001, 0.999)
+            else:
+                rho_estimate = None
+        else:
+            rho_estimate = None
+            z_corr = None
 
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
@@ -664,16 +690,60 @@ class OLSResult(Protoresult):
         self.inference['pos_sig_p'] = self.__class__._empirical_p_two_sided(null_pos_sig, obs_pos_sig)
         self.inference['neg_sig_p'] = self.__class__._empirical_p_two_sided(null_neg_sig, obs_neg_sig)
 
-        Z, p_comb = stouffer_method(
-                    df_model_result['p_values'].to_numpy(),
-                    two_sided=True,
-                    betas=df_model_result['betas'].to_numpy(),  # provides direction
-                    # weights=...,                               # optional
-                    # rho=... or Sigma=...,                      # optional dependence model
-                )
-        log_p_two = np.log(2.0) + norm.logsf(abs(Z))
-        p_two = float(np.exp(log_p_two))  # identical to 2*sf(|Z|) but stable
-        self.inference['Stouffers'] = (Z, p_two)
+        # Estimate rho from bootstrap p-values
+        # Convert p-values to z-scores across bootstrap draws
+        p_matrix = self.p_values.to_numpy()  # shape: (n_specs, n_draws)
+        if p_matrix.shape[1] > 1:  # Need multiple draws to estimate correlation
+            # Convert two-sided p-values to z-scores
+            z_matrix = np.zeros_like(p_matrix)
+            for i in range(p_matrix.shape[0]):
+                signs = np.sign(self.estimates.iloc[i, :].to_numpy())
+                z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
+            
+            # Calculate correlation matrix of z-scores across specifications
+            z_corr = np.corrcoef(z_matrix)
+            
+            # Extract mean off-diagonal correlation as rho estimate
+            n_specs = z_corr.shape[0]
+            if n_specs > 1:
+                off_diag_sum = np.sum(z_corr) - np.trace(z_corr)
+                rho_estimate = off_diag_sum / (n_specs * (n_specs - 1))
+                # Clip to valid range
+                rho_estimate = np.clip(rho_estimate, -1.0 / (n_specs - 1) + 0.001, 0.999)
+            else:
+                rho_estimate = None
+        else:
+            rho_estimate = None
+            z_corr = None
+
+        # Stouffer's method with estimated covariance
+        # Use full correlation matrix (Sigma) to account for heterogeneous correlations
+        if z_corr is not None and p_matrix.shape[1] > 1:
+            # Use full covariance matrix (Sigma)
+            # This accounts for heterogeneous correlations between specifications
+            Z, p_combined = stouffer_method(
+                df_model_result['p_values'].to_numpy(),
+                two_sided=True,
+                betas=df_model_result['betas'].to_numpy(),
+                Sigma=z_corr,  # Full correlation matrix
+            )
+            
+            # Store results with covariance structure
+            self.inference['Stouffers'] = (Z, p_combined)
+            self.inference['correlation_matrix'] = z_corr
+            self.inference['mean_correlation'] = rho_estimate
+        else:
+            # Fall back to independence assumption
+            Z, p_comb = stouffer_method(
+                df_model_result['p_values'].to_numpy(),
+                two_sided=True,
+                betas=df_model_result['betas'].to_numpy(),
+            )
+            log_p_two = np.log(2.0) + norm.logsf(abs(Z))
+            p_two = float(np.exp(log_p_two))
+            self.inference['Stouffers'] = (Z, p_two)
+            self.inference['correlation_matrix'] = None
+            self.inference['mean_correlation'] = None
 
 
     def summary(self, digits=3) -> None:
@@ -1459,6 +1529,10 @@ class OLSRobust(BaseRobust):
             explainer = shap.LinearExplainer(model, x_train)
             shap_return = [explainer.shap_values(x_test), x_test]
             
+            # Generate shared bootstrap seeds ONCE for all specifications
+            # This ensures all specs use the same bootstrap samples, creating proper correlation
+            shared_seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
+            
             # Loop over all z-specs (combinations of control variables)
             for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
                 if 0 == len(spec):
@@ -1486,9 +1560,9 @@ class OLSRobust(BaseRobust):
                  
                 # Calculate pseudo-outcome residuals for bootstrapping
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
-                seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
                 
-                # Bootstrap OLS model draws in parallel
+                # Bootstrap OLS model draws in parallel using SHARED seeds
+                # All specs use the same seeds to create proper correlation structure
                 b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
                 (delayed(self._strap_OLS)
                  (comb,
@@ -1496,7 +1570,7 @@ class OLSRobust(BaseRobust):
                   sample_size,
                   seed,
                   y_star)
-                 for seed in seeds))
+                 for seed in shared_seeds))
                 
                 # Store results for current spec
                 specs.append(frozenset(spec))
