@@ -73,11 +73,16 @@ model_results = model_robust.get_results()
 
 Where `y` is a list of (string) variable names used to create your dependent variable, `x` is your dependent (string) variable name of interest (which can be a list of `len>1`), and c is a list of control (string) variable names predictors. If you don't fully specify all the things that RobustiPy needs, it will prompt the user through [inquiry](https://pypi.org/project/inquirer/) (this currently includes the number of CPUs to use, the seed or "random state", the number of draws, and the number of folds).
 
+## Guides
+
+- [Getting started](./GETTING_STARTED.md)
+- [Figure interpretation guide](./INTERPRETATION_GUIDE.md)
+
 ## Examples
 
 There are ten empirical example notebooks [here](https://github.com/RobustiPy/robustipy/empirical_examples) which replicate high profile research and teaching examples, and five relatively straightforward simulated examples scripts [here](https://github.com/RobustiPy/robustipy/simulated_examples). The below is the output of a ```results.plot()``` function call made on the canonical [union dataset]((https://github.com/RobustiPy/robustipy/empirical_examples/empirical1_union.ipynb)). Note: ```results.summary()``` also prints out a *large* number of helpful statistics about your models, and the ```results``` object more broadly stores all results for downstream analysis (as done in the examples which replicate [Mankiew et al. 1992](https://academic.oup.com/qje/article-abstract/107/2/407/1838296) and the infamously retracted [Gino et al. 2020](https://pubmed.ncbi.nlm.nih.gov/37589685/) in the ```./empirical_examples``` subdirectory).
 
-![Union dataset example](./figures/union_example/union_example_all.svg)
+![Union dataset example](./figures/union_example/union_example_all.png)
 
 ## Citing
 
