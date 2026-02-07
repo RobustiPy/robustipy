@@ -11,6 +11,7 @@ import matplotlib.ticker as mticker
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, Patch, Rectangle
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 import sys
 from pathlib import Path
@@ -388,7 +389,9 @@ def shap_violin(
         cmap: str = 'viridis',
         use_log_scale: bool = False,
         title: str = '',
-        clear_yticklabels: bool = False
+        clear_yticklabels: bool = False,
+        cbar_ax: Optional[plt.Axes] = None,
+        cbar_width: float = 0.04
 ) -> List[str]:
     """
     Create a SHAP beeswarm plot, colored by feature values when they are provided.
@@ -419,6 +422,12 @@ def shap_violin(
         Title text for the axes.
     clear_yticklabels : bool, default=False
         If True, hide the y-tick labels.
+    cbar_ax : matplotlib.axes.Axes, optional
+        If provided, draw the colorbar inside this axes instead of
+        creating an inset colorbar on the right.
+    cbar_width : float, default=0.04
+        Colorbar width as a fraction of the axes width (or the cbar axis width
+        when `cbar_ax` is provided).
 
     Returns
     -------
@@ -596,9 +605,35 @@ def shap_violin(
     # Add colorbar if using feature values
     m = cm.ScalarMappable(cmap=cmap)
     m.set_array([0, 1])
-    cb = plt.colorbar(m, ax=ax, ticks=[0, 1], aspect=20)
+    if cbar_ax is None:
+        cax = inset_axes(
+            ax,
+            width=f"{cbar_width * 100:.1f}%",
+            height="100%",
+            loc="lower left",
+            bbox_to_anchor=(1.02, 0.0, 1, 1),
+            bbox_transform=ax.transAxes,
+            borderpad=0,
+        )
+    else:
+        cbar_ax.set_axis_off()
+        cax = inset_axes(
+            cbar_ax,
+            width=f"{cbar_width * 100:.1f}%",
+            height="100%",
+            loc="center",
+            bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
+            bbox_transform=cbar_ax.transAxes,
+            borderpad=0,
+        )
+    cb = plt.colorbar(m, cax=cax, ticks=[0, 1])
     cb.set_ticklabels(['Low', 'High'])
-    cb.set_label('Feature Value', size=12, labelpad=-20)
+    if cbar_ax is None:
+        cb.set_label('Feature Value', size=12, labelpad=-20)
+    else:
+        cb.ax.yaxis.set_ticks_position('right')
+        cb.ax.yaxis.set_label_position('right')
+        cb.set_label('Feature Value', size=12, labelpad=-8)
     cb.outline.set_edgecolor('k')
     cb.ax.tick_params(labelsize=11, length=0)
     cb.set_alpha(1)
@@ -800,7 +835,7 @@ def plot_curve(
     
     # Format axes and apply limits
     axis_formatter(ax, r'Estimand of Interest', 'Ordered Specifications', title)
-    ax.set_xlim(0, n - 1)
+    ax.set_xlim(-0.5, n - 0.5)
     pad = (y1 - y0) * 0.1
     ax.set_ylim(y0 - pad, y1 + pad)
 
@@ -830,7 +865,9 @@ def plot_spec_matrix(
         title: str = '',
         bins: Optional[int] = None,
         heatmap_threshold: int = 128,
-        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis',
+        cbar_ax: Optional[plt.Axes] = None,
+        cbar_width: float = 0.04
 ) -> plt.Axes:
     """
     Plot a dot matrix indicating which controls are included in each specification.
@@ -858,6 +895,12 @@ def plot_spec_matrix(
         Minimum number of specifications required to switch from dots to heatmap.
     colormap : str or Colormap, default='viridis'
         Colormap used for dot color and heatmap shading.
+    cbar_ax : matplotlib.axes.Axes, optional
+        If provided, draw the heatmap colorbar inside this axes instead of
+        creating an inset colorbar on the right.
+    cbar_width : float, default=0.04
+        Colorbar width as a fraction of the heatmap axes width (or the cbar axis
+        width when `cbar_ax` is provided).
 
     Returns
     -------
@@ -893,7 +936,14 @@ def plot_spec_matrix(
     for i, ctrl in enumerate(controls):
         mask[i, :] = [ctrl in spec for spec in specs_ordered]
 
-    dot_color = _blue_palette(1)[0]
+    if isinstance(colormap, str):
+        cmap = matplotlib.colormaps[colormap]
+    elif isinstance(colormap, matplotlib.colors.Colormap):
+        cmap = colormap
+    else:
+        raise TypeError("colormap must be a string name or a Matplotlib Colormap.")
+
+    dot_color = matplotlib.colors.to_hex(cmap(0.7), keep_alpha=False)
 
     n_specs = len(specs_ordered)
     use_heatmap = bins is not None and bins > 0 and n_specs > heatmap_threshold
@@ -905,21 +955,54 @@ def plot_spec_matrix(
             if idxs.size == 0:
                 continue
             heat[:, b] = mask[:, idxs].mean(axis=1)
-        cmap = matplotlib.colormaps['Blues']
-        im = ax.imshow(
+        x_edges = np.empty(bins + 1, dtype=float)
+        x_edges[0] = idx_bins[0][0] - 0.5
+        for b, idxs in enumerate(idx_bins):
+            x_edges[b + 1] = idxs[-1] + 0.5
+
+        y_edges = np.arange(len(controls) + 1) - 0.5
+        im = ax.pcolormesh(
+            x_edges,
+            y_edges,
             heat,
-            aspect='auto',
             cmap=cmap,
             vmin=0,
             vmax=1,
-            origin='upper',
-            extent=[0, n_specs - 1, len(controls) - 0.5, -0.5],
-            interpolation='nearest'
+            shading='flat'
         )
-        cbar = ax.figure.colorbar(im, ax=ax, pad=0.02, fraction=0.05, aspect=25)
-        cbar.set_label('Inclusion Rate', fontsize=11)
-        cbar.ax.tick_params(labelsize=10)
+        if cbar_ax is None:
+            cax = inset_axes(
+                ax,
+                width=f"{cbar_width * 100:.1f}%",
+                height="100%",
+                loc="lower left",
+                bbox_to_anchor=(1.02, 0.0, 1, 1),
+                bbox_transform=ax.transAxes,
+                borderpad=0,
+            )
+        else:
+            cbar_ax.set_axis_off()
+            cax = inset_axes(
+                cbar_ax,
+                width=f"{cbar_width * 100:.1f}%",
+                height="100%",
+                loc="center",
+                bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
+                bbox_transform=cbar_ax.transAxes,
+                borderpad=0,
+            )
+        cbar = ax.figure.colorbar(im, cax=cax)
+        if cbar_ax is None:
+            cbar.set_label('Inclusion Rate', fontsize=11, labelpad=8)
+        else:
+            cbar.ax.set_title('')
+            cbar.ax.yaxis.set_ticks_position('right')
+            cbar.ax.yaxis.set_label_position('right')
+            cbar.set_label('Inclusion Rate', fontsize=11, labelpad=4)
+        cbar.ax.tick_params(labelsize=10, pad=2)
     else:
+        if cbar_ax is not None:
+            cbar_ax.axis('off')
         y_idx, x_idx = np.where(mask)
         ax.scatter(
             x_idx,
@@ -937,7 +1020,7 @@ def plot_spec_matrix(
     ax.set_yticklabels(controls, fontsize=11)
     ax.set_ylim(-0.5, len(controls) - 0.5)
     ax.invert_yaxis()
-    ax.set_xlim(0, len(specs_ordered) - 1)
+    ax.set_xlim(-0.5, len(specs_ordered) - 0.5)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
 
     ax.grid(False)
@@ -1486,16 +1569,26 @@ def plot_results(
         # Set up axes for subplots
         ax1 = fig.add_subplot(gs[0:3, 0:12])
         ax2 = fig.add_subplot(gs[0:3, 13:24])
-        ax4 = fig.add_subplot(gs[3:5, 6:14])
+        ax4 = fig.add_subplot(gs[3:5, 6:12])
         ax3 = fig.add_subplot(gs[3:5, 0:6])
+        ax4_cbar = fig.add_subplot(gs[3:5, 12:13])
         ax5 = fig.add_subplot(gs[3:5, 14:23])
         spec_gs = GridSpecFromSubplotSpec(
-            2, 1, subplot_spec=gs[5:9, 0:13], height_ratios=[2, 1], hspace=0.12
+            2,
+            2,
+            subplot_spec=gs[5:9, 0:13],
+            height_ratios=[2, 1],
+            width_ratios=[12, 1],
+            hspace=0.12,
+            wspace=0.05
         )
         ax6 = fig.add_subplot(spec_gs[0, 0])
         ax6m = fig.add_subplot(spec_gs[1, 0], sharex=ax6)
-        ax7 = fig.add_subplot(gs[5:7, 13:23])
-        ax8 = fig.add_subplot(gs[7:9, 13:23])
+        ax6m_cbar = fig.add_subplot(spec_gs[1, 1])
+        ax6_cbar_spacer = fig.add_subplot(spec_gs[0, 1])
+        ax6_cbar_spacer.axis('off')
+        ax7 = fig.add_subplot(gs[5:7, 12:21])
+        ax8 = fig.add_subplot(gs[7:9, 14:23])
 
         # Prepare SHAP values and input matrix
         shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
@@ -1505,15 +1598,35 @@ def plot_results(
         # Generate plots in the grid
         plot_hexbin_r2(results_object, ax1, fig, oddsratio, colormap, title='a.')
         plot_hexbin_log(results_object, ax2, fig, oddsratio, colormap, title='b.')
-        feature_order = shap_violin(ax4, shap_vals, shap_x, shap_cols, title='d.', clear_yticklabels=True, cmap=colormap)
+        cbar_width = 0.6
+        feature_order = shap_violin(
+            ax4,
+            shap_vals,
+            shap_x,
+            shap_cols,
+            title='d.',
+            clear_yticklabels=True,
+            cmap=colormap,
+            cbar_ax=ax4_cbar,
+            cbar_width=cbar_width
+        )
         plot_bma(results_object, colormap, ax3, feature_order, title='c.')
         plot_kfolds(results_object, colormap, ax5, title='e.', despine_left=True)
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
                    ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio, colormap=colormap)
         order_idx = _spec_order_idx(results_object, oddsratio)
-        plot_spec_matrix(results_object=results_object, ax=ax6m, order_idx=order_idx,
-                         oddsratio=oddsratio, controls=feature_order,
-                         bins=spec_matrix_bins, heatmap_threshold=spec_matrix_threshold, colormap=colormap)
+        plot_spec_matrix(
+            results_object=results_object,
+            ax=ax6m,
+            order_idx=order_idx,
+            oddsratio=oddsratio,
+            controls=feature_order,
+            bins=spec_matrix_bins,
+            heatmap_threshold=spec_matrix_threshold,
+            colormap=colormap,
+            cbar_ax=ax6m_cbar,
+            cbar_width=cbar_width
+        )
         locator = mticker.MaxNLocator(5)
         ax6.xaxis.set_major_locator(locator)
         ax6m.xaxis.set_major_locator(locator)

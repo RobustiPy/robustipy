@@ -990,19 +990,23 @@ def get_selection_key(specs: List[List[str]]) -> List[frozenset]:
     else:
         raise ValueError('Argument `specs` must be a list of list.')
 
-def get_colormap_colors(num_colors: int = 3) -> List[str]:
+def get_colormap_colors(
+        num_colors: int = 3,
+        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
+) -> List[str]:
     r"""
-    Return the first \(\texttt{num_colors}\) entries of a predetermined color palette.
+    Return \(\texttt{num_colors}\) evenly spaced colors from a Matplotlib colormap.
 
     Parameters
     ----------
     num_colors : int, optional
         The number of colors to return. Must satisfy
         \[
-            1 \;\le\; \texttt{num_colors} \;\le\; N,
+            1 \;\le\; \texttt{num_colors},
         \]
-        where \(N = 4\) is the total number of available colors in the palette.
         Defaults to 3.
+    colormap : str or matplotlib.colors.Colormap, optional
+        Colormap name or object to sample from. Defaults to 'viridis'.
 
     Returns
     -------
@@ -1014,21 +1018,30 @@ def get_colormap_colors(num_colors: int = 3) -> List[str]:
     TypeError
         If `num_colors` is not an integer.
     ValueError
-        If `num_colors < 1` or `num_colors > 4`.
+        If `num_colors < 1`.
     """
-
-    palette: List[str] = ["#345995", "#B80C09", "#D4AF37", '#2E6F40', "#955196", "#3C4CAD"]
 
     # Validate type
     if not isinstance(num_colors, int):
         raise TypeError(f"num_colors must be an integer, got {type(num_colors).__name__!r}")
 
-    N = len(palette)
     # Validate bounds
-    if num_colors < 1 or num_colors > N:
-        raise ValueError(f"num_colors must be between 1 and {N}, inclusive (got {num_colors}).")
+    if num_colors < 1:
+        raise ValueError(f"num_colors must be >= 1 (got {num_colors}).")
 
-    return palette[:num_colors]
+    if isinstance(colormap, str):
+        cmap = matplotlib.colormaps[colormap]
+    elif isinstance(colormap, matplotlib.colors.Colormap):
+        cmap = colormap
+    else:
+        raise TypeError("colormap must be a string name or a Matplotlib Colormap.")
+
+    if num_colors == 1:
+        samples = np.array([0.5])
+    else:
+        samples = np.linspace(0.0, 1.0, num_colors)
+
+    return [matplotlib.colors.to_hex(cmap(s), keep_alpha=False) for s in samples]
 
 def get_colors(specs: List[List[str]], color_set_name: Optional[str] = 'Set1') -> List[Tuple[float, float, float, float]]:
     """
