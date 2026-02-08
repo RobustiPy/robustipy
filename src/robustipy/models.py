@@ -614,8 +614,16 @@ class OLSResult(Protoresult):
                 signs = np.sign(self.estimates.iloc[i, :].to_numpy())
                 z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
             
-            # Calculate correlation matrix of z-scores across specifications
-            z_corr = np.corrcoef(z_matrix)
+            # Calculate correlation matrix of z-scores across specifications.
+            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
+            # when any row has near-zero variance.
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    category=RuntimeWarning,
+                    module=r"numpy\.lib\.function_base",
+                )
+                z_corr = np.corrcoef(z_matrix)
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -700,8 +708,16 @@ class OLSResult(Protoresult):
                 signs = np.sign(self.estimates.iloc[i, :].to_numpy())
                 z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
             
-            # Calculate correlation matrix of z-scores across specifications
-            z_corr = np.corrcoef(z_matrix)
+            # Calculate correlation matrix of z-scores across specifications.
+            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
+            # when any row has near-zero variance.
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    category=RuntimeWarning,
+                    module=r"numpy\.lib\.function_base",
+                )
+                z_corr = np.corrcoef(z_matrix)
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -722,12 +738,15 @@ class OLSResult(Protoresult):
             # Attempt Stouffer with the raw estimated correlation matrix.
             z_corr = np.asarray(z_corr, dtype=np.float64)
             try:
-                Z, p_combined = stouffer_method(
-                    df_model_result['p_values'].to_numpy(),
-                    two_sided=True,
-                    betas=df_model_result['betas'].to_numpy(),
-                    Sigma=z_corr,
-                )
+                # Suppress numpy divide/invalid runtime warnings here —
+                # we emit a clearer UserWarning on failure below.
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    Z, p_combined = stouffer_method(
+                        df_model_result['p_values'].to_numpy(),
+                        two_sided=True,
+                        betas=df_model_result['betas'].to_numpy(),
+                        Sigma=z_corr,
+                    )
 
                 # Store results with covariance structure
                 self.inference['Stouffers'] = (Z, p_combined)
@@ -735,7 +754,8 @@ class OLSResult(Protoresult):
                 self.inference['mean_correlation'] = rho_estimate
             except ValueError as e:
                 # If Σ leads to nonpositive/nonfinite variance, fall back to independence
-                warnings.warn(f"Stouffer: Σ path failed ({e}); falling back to independence assumption.", UserWarning)
+                # Use project-style WARNING lines (consistent with other messages).
+                print(f"WARNING: Stouffer Σ path failed ({e}); falling back to independence assumption.")
                 Z, p_comb = stouffer_method(
                     df_model_result['p_values'].to_numpy(),
                     two_sided=True,
