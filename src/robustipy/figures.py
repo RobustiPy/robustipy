@@ -909,7 +909,7 @@ def plot_spec_matrix(
     heatmap_threshold : int, default=128
         Minimum number of specifications required to switch from dots to heatmap.
     colormap : str or Colormap, default='viridis'
-        Colormap used for dot color and heatmap shading.
+        Colormap used for heatmap shading (dot matrix uses a fixed blue tone).
     cbar_ax : matplotlib.axes.Axes, optional
         If provided, draw the heatmap colorbar inside this axes instead of
         creating an inset colorbar on the right.
@@ -962,7 +962,8 @@ def plot_spec_matrix(
     else:
         raise TypeError("colormap must be a string name or a Matplotlib Colormap.")
 
-    dot_color = matplotlib.colors.to_hex(cmap(0.7), keep_alpha=False)
+    # Dot-matrix uses the consistent blue tone used in panels c/g
+    dot_color = _blue_palette(1)[0]
 
     n_specs = len(specs_ordered)
     use_heatmap = bins is not None and bins > 0 and n_specs > heatmap_threshold
@@ -1113,27 +1114,30 @@ def plot_ic(
             label = ', '.join(df.spec_name.iloc[idx])
             lines.append(ax.vlines(idx, ymin, df.at[idx, ic], color=col, label=label))
             markers.append(Line2D([0], [0], marker='o', color=col,
-                                  markerfacecolor='w', markersize=10, label=label))
+                                  markerfacecolor='w', markeredgecolor='k',
+                                  markersize=10, label=label))
             ax.plot(idx, df.at[idx, ic], 'o',
-                    markeredgecolor=col, markerfacecolor='w', markersize=15)
+                    markeredgecolor='k', markerfacecolor='w', markersize=15)
 
         # full‐model in last colour
         full_pos = df.index[df['full_spec_idx']].item()
         col_f = colorset[-1]
         lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
         markers.append(Line2D([0], [0], marker='o', color=col_f,
-                              markerfacecolor='w', markersize=10, label='Full Model'))
+                              markerfacecolor='w', markeredgecolor='k',
+                              markersize=10, label='Full Model'))
         ax.plot(full_pos, df.at[full_pos, ic], 'o',
-                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
+                markeredgecolor='k', markerfacecolor='w', markersize=15)
 
         # no‐controls in first colour
         null_pos = df.index[df['null_spec_idx']].item()
         col_n = colorset[0]
         lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
         markers.append(Line2D([0], [0], marker='o', color=col_n,
-                              markerfacecolor='w', markersize=10, label='No Controls'))
+                              markerfacecolor='w', markeredgecolor='k',
+                              markersize=10, label='No Controls'))
         ax.plot(null_pos, df.at[null_pos, ic], 'o',
-                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
+                markeredgecolor='k', markerfacecolor='w', markersize=15)
 
         ax.legend(handles=markers,
                   frameon=True, edgecolor='black',
@@ -1161,18 +1165,20 @@ def plot_ic(
         col_f = colorset[-1]
         lines.append(ax.vlines(full_pos, ymin, df.at[full_pos, ic], color=col_f, label='Full Model'))
         markers.append(Line2D([0], [0], marker='o', color=col_f,
-                              markerfacecolor='w', markersize=10, label='Full Model'))
+                              markerfacecolor='w', markeredgecolor='k',
+                              markersize=10, label='Full Model'))
         ax.plot(full_pos, df.at[full_pos, ic], 'o',
-                markeredgecolor=col_f, markerfacecolor='w', markersize=15)
+                markeredgecolor='k', markerfacecolor='w', markersize=15)
 
         # no controls
         null_pos = df.index[df['null_spec_idx']].item()
         col_n = colorset[0]
         lines.append(ax.vlines(null_pos, ymin, df.at[null_pos, ic], color=col_n, label='No Controls'))
         markers.append(Line2D([0], [0], marker='o', color=col_n,
-                              markerfacecolor='w', markersize=10, label='No Controls'))
+                              markerfacecolor='w', markeredgecolor='k',
+                              markersize=10, label='No Controls'))
         ax.plot(null_pos, df.at[null_pos, ic], 'o',
-                markeredgecolor=col_n, markerfacecolor='w', markersize=15)
+                markeredgecolor='k', markerfacecolor='w', markersize=15)
 
         ax.legend(handles=markers,
                   frameon=True, edgecolor='black',
