@@ -27,7 +27,6 @@ from sklearn.metrics import log_loss, root_mean_squared_error
 from sklearn.model_selection import GroupKFold, KFold, train_test_split
 from statsmodels.tools.tools import add_constant
 
-from robustipy.bootstrap_utils import stripped_ols
 from robustipy.figures import plot_results
 from robustipy.prototypes import Protoresult, BaseRobust
 from robustipy.utils import (
@@ -42,7 +41,8 @@ from robustipy.utils import (
     sample_z_masks,
     _ensure_single_constant,
     rescale,
-    make_inquiry
+    make_inquiry,
+    stripped_ols
 )
 import warnings
 from typing import List, Tuple

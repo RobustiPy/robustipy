@@ -4,14 +4,6 @@ robustipy package
 Submodules
 ----------
 
-robustipy.bootstrap\_utils module
----------------------------------
-
-.. automodule:: robustipy.bootstrap_utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 robustipy.figures module
 ------------------------
 
