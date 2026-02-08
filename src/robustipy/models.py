@@ -237,7 +237,7 @@ class MergedResult(Protoresult):
         self,
         loess: bool = True,
         specs: Optional[List[List[str]]] = None,
-        colormap: str = 'Spectral_r',
+        colormap: str = 'viridis',
         figsize: Tuple[int, int] = (16, 14),
         ext: str = 'pdf',
         figpath: str = None,
@@ -921,7 +921,7 @@ class OLSResult(Protoresult):
              specs: Optional[List[List[str]]] = None,
              ic: str = 'aic',
              ci: float = 1,
-             colormap: str = 'Spectral_r',
+             colormap: str = 'viridis',
              figsize: Tuple[int, int] = (12, 6),
              ext: str = '   pdf',
              figpath = None,
@@ -942,7 +942,7 @@ class OLSResult(Protoresult):
             Which information criterion to display.
         ci: float, default=1
             Confidence interval.
-        colormap : str, default='Spectral_r'
+        colormap : str, default='viridis'
             Name of the matplotlib colormap for the plot.
         figpath : str or Path, optional
             Directory in which to save outputs; if None, uses current working dir.
