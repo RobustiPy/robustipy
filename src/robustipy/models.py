@@ -719,19 +719,33 @@ class OLSResult(Protoresult):
         # Stouffer's method with estimated covariance
         # Use full correlation matrix (Sigma) to account for heterogeneous correlations
         if z_corr is not None and p_matrix.shape[1] > 1:
-            # Use full covariance matrix (Sigma)
-            # This accounts for heterogeneous correlations between specifications
-            Z, p_combined = stouffer_method(
-                df_model_result['p_values'].to_numpy(),
-                two_sided=True,
-                betas=df_model_result['betas'].to_numpy(),
-                Sigma=z_corr,  # Full correlation matrix
-            )
-            
-            # Store results with covariance structure
-            self.inference['Stouffers'] = (Z, p_combined)
-            self.inference['correlation_matrix'] = z_corr
-            self.inference['mean_correlation'] = rho_estimate
+            # Attempt Stouffer with the raw estimated correlation matrix.
+            z_corr = np.asarray(z_corr, dtype=np.float64)
+            try:
+                Z, p_combined = stouffer_method(
+                    df_model_result['p_values'].to_numpy(),
+                    two_sided=True,
+                    betas=df_model_result['betas'].to_numpy(),
+                    Sigma=z_corr,
+                )
+
+                # Store results with covariance structure
+                self.inference['Stouffers'] = (Z, p_combined)
+                self.inference['correlation_matrix'] = z_corr
+                self.inference['mean_correlation'] = rho_estimate
+            except ValueError as e:
+                # If Σ leads to nonpositive/nonfinite variance, fall back to independence
+                warnings.warn(f"Stouffer: Σ path failed ({e}); falling back to independence assumption.", UserWarning)
+                Z, p_comb = stouffer_method(
+                    df_model_result['p_values'].to_numpy(),
+                    two_sided=True,
+                    betas=df_model_result['betas'].to_numpy(),
+                )
+                log_p_two = np.log(2.0) + norm.logsf(abs(Z))
+                p_two = float(np.exp(log_p_two))
+                self.inference['Stouffers'] = (Z, p_two)
+                self.inference['correlation_matrix'] = None
+                self.inference['mean_correlation'] = None
         else:
             # Fall back to independence assumption
             Z, p_comb = stouffer_method(
