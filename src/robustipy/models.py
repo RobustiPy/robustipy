@@ -63,7 +63,8 @@ def stouffer_method(
     rho=None,                   # optional common correlation among z's
     Sigma=None,                 # optional full covariance of z; overrides rho
     clip_floor=1e-300,          # must be >= np.finfo(float).tiny
-    na_action="omit"
+    na_action="omit",
+    warn: bool = True
 ):
     """
     Combine p-values via Stouffer's Z-method with numerical safeguards.
@@ -122,7 +123,7 @@ def stouffer_method(
 
     n_zeros = int(np.sum(p == 0.0))
     n_ones  = int(np.sum(p == 1.0))
-    if n_zeros or n_ones:
+    if warn and (n_zeros or n_ones):
         print(f"WARNING: clipping {n_zeros} p=0 and {n_ones} p=1 to "
               f"[{clip_floor:g}, {clip_ceiling:g}].")
     p = np.clip(p, clip_floor, clip_ceiling)
@@ -137,7 +138,8 @@ def stouffer_method(
     if not np.all(np.isfinite(z)):
         # Numerical cap: Φ^{-1}(1 - 5e-300) ≈ 37
         Z_MAX = 37.0
-        print("WARNING: non-finite z encountered; clipping z to ±37.")
+        if warn:
+            print("WARNING: non-finite z encountered; clipping z to ±37.")
         z = np.clip(z, -Z_MAX, Z_MAX)
 
     # ---- 5) variance denominator under dependence
@@ -618,12 +620,9 @@ class OLSResult(Protoresult):
             # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
             # when any row has near-zero variance.
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    category=RuntimeWarning,
-                    module=r"numpy\.lib\.function_base",
-                )
-                z_corr = np.corrcoef(z_matrix)
+                warnings.simplefilter("ignore", RuntimeWarning)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    z_corr = np.corrcoef(z_matrix)
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -712,12 +711,9 @@ class OLSResult(Protoresult):
             # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
             # when any row has near-zero variance.
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    category=RuntimeWarning,
-                    module=r"numpy\.lib\.function_base",
-                )
-                z_corr = np.corrcoef(z_matrix)
+                warnings.simplefilter("ignore", RuntimeWarning)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    z_corr = np.corrcoef(z_matrix)
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -760,6 +756,7 @@ class OLSResult(Protoresult):
                     df_model_result['p_values'].to_numpy(),
                     two_sided=True,
                     betas=df_model_result['betas'].to_numpy(),
+                    warn=False,
                 )
                 log_p_two = np.log(2.0) + norm.logsf(abs(Z))
                 p_two = float(np.exp(log_p_two))
