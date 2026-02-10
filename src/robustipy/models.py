@@ -617,12 +617,18 @@ class OLSResult(Protoresult):
                 z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
             
             # Calculate correlation matrix of z-scores across specifications.
-            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
-            # when any row has near-zero variance.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    z_corr = np.corrcoef(z_matrix)
+            # Use safe manual correlation computation that handles zero-variance rows
+            # without emitting platform-dependent warnings.
+            z_centered = z_matrix - z_matrix.mean(axis=1, keepdims=True)
+            z_std = np.std(z_matrix, axis=1, keepdims=True)
+            # Avoid divide-by-zero: replace zero std with 1 (correlation undefined, set to NaN)
+            z_std_safe = np.where(z_std > 1e-14, z_std, 1.0)
+            z_normalized = z_centered / z_std_safe
+            z_corr = np.dot(z_normalized, z_normalized.T) / z_matrix.shape[1]
+            # Set correlation to NaN where either row has zero variance
+            zero_var_rows = (z_std[:, 0] <= 1e-14)
+            z_corr[zero_var_rows, :] = np.nan
+            z_corr[:, zero_var_rows] = np.nan
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -708,12 +714,18 @@ class OLSResult(Protoresult):
                 z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
             
             # Calculate correlation matrix of z-scores across specifications.
-            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
-            # when any row has near-zero variance.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    z_corr = np.corrcoef(z_matrix)
+            # Use safe manual correlation computation that handles zero-variance rows
+            # without emitting platform-dependent warnings.
+            z_centered = z_matrix - z_matrix.mean(axis=1, keepdims=True)
+            z_std = np.std(z_matrix, axis=1, keepdims=True)
+            # Avoid divide-by-zero: replace zero std with 1 (correlation undefined, set to NaN)
+            z_std_safe = np.where(z_std > 1e-14, z_std, 1.0)
+            z_normalized = z_centered / z_std_safe
+            z_corr = np.dot(z_normalized, z_normalized.T) / z_matrix.shape[1]
+            # Set correlation to NaN where either row has zero variance
+            zero_var_rows = (z_std[:, 0] <= 1e-14)
+            z_corr[zero_var_rows, :] = np.nan
+            z_corr[:, zero_var_rows] = np.nan
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -734,15 +746,12 @@ class OLSResult(Protoresult):
             # Attempt Stouffer with the raw estimated correlation matrix.
             z_corr = np.asarray(z_corr, dtype=np.float64)
             try:
-                # Suppress numpy divide/invalid runtime warnings here —
-                # we emit a clearer UserWarning on failure below.
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    Z, p_combined = stouffer_method(
-                        df_model_result['p_values'].to_numpy(),
-                        two_sided=True,
-                        betas=df_model_result['betas'].to_numpy(),
-                        Sigma=z_corr,
-                    )
+                Z, p_combined = stouffer_method(
+                    df_model_result['p_values'].to_numpy(),
+                    two_sided=True,
+                    betas=df_model_result['betas'].to_numpy(),
+                    Sigma=z_corr,
+                )
 
                 # Store results with covariance structure
                 self.inference['Stouffers'] = (Z, p_combined)
