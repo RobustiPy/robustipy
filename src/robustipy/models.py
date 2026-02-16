@@ -40,6 +40,7 @@ from robustipy.utils import (
     calculate_imv_score,
     sample_z_masks,
     _ensure_single_constant,
+    _find_group_invariant_columns,
     rescale,
     make_inquiry,
     stripped_ols
@@ -1317,7 +1318,31 @@ class OLSRobust(BaseRobust):
         self.composite_sample = composite_sample
 
         # Ensure constant term and prepare x, controls
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        if group:
+            # With group demeaning, an intercept is not identified. Drop any existing constant.
+            if "const" in self.data.columns:
+                self.data = self.data.drop(columns=["const"])
+            if "const" in self.x:
+                self.x = [c for c in self.x if c != "const"]
+            if "const" in controls:
+                controls = [c for c in controls if c != "const"]
+            warnings.warn(
+                "[OLSRobust] Group fixed effects requested: dropping constant term "
+                "before demeaning so t/p are identified.",
+                UserWarning
+            )
+            invariant = _find_group_invariant_columns(self.data, self.x + controls, group)
+            inv_x = [c for c in invariant if c in self.x]
+            inv_controls = [c for c in invariant if c in controls]
+            if inv_x or inv_controls:
+                warnings.warn(
+                    "[OLSRobust] These variables are constant within each group and "
+                    "are not identified under group demeaning. t/p will be NaN for them: "
+                    f"x={inv_x!r}, controls={inv_controls!r}.",
+                    UserWarning
+                )
+        else:
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
 
         # Handle multiple y case
         if len(self.y) > 1:
@@ -2164,7 +2189,31 @@ class LRobust(BaseRobust):
         self.data = self.data.copy()
 
         # Ensure a constant term in the design matrix
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        if group:
+            # With group demeaning, an intercept is not identified. Drop any existing constant.
+            if "const" in self.data.columns:
+                self.data = self.data.drop(columns=["const"])
+            if "const" in self.x:
+                self.x = [c for c in self.x if c != "const"]
+            if "const" in controls:
+                controls = [c for c in controls if c != "const"]
+            warnings.warn(
+                "[LRobust] Group fixed effects requested: dropping constant term "
+                "before demeaning so t/p are identified.",
+                UserWarning
+            )
+            invariant = _find_group_invariant_columns(self.data, self.x + controls, group)
+            inv_x = [c for c in invariant if c in self.x]
+            inv_controls = [c for c in invariant if c in controls]
+            if inv_x or inv_controls:
+                warnings.warn(
+                    "[LRobust] These variables are constant within each group and "
+                    "are not identified under group demeaning. t/p will be NaN for them: "
+                    f"x={inv_x!r}, controls={inv_controls!r}.",
+                    UserWarning
+                )
+        else:
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
 
         # Validate modeling parameters
         self._validate_fit_args(
