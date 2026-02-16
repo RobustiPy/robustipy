@@ -10,3 +10,4 @@ seaborn>=0.13.2
 rich
 scikit-learn>=1.4.0
 sphinx_rtd_theme
+ipywidgets
