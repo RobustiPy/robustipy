@@ -1664,6 +1664,17 @@ def plot_results(
             cbar_width=cbar_width,
             cbar_width_fig=cbar_width_fig
         )
+        # If spec matrix is dots (not heatmap), align panel h horizontally with g.
+        n_specs = len(results_object.specs_names)
+        use_heatmap = (
+            spec_matrix_bins is not None
+            and spec_matrix_bins > 0
+            and n_specs > spec_matrix_threshold
+        )
+        if not use_heatmap:
+            pos_g = ax7.get_position()
+            pos_h = ax8.get_position()
+            ax8.set_position([pos_g.x0, pos_h.y0, pos_g.width, pos_h.height])
         locator = mticker.MaxNLocator(5)
         ax6.xaxis.set_major_locator(locator)
         ax6m.xaxis.set_major_locator(locator)
