@@ -720,6 +720,7 @@ class OLSResult(Protoresult):
                 warnings.simplefilter("ignore", RuntimeWarning)
                 with np.errstate(divide="ignore", invalid="ignore"):
                     z_corr = np.corrcoef(z_matrix)
+                    z_corr = np.nan_to_num(z_corr, nan=0.0)
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
