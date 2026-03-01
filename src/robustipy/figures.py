@@ -1651,12 +1651,20 @@ def plot_results(
         plot_curve(results_object=results_object, loess=loess, ci=ci, specs=specs,
                    ax=ax6, highlights=highlights, title='f.', oddsratio=oddsratio, colormap=colormap)
         order_idx = _spec_order_idx(results_object, oddsratio)
+        # Build the spec-matrix control list: all controls, ordered by
+        # SHAP importance (feature_order) where available, with any
+        # controls not ranked by SHAP appended at the end.
+        controls_set = set(results_object.controls)
+        spec_matrix_controls = [c for c in feature_order if c in controls_set]
+        for c in results_object.controls:
+            if c not in spec_matrix_controls:
+                spec_matrix_controls.append(c)
         plot_spec_matrix(
             results_object=results_object,
             ax=ax6m,
             order_idx=order_idx,
             oddsratio=oddsratio,
-            controls=feature_order,
+            controls=spec_matrix_controls,
             bins=spec_matrix_bins,
             heatmap_threshold=spec_matrix_threshold,
             colormap=colormap,
