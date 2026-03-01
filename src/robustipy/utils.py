@@ -892,10 +892,14 @@ def simple_ols(y, x) -> dict:
     sse = np.dot(e.T, e) / df_e
 
     # Standard errors of coefficients
-    se = np.sqrt(np.diagonal(sse * inv_xx))
+    # Suppress invalid value warnings when computing sqrt of near-singular matrices
+    with np.errstate(divide='ignore', invalid='ignore'):
+        se = np.sqrt(np.diagonal(sse * inv_xx))
 
     # T-statistics and p-values
-    t = b / se
+    # Suppress divide-by-zero warnings when se contains near-zero values
+    with np.errstate(divide='ignore', invalid='ignore'):
+        t = b / se
     p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2
 
     # R² and adjusted R²
@@ -917,7 +921,7 @@ def simple_ols(y, x) -> dict:
     }
 
 
-def stripped_ols(y, x) -> dict:
+def stripped_ols(y, x, add_const: bool = True) -> dict:
     """
     Perform Ordinary Least Squares (OLS) regression analysis with stripped output.
 
@@ -928,6 +932,10 @@ def stripped_ols(y, x) -> dict:
     x : array-like
         Independent variable values. The matrix should be shaped as
                    (number of observations, number of independent variables).
+    add_const : bool, default True
+        Whether to add a constant column for the intercept term.
+        Set to False when using group-demeaned data (fixed effects), where the
+        intercept is already absorbed by the demeaning.
 
     Returns
     -------
@@ -943,10 +951,12 @@ def stripped_ols(y, x) -> dict:
     - Missing values in `x` or `y` are not handled, and the function may produce
       unexpected results if there are missing values in the input data.
     - The function internally adds a constant column to the independent variables
-      matrix `x` to represent the intercept term in the regression equation.
-    - Constant terms are added to `x` by default.
+      matrix `x` to represent the intercept term in the regression equation, unless
+      add_const=False is specified.
+    - Constant terms are added to `x` by default (add_const=True).
     """
-    x['const'] = 1  # Add constant term for intercept
+    if add_const:
+        x['const'] = 1  # Add constant term for intercept
     x = np.asarray(x)
     y = np.asarray(y)
     if x.size == 0 or y.size == 0:

@@ -1326,7 +1326,28 @@ class OLSRobust(BaseRobust):
         self.composite_sample = composite_sample
 
         # Ensure constant term and prepare x, controls
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        # NOTE: When using group-demeaning (fixed effects), the constant term is absorbed
+        # by the demeaning process and becomes zero-variance, creating singularity.
+        # Therefore, we skip adding a constant when group is specified.
+        if group is None:
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        else:
+            # With group-demeaning, still check for existing zero-variance columns to keep one
+            # but don't create a new const column
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+            # Remove 'const' if it was just created (to avoid post-demeaning singularity)
+            if 'const' in self.x and self.x[-1] == 'const':
+                # Check if 'const' is truly a newly-added column (all 1.0 values)
+                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
+                    self.x.remove('const')
+                    if 'const' in self.data.columns:
+                        self.data.drop(columns=['const'], inplace=True)
+            if 'const' in controls and controls[-1] == 'const':
+                # Similar check for controls
+                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
+                    controls.remove('const')
+                    if 'const' in self.data.columns:
+                        self.data.drop(columns=['const'], inplace=True)
 
         # Handle multiple y case
         if len(self.y) > 1:
@@ -1870,8 +1891,9 @@ class OLSRobust(BaseRobust):
             x = x.drop(no_singleton.columns[0], axis=1)
 
         # Fit standard OLS and y_star model
-        output = stripped_ols(y=y, x=x)
-        output_ystar = stripped_ols(y=y_star, x=x)
+        # When using group-demeaning (fixed effects), don't add const since intercept is absorbed
+        output = stripped_ols(y=y, x=x, add_const=(group is None))
+        output_ystar = stripped_ols(y=y_star, x=x, add_const=(group is None))
 
         b = output['b']
         p = output['p']
@@ -2173,7 +2195,28 @@ class LRobust(BaseRobust):
         self.data = self.data.copy()
 
         # Ensure a constant term in the design matrix
-        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        # NOTE: When using group-demeaning (fixed effects), the constant term is absorbed
+        # by the demeaning process and becomes zero-variance, creating singularity.
+        # Therefore, we skip adding a constant when group is specified.
+        if group is None:
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+        else:
+            # With group-demeaning, still check for existing zero-variance columns to keep one
+            # but don't create a new const column
+            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+            # Remove 'const' if it was just created (to avoid post-demeaning singularity)
+            if 'const' in self.x and self.x[-1] == 'const':
+                # Check if 'const' is truly a newly-added column (all 1.0 values)
+                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
+                    self.x.remove('const')
+                    if 'const' in self.data.columns:
+                        self.data.drop(columns=['const'], inplace=True)
+            if 'const' in controls and controls[-1] == 'const':
+                # Similar check for controls
+                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
+                    controls.remove('const')
+                    if 'const' in self.data.columns:
+                        self.data.drop(columns=['const'], inplace=True)
 
         # Validate modeling parameters
         self._validate_fit_args(
