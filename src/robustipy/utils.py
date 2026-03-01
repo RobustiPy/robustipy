@@ -904,51 +904,49 @@ def simple_ols(y, x) -> dict:
         raise ValueError("Inputs must not be empty.")
 
     # Compute (X'X)^(-1) or use pseudo-inverse if singular
-    try:
-        inv_xx = np.linalg.inv(np.dot(x.T, x))
-    except np.linalg.LinAlgError:
-        inv_xx = np.linalg.pinv(np.dot(x.T, x))
-
-    # Compute X'Y
-    xy = np.dot(x.T, y)
-
-    # Estimate coefficients: b = (X'X)^(-1) X'Y
-    b = np.dot(inv_xx, xy)
-
-    # Basic dimensions
-    nobs = y.shape[0]       # number of observations
-    ncoef = x.shape[1]      # number of coefficients
-    df_e = nobs - ncoef     # degrees of freedom (residual)
-
-    # Compute residuals
-    e = y - np.dot(x, b)
-
-    # Sum of squared errors divided by df: residual variance
-    sse = np.dot(e.T, e) / df_e
-
-
-    # Standard errors of coefficients
-    se = np.sqrt(np.diagonal(sse * inv_xx))
-    se_col = se.reshape(-1, 1)
-
-    # T-statistics and p-values (safe for zero SEs)
     with np.errstate(divide='ignore', invalid='ignore'):
+        try:
+            inv_xx = np.linalg.inv(np.dot(x.T, x))
+        except np.linalg.LinAlgError:
+            inv_xx = np.linalg.pinv(np.dot(x.T, x))
+
+        # Compute X'Y
+        xy = np.dot(x.T, y)
+
+        # Estimate coefficients: b = (X'X)^(-1) X'Y
+        b = np.dot(inv_xx, xy)
+
+        # Basic dimensions
+        nobs = y.shape[0]       # number of observations
+        ncoef = x.shape[1]      # number of coefficients
+        df_e = nobs - ncoef     # degrees of freedom (residual)
+
+        # Compute residuals
+        e = y - np.dot(x, b)
+
+        # Sum of squared errors divided by df: residual variance
+        sse = np.dot(e.T, e) / df_e
+
+        # Standard errors of coefficients (suppress warnings from sqrt of negative/NaN)
+        se = np.sqrt(np.diagonal(sse * inv_xx))
+        se_col = se.reshape(-1, 1)
+
+        # T-statistics and p-values (safe for zero SEs)
         t = b / se_col
-    t = np.where(se_col == 0, np.nan, t)
-    p = np.where(
-        np.isfinite(t),
-        (1 - scipy.stats.t.cdf(np.abs(t), df_e)) * 2,
-        np.nan
-    )
+        t = np.where(se_col == 0, np.nan, t)
+        p = np.where(
+            np.isfinite(t),
+            (1 - scipy.stats.t.cdf(np.abs(t), df_e)) * 2,
+            np.nan
+        )
 
+        # R² and adjusted R²
+        R2 = 1 - e.var() / y.var()
+        R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))
 
-    # R² and adjusted R²
-    R2 = 1 - e.var() / y.var()
-    R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))
-
-    # Log-likelihood of model under Gaussian errors
-    ll = (-(nobs / 2) * (1 + np.log(2 * np.pi)) -
-          (nobs / 2) * np.log(abs(np.dot(e.T, e) / nobs)))
+        # Log-likelihood of model under Gaussian errors
+        ll = (-(nobs / 2) * (1 + np.log(2 * np.pi)) -
+              (nobs / 2) * np.log(abs(np.dot(e.T, e) / nobs)))
 
 
     return {
@@ -1014,10 +1012,10 @@ def stripped_ols(y, x, add_const: bool = True) -> dict:
         df_e = nobs - ncoef  # degrees of freedom, error
         e = y - np.dot(x, b)  # residuals
         sse = np.dot(e.T, e) / df_e  # SSE
+        # Suppress warnings for sqrt of potentially negative/NaN values from singular designs
         se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
         se_col = se.reshape(-1, 1)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            t = b / se_col  # coef. t-statistics
+        t = b / se_col  # coef. t-statistics
         t = np.where(se_col == 0, np.nan, t)
         p = np.where(
             np.isfinite(t),
