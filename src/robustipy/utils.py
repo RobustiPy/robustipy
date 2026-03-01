@@ -484,6 +484,41 @@ def _ensure_single_constant(
     return x_list, controls
 
 
+def _find_group_invariant_columns(
+    dataframe: pd.DataFrame,
+    cols: List[str],
+    group: str
+) -> List[str]:
+    """
+    Identify columns that are constant within every group.
+
+    Parameters
+    ----------
+    dataframe : pd.DataFrame
+        Input data.
+    cols : list of str
+        Candidate columns to check.
+    group : str
+        Grouping column name.
+
+    Returns
+    -------
+    list of str
+        Columns whose within-group nunique max <= 1.
+    """
+    if group is None or group not in dataframe.columns:
+        return []
+
+    cols = [c for c in cols if c in dataframe.columns and c != group]
+    if not cols:
+        return []
+
+    grouped = dataframe.groupby(group, observed=True)
+    nunique = grouped[cols].nunique(dropna=False)
+    max_nunique = nunique.max()
+    invariant = max_nunique[max_nunique <= 1].index.tolist()
+    return invariant
+
 
 def concat_results(objs: List["OLSResult"], de_dupe=True) -> "OLSResult":
     """
@@ -891,16 +926,21 @@ def simple_ols(y, x) -> dict:
     # Sum of squared errors divided by df: residual variance
     sse = np.dot(e.T, e) / df_e
 
-    # Standard errors of coefficients
-    # Suppress invalid value warnings when computing sqrt of near-singular matrices
-    with np.errstate(divide='ignore', invalid='ignore'):
-        se = np.sqrt(np.diagonal(sse * inv_xx))
 
-    # T-statistics and p-values
-    # Suppress divide-by-zero warnings when se contains near-zero values
+    # Standard errors of coefficients
+    se = np.sqrt(np.diagonal(sse * inv_xx))
+    se_col = se.reshape(-1, 1)
+
+    # T-statistics and p-values (safe for zero SEs)
     with np.errstate(divide='ignore', invalid='ignore'):
-        t = b / se
-    p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2
+        t = b / se_col
+    t = np.where(se_col == 0, np.nan, t)
+    p = np.where(
+        np.isfinite(t),
+        (1 - scipy.stats.t.cdf(np.abs(t), df_e)) * 2,
+        np.nan
+    )
+
 
     # R² and adjusted R²
     R2 = 1 - e.var() / y.var()
@@ -909,6 +949,7 @@ def simple_ols(y, x) -> dict:
     # Log-likelihood of model under Gaussian errors
     ll = (-(nobs / 2) * (1 + np.log(2 * np.pi)) -
           (nobs / 2) * np.log(abs(np.dot(e.T, e) / nobs)))
+
 
     return {
         'b': b,
@@ -974,13 +1015,21 @@ def stripped_ols(y, x, add_const: bool = True) -> dict:
         e = y - np.dot(x, b)  # residuals
         sse = np.dot(e.T, e) / df_e  # SSE
         se = np.sqrt(np.diagonal(sse * inv_xx))  # coef. standard errors
-        t = b / se  # coef. t-statistics
-        p = (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2  # coef. p-values
+        se_col = se.reshape(-1, 1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            t = b / se_col  # coef. t-statistics
+        t = np.where(se_col == 0, np.nan, t)
+        p = np.where(
+            np.isfinite(t),
+            (1 - scipy.stats.t.cdf(abs(t), df_e)) * 2,
+            np.nan
+        )  # coef. p-values
         R2 = 1 - e.var() / y.var()  # model R-squared
         R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))  # adjusted R-square
     return {'b': b,
             'p': p,
             'r2': R2adj}
+
 
 def group_demean(x: pd.DataFrame, group: Optional[str] = None) -> pd.DataFrame:
     """
@@ -1280,8 +1329,8 @@ def prepare_asc(asc_path: str) -> Tuple[str, List[str], List[str], str, pd.DataF
     """
     ASC_df = pd.read_stata(asc_path, convert_categoricals=False)
     one_hot = pd.get_dummies(ASC_df['year'])
-    ASC_df = ASC_df.join(one_hot)
-    ASC_df['dcareNew*c.lrealgs'] = ASC_df['dcareNew'] * ASC_df['lrealgs']
+    interaction = (ASC_df['dcareNew'] * ASC_df['lrealgs']).rename('dcareNew*c.lrealgs')
+    ASC_df = pd.concat([ASC_df, one_hot, interaction], axis=1)
 
     ASC_df = ASC_df[['wellbeing_kikert', 'lrealgs', 'dcareNew*c.lrealgs', 'dcareNew',
                      'DR', 'lgva', 'Mtotp', 'ddgree', 'age',

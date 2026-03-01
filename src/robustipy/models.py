@@ -40,6 +40,7 @@ from robustipy.utils import (
     calculate_imv_score,
     sample_z_masks,
     _ensure_single_constant,
+    _find_group_invariant_columns,
     rescale,
     make_inquiry,
     stripped_ols
@@ -714,18 +715,15 @@ class OLSResult(Protoresult):
                 z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
             
             # Calculate correlation matrix of z-scores across specifications.
-            # Use safe manual correlation computation that handles zero-variance rows
-            # without emitting platform-dependent warnings.
-            z_centered = z_matrix - z_matrix.mean(axis=1, keepdims=True)
-            z_std = np.std(z_matrix, axis=1, keepdims=True)
-            # Avoid divide-by-zero: replace zero std with 1 (correlation undefined, set to NaN)
-            z_std_safe = np.where(z_std > 1e-14, z_std, 1.0)
-            z_normalized = z_centered / z_std_safe
-            z_corr = np.dot(z_normalized, z_normalized.T) / z_matrix.shape[1]
-            # Set correlation to NaN where either row has zero variance
-            zero_var_rows = (z_std[:, 0] <= 1e-14)
-            z_corr[zero_var_rows, :] = np.nan
-            z_corr[:, zero_var_rows] = np.nan
+
+            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
+            # when any row has near-zero variance.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    z_corr = np.corrcoef(z_matrix)
+                    z_corr = np.nan_to_num(z_corr, nan=0.0)
+
             
             # Extract mean off-diagonal correlation as rho estimate
             n_specs = z_corr.shape[0]
@@ -1326,28 +1324,33 @@ class OLSRobust(BaseRobust):
         self.composite_sample = composite_sample
 
         # Ensure constant term and prepare x, controls
-        # NOTE: When using group-demeaning (fixed effects), the constant term is absorbed
-        # by the demeaning process and becomes zero-variance, creating singularity.
-        # Therefore, we skip adding a constant when group is specified.
-        if group is None:
-            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+
+        if group:
+            # With group demeaning, an intercept is not identified. Drop any existing constant.
+            if "const" in self.data.columns:
+                self.data = self.data.drop(columns=["const"])
+            if "const" in self.x:
+                self.x = [c for c in self.x if c != "const"]
+            if "const" in controls:
+                controls = [c for c in controls if c != "const"]
+            warnings.warn(
+                "[OLSRobust] Group fixed effects requested: dropping constant term "
+                "before demeaning so t/p are identified.",
+                UserWarning
+            )
+            invariant = _find_group_invariant_columns(self.data, self.x + controls, group)
+            inv_x = [c for c in invariant if c in self.x]
+            inv_controls = [c for c in invariant if c in controls]
+            if inv_x or inv_controls:
+                warnings.warn(
+                    "[OLSRobust] These variables are constant within each group and "
+                    "are not identified under group demeaning. t/p will be NaN for them: "
+                    f"x={inv_x!r}, controls={inv_controls!r}.",
+                    UserWarning
+                )
         else:
-            # With group-demeaning, still check for existing zero-variance columns to keep one
-            # but don't create a new const column
             self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
-            # Remove 'const' if it was just created (to avoid post-demeaning singularity)
-            if 'const' in self.x and self.x[-1] == 'const':
-                # Check if 'const' is truly a newly-added column (all 1.0 values)
-                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
-                    self.x.remove('const')
-                    if 'const' in self.data.columns:
-                        self.data.drop(columns=['const'], inplace=True)
-            if 'const' in controls and controls[-1] == 'const':
-                # Similar check for controls
-                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
-                    controls.remove('const')
-                    if 'const' in self.data.columns:
-                        self.data.drop(columns=['const'], inplace=True)
+
 
         # Handle multiple y case
         if len(self.y) > 1:
@@ -2195,28 +2198,33 @@ class LRobust(BaseRobust):
         self.data = self.data.copy()
 
         # Ensure a constant term in the design matrix
-        # NOTE: When using group-demeaning (fixed effects), the constant term is absorbed
-        # by the demeaning process and becomes zero-variance, creating singularity.
-        # Therefore, we skip adding a constant when group is specified.
-        if group is None:
-            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+
+        if group:
+            # With group demeaning, an intercept is not identified. Drop any existing constant.
+            if "const" in self.data.columns:
+                self.data = self.data.drop(columns=["const"])
+            if "const" in self.x:
+                self.x = [c for c in self.x if c != "const"]
+            if "const" in controls:
+                controls = [c for c in controls if c != "const"]
+            warnings.warn(
+                "[LRobust] Group fixed effects requested: dropping constant term "
+                "before demeaning so t/p are identified.",
+                UserWarning
+            )
+            invariant = _find_group_invariant_columns(self.data, self.x + controls, group)
+            inv_x = [c for c in invariant if c in self.x]
+            inv_controls = [c for c in invariant if c in controls]
+            if inv_x or inv_controls:
+                warnings.warn(
+                    "[LRobust] These variables are constant within each group and "
+                    "are not identified under group demeaning. t/p will be NaN for them: "
+                    f"x={inv_x!r}, controls={inv_controls!r}.",
+                    UserWarning
+                )
         else:
-            # With group-demeaning, still check for existing zero-variance columns to keep one
-            # but don't create a new const column
             self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
-            # Remove 'const' if it was just created (to avoid post-demeaning singularity)
-            if 'const' in self.x and self.x[-1] == 'const':
-                # Check if 'const' is truly a newly-added column (all 1.0 values)
-                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
-                    self.x.remove('const')
-                    if 'const' in self.data.columns:
-                        self.data.drop(columns=['const'], inplace=True)
-            if 'const' in controls and controls[-1] == 'const':
-                # Similar check for controls
-                if 'const' in self.data.columns and self.data['const'].nunique() == 1 and self.data['const'].iloc[0] == 1.0:
-                    controls.remove('const')
-                    if 'const' in self.data.columns:
-                        self.data.drop(columns=['const'], inplace=True)
+
 
         # Validate modeling parameters
         self._validate_fit_args(
