@@ -55,6 +55,81 @@ import pandas as pd
 from typing import List, Tuple
 
 
+def _progress_iter(iterable, *, total: int, description: str = "Working..."):
+    """
+    Return a progress-enabled iterator in terminal sessions and a plain iterator
+    in notebooks / non-interactive outputs.
+    """
+    in_jupyter = _in_jupyter()
+    if in_jupyter:
+        # Notebook progress is handled with draw-level tqdm bars.
+        return iterable
+    has_tty_output = sys.stdout.isatty() or sys.stderr.isatty()
+    return track(
+        iterable,
+        total=total,
+        description=description,
+        disable=not (has_tty_output or in_jupyter),
+    )
+
+
+def _in_jupyter() -> bool:
+    """True when running inside a Jupyter kernel."""
+    try:
+        from IPython import get_ipython
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+    except (ImportError, AttributeError):
+        return False
+
+
+def _make_notebook_draws_bar(*, total: int, description: str):
+    """
+    Build a tqdm progress bar for notebooks. Returns None outside notebooks or
+    when tqdm isn't available.
+    """
+    if not _in_jupyter():
+        return None
+    try:
+        from tqdm.auto import tqdm
+    except ImportError:
+        return None
+    return tqdm(
+        total=total,
+        desc=description,
+        leave=True,
+        miniters=1,
+        mininterval=0.2,
+        smoothing=0,
+        unit="draw",
+        unit_scale=False,
+        bar_format=(
+            "{desc}: {percentage:5.1f}%|{bar}| "
+            "{n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+        ),
+    )
+
+
+def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=None):
+    """
+    Execute bootstrap seeds in batches so notebook progress can advance during a
+    specification (instead of waiting for all draws in that spec).
+    """
+    outputs = []
+    if len(seeds) == 0:
+        return outputs
+    batch_size = max(32, int(n_cpu) * 4)
+    for start in range(0, len(seeds), batch_size):
+        seed_batch = seeds[start:start + batch_size]
+        batch_output = Parallel(n_jobs=n_cpu)(
+            delayed(run_one_seed)(int(seed))
+            for seed in seed_batch
+        )
+        outputs.extend(batch_output)
+        if draws_bar is not None:
+            draws_bar.update(len(batch_output))
+    return outputs
+
+
 def stouffer_method(
     p_values,
     *,
@@ -1403,6 +1478,10 @@ class OLSRobust(BaseRobust):
             n_y_composites=n_y_comps,
             threshold=threshold
         )
+        notebook_draws_bar = _make_notebook_draws_bar(
+            total=space_n * draws * n_y_comps,
+            description="Bootstrap draws"
+        )
 
         # Delegate to single or multiple y logic
         if len(self.y) > 1:
@@ -1427,8 +1506,11 @@ class OLSRobust(BaseRobust):
             p_all_list = []
             
             # Loop over each composite y variable
-            for y, y_name in track(zip(self.y_composites,
-                                 self.y_specs), total=len(self.y_composites)):
+            for y, y_name in _progress_iter(
+                zip(self.y_composites, self.y_specs),
+                total=len(self.y_composites),
+                description="Composite Ys",
+            ):
                 
                 # Initialize arrays to store draws for this y-spec
                 b_array = np.empty([space_n, draws])
@@ -1483,15 +1565,16 @@ class OLSRobust(BaseRobust):
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                     seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
                     # Run bootstrap regressions in parallel
-                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*Parallel(n_jobs=n_cpu)
-                    (delayed(self._strap_OLS)
-                     (comb,
-                      group,
-                      sample_size,
-                      seed,
-                      y_star
-                      )
-                     for seed in seeds))
+                    def _run_one_seed(seed_i: int):
+                        return self._strap_OLS(comb, group, sample_size, seed_i, y_star)
+
+                    bootstrap_out = _run_parallel_seed_batches(
+                        seeds=seeds,
+                        n_cpu=n_cpu,
+                        run_one_seed=_run_one_seed,
+                        draws_bar=notebook_draws_bar
+                    )
+                    b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*bootstrap_out)
                     
                     # Collect and store results for this spec
                     y_names.append(y_name)
@@ -1601,7 +1684,11 @@ class OLSRobust(BaseRobust):
             shared_seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
             
             # Loop over all z-specs (combinations of control variables)
-            for spec, index in track(zip(z_specs, range(0, space_n)), total=space_n):
+            for spec, index in _progress_iter(
+                zip(z_specs, range(0, space_n)),
+                total=space_n,
+                description="Control specs",
+            ):
                 if 0 == len(spec):
                     comb = self.data[self.y + self.x]
                 else:
@@ -1630,14 +1717,16 @@ class OLSRobust(BaseRobust):
                 
                 # Bootstrap OLS model draws in parallel using SHARED seeds
                 # All specs use the same seeds to create proper correlation structure
-                b_list, p_list, r2_list, b_list_ystar, p_list_ystar  = zip(*Parallel(n_jobs=n_cpu)
-                (delayed(self._strap_OLS)
-                 (comb,
-                  group,
-                  sample_size,
-                  seed,
-                  y_star)
-                 for seed in shared_seeds))
+                def _run_one_seed(seed_i: int):
+                    return self._strap_OLS(comb, group, sample_size, seed_i, y_star)
+
+                bootstrap_out = _run_parallel_seed_batches(
+                    seeds=shared_seeds,
+                    n_cpu=n_cpu,
+                    run_one_seed=_run_one_seed,
+                    draws_bar=notebook_draws_bar
+                )
+                b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*bootstrap_out)
                 
                 # Store results for current spec
                 specs.append(frozenset(spec))
@@ -1682,6 +1771,8 @@ class OLSRobust(BaseRobust):
                                 name_av_k_metric=self.oos_metric_name,
                                 shap_return=shap_return)
             self.results = results
+        if notebook_draws_bar is not None:
+            notebook_draws_bar.close()
 
 
 
@@ -2268,6 +2359,10 @@ class LRobust(BaseRobust):
 
         else:
             space_n = space_size(controls)  # Number of control variable combinations
+            notebook_draws_bar = _make_notebook_draws_bar(
+                total=space_n * draws,
+                description="Bootstrap draws"
+            )
             specs = []
             all_predictors = []
             b_all_list = []
@@ -2310,7 +2405,11 @@ class LRobust(BaseRobust):
             shap_return = [explainer.shap_values(x_test), x_test]
 
             # Loop through all subsets of control variables
-            for spec, index in track(zip(all_subsets(controls), range(0, space_n)), total=space_n):
+            for spec, index in _progress_iter(
+                zip(all_subsets(controls), range(0, space_n)),
+                total=space_n,
+                description="Control specs",
+            ):
 
                 # Subset the data according to the current control combination
                 if len(spec) == 0:
@@ -2341,15 +2440,16 @@ class LRobust(BaseRobust):
 
                 # Bootstrap sampling (parallelized)
                 seeds = np.random.randint(0, 2**32 - 1, size=draws, dtype=np.int64)
-                (b_list, p_list, r2_list) = zip(*Parallel(n_jobs=n_cpu)(
-                    delayed(self._strap_regression)(
-                        comb,
-                        group,
-                        sample_size,
-                        seed
-                    )
-                    for seed in seeds
-                ))
+                def _run_one_seed(seed_i: int):
+                    return self._strap_regression(comb, group, sample_size, seed_i)
+
+                bootstrap_out = _run_parallel_seed_batches(
+                    seeds=seeds,
+                    n_cpu=n_cpu,
+                    run_one_seed=_run_one_seed,
+                    draws_bar=notebook_draws_bar
+                )
+                b_list, p_list, r2_list = zip(*bootstrap_out)
 
                 # Save results
                 specs.append(frozenset(spec))
@@ -2395,6 +2495,8 @@ class LRobust(BaseRobust):
                 name_av_k_metric=self.oos_metric_name,
                 shap_return=shap_return
             )
+            if notebook_draws_bar is not None:
+                notebook_draws_bar.close()
 
     def _strap_regression(
         self,
