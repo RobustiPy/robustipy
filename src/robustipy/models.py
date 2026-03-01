@@ -744,12 +744,15 @@ class OLSResult(Protoresult):
             # Attempt Stouffer with the raw estimated correlation matrix.
             z_corr = np.asarray(z_corr, dtype=np.float64)
             try:
-                Z, p_combined = stouffer_method(
-                    df_model_result['p_values'].to_numpy(),
-                    two_sided=True,
-                    betas=df_model_result['betas'].to_numpy(),
-                    Sigma=z_corr,
-                )
+                # Suppress numpy divide/invalid runtime warnings here —
+                # we emit a clearer UserWarning on failure below.
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    Z, p_combined = stouffer_method(
+                        df_model_result['p_values'].to_numpy(),
+                        two_sided=True,
+                        betas=df_model_result['betas'].to_numpy(),
+                        Sigma=z_corr,
+                    )
 
                 # Store results with covariance structure
                 self.inference['Stouffers'] = (Z, p_combined)
