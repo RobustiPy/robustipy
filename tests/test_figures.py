@@ -261,3 +261,40 @@ def test_plot_results_creates_files(tmp_path, mock_results_object, ic):
         )
         main_plot_path = out_dir / f"{test_proj_name}_all.png"
         assert main_plot_path.exists(), f"Expected {main_plot_path} to be created."
+
+
+def test_plot_results_type3_uses_control_order_for_bma(tmp_path, mock_results_object):
+    """
+    Regression test for Type-3 style models where x is a list of fixed covariates.
+    SHAP/BMA ordering should be built from controls (z), not x variables.
+    """
+    mock_results_object.x_name = ["x1", "x2"]
+    shap_vals = np.random.randn(30, 5)
+    mock_results_object.shap_return = [
+        shap_vals,
+        pd.DataFrame(shap_vals, columns=["x1", "x2", "featA", "featB", "featC"]),
+    ]
+
+    captured_feature_orders = []
+    original_plot_bma = plot_bma
+
+    def _capture_plot_bma(results_object, colormap, ax, feature_order, title=''):
+        captured_feature_orders.append(list(feature_order))
+        return original_plot_bma(results_object, colormap, ax, feature_order, title)
+
+    with patch("robustipy.figures.plot_bma", side_effect=_capture_plot_bma):
+        plot_results(
+            results_object=mock_results_object,
+            loess=True,
+            specs=[],
+            ic="aic",
+            colormap="Spectral_r",
+            figsize=(8, 8),
+            ext="png",
+            figpath=tmp_path,
+            project_name="type3_controls_only"
+        )
+
+    assert len(captured_feature_orders) >= 1
+    for order in captured_feature_orders:
+        assert set(order) == set(mock_results_object.controls)

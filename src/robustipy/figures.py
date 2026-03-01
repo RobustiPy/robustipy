@@ -1624,10 +1624,29 @@ def plot_results(
         ax7 = fig.add_subplot(gs[5:7, 12:21])
         ax8 = fig.add_subplot(gs[7:9, 14:23])
 
-        # Prepare SHAP values and input matrix
-        shap_vals = np.delete(results_object.shap_return[0], 0, axis=1)
-        shap_x = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").to_numpy()
-        shap_cols = results_object.shap_return[1].drop(columns=results_object.x_name, errors="ignore").columns
+        # Prepare SHAP values and input matrix (control/z variables only).
+        # This keeps panel c/d/spec-matrix focused on specification-varying terms.
+        shap_vals_full = np.asarray(results_object.shap_return[0])
+        shap_x_full = results_object.shap_return[1]
+        if not isinstance(shap_x_full, pd.DataFrame):
+            shap_x_full = pd.DataFrame(shap_x_full)
+        if shap_vals_full.ndim != 2:
+            raise ValueError(
+                f"Expected 2D SHAP values, received shape {shap_vals_full.shape!r}."
+            )
+        # Some SHAP pipelines prepend a bias column; drop it if present.
+        if shap_vals_full.shape[1] == shap_x_full.shape[1] + 1:
+            shap_vals_full = shap_vals_full[:, 1:]
+        if shap_vals_full.shape[1] != shap_x_full.shape[1]:
+            raise ValueError(
+                f"SHAP values columns ({shap_vals_full.shape[1]}) do not match "
+                f"feature matrix columns ({shap_x_full.shape[1]})."
+            )
+
+        shap_cols = [c for c in results_object.controls if c in shap_x_full.columns]
+        shap_idx = [shap_x_full.columns.get_loc(c) for c in shap_cols]
+        shap_vals = shap_vals_full[:, shap_idx]
+        shap_x = shap_x_full[shap_cols].to_numpy()
 
         # Generate plots in the grid
         plot_hexbin_r2(results_object, ax1, fig, oddsratio, colormap, title='a.')
