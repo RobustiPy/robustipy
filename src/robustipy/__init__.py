@@ -1,13 +1,16 @@
-"""Robustipy package initialization.
+"""robustipy package initialization.
 
-Keep warning output clean by stripping internal file paths for robustipy
-warnings while leaving external warnings unchanged.
+This module intentionally avoids global warning-hook side effects at import
+time. If compact robustipy-only warning formatting is desired, call
+`enable_compact_warnings()` explicitly.
 """
 
 from __future__ import annotations
 
 import sys
 import warnings
+
+__all__ = ["enable_compact_warnings", "disable_compact_warnings"]
 
 _ORIGINAL_SHOWWARNING = warnings.showwarning
 
@@ -27,9 +30,14 @@ def _robustipy_showwarning(message, category, filename, lineno, file=None, line=
     _ORIGINAL_SHOWWARNING(message, category, filename, lineno, file=file, line=line)
 
 
-def _install_warning_formatter() -> None:
+def enable_compact_warnings() -> None:
+    """Enable compact formatting for warnings emitted from robustipy modules."""
     if warnings.showwarning is not _robustipy_showwarning:
         warnings.showwarning = _robustipy_showwarning
 
 
-_install_warning_formatter()
+def disable_compact_warnings() -> None:
+    """Restore the original warning formatting handler."""
+    if warnings.showwarning is _robustipy_showwarning:
+        warnings.showwarning = _ORIGINAL_SHOWWARNING
+
