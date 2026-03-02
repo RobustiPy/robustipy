@@ -151,6 +151,42 @@ def _spec_bitmask(spec: Sequence[str], control_positions: dict[str, int]) -> int
     return mask
 
 
+def _cluster_bootstrap_by_rows(
+    temp_data: pd.DataFrame,
+    group: str,
+    seed: int,
+    target_rows: int
+) -> pd.DataFrame:
+    """
+    Draw a cluster bootstrap sample by repeatedly sampling groups (with replacement)
+    until at least `target_rows` observations are collected.
+
+    Notes
+    -----
+    - Preserves cluster integrity (whole groups are appended each draw).
+    - Output may exceed `target_rows` due to whole-cluster appends.
+    """
+    unique_groups = temp_data[group].unique()
+    if unique_groups.size == 0:
+        raise ValueError(f"No groups available in column '{group}'.")
+
+    target_rows = max(1, int(target_rows))
+    rng = np.random.default_rng(seed)
+    group_lookup = {
+        g: df_g for g, df_g in temp_data.groupby(group, sort=False, observed=True)
+    }
+
+    sampled_frames = []
+    n_rows = 0
+    while n_rows < target_rows:
+        g = rng.choice(unique_groups)
+        df_g = group_lookup[g]
+        sampled_frames.append(df_g)
+        n_rows += len(df_g)
+
+    return pd.concat(sampled_frames, ignore_index=True)
+
+
 def stouffer_method(
     p_values,
     *,
@@ -2134,16 +2170,13 @@ class OLSRobust(BaseRobust):
             x = x.drop(samp_df.columns[0], axis=1)
 
         else:
-            # Cluster bootstrap at the group level:
-            # sample groups with replacement and keep multiplicity.
-            # (Using `isin` would collapse duplicate sampled groups.)
-            unique_groups = temp_data[group].unique()
-            rng = np.random.default_rng(seed)
-            sampled_groups = rng.choice(unique_groups, size=len(unique_groups), replace=True)
-            group_lookup = {
-                g: df_g for g, df_g in temp_data.groupby(group, sort=False, observed=True)
-            }
-            select = pd.concat([group_lookup[g] for g in sampled_groups], ignore_index=True)
+            # Cluster bootstrap at the group level with a row target.
+            select = _cluster_bootstrap_by_rows(
+                temp_data=temp_data,
+                group=group,
+                seed=seed,
+                target_rows=sample_size
+            )
 
             # Remove singleton groups (with only one observation)
             no_singleton = select[select.groupby(group).transform('size') > 1]
@@ -2726,16 +2759,13 @@ class LRobust(BaseRobust):
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
         else:
-            # Cluster bootstrap at the group level:
-            # sample groups with replacement and keep multiplicity.
-            # (Using `isin` would collapse duplicate sampled groups.)
-            unique_groups = temp_data[group].unique()
-            rng = np.random.default_rng(seed)
-            sampled_groups = rng.choice(unique_groups, size=len(unique_groups), replace=True)
-            group_lookup = {
-                g: df_g for g, df_g in temp_data.groupby(group, sort=False, observed=True)
-            }
-            select = pd.concat([group_lookup[g] for g in sampled_groups], ignore_index=True)
+            # Cluster bootstrap at the group level with a row target.
+            select = _cluster_bootstrap_by_rows(
+                temp_data=temp_data,
+                group=group,
+                seed=seed,
+                target_rows=sample_size
+            )
             no_singleton = select[select.groupby(group).transform('size') > 1]
             no_singleton = no_singleton.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
