@@ -1600,7 +1600,7 @@ def plot_results(
 
     # Validate confidence interval value
     if not (0 <= ci <= 1):
-        sys.exit(f"`ci` must lie strictly between 0 and 1; received ci={ci!r}")
+        raise ValueError(f"`ci` must lie between 0 and 1; received ci={ci!r}")
 
     # Prepare output directory for saving figures
     outdir = _prepare_output_dir(Path(figpath) if figpath else None, project_name)
