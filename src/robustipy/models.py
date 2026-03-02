@@ -170,7 +170,7 @@ def stouffer_method(
         if betas is None:
             raise ValueError("`betas` must be provided when two_sided=True.")
         b_all = np.asarray(betas, dtype=np.float64)
-        b = b_all[valid] if b_all.shape != p_all.shape else b_all
+        b = b_all[valid] if not valid.all() else b_all
         if b.shape != p.shape:
             raise ValueError("`betas` length must match the number of valid p-values.")
         signs = np.sign(b)  # zeros give sign 0 -> z=0
@@ -181,7 +181,7 @@ def stouffer_method(
         w = np.ones(m, dtype=np.float64)
     else:
         w_all = np.asarray(weights, dtype=np.float64)
-        w = w_all[valid] if w_all.shape != p_all.shape else w_all
+        w = w_all[valid] if not valid.all() else w_all
         if w.shape != (m,):
             raise ValueError("`weights` must have the same length as valid p-values.")
         if not np.all(np.isfinite(w)):
@@ -220,10 +220,17 @@ def stouffer_method(
 
     # ---- 5) variance denominator under dependence
     if Sigma is not None:
-        Sigma = np.asarray(Sigma, dtype=np.float64)
-        if Sigma.shape != (m, m):
+        Sigma_all = np.asarray(Sigma, dtype=np.float64)
+
+        # If we omitted invalid p-values, we must take the matching principal submatrix.
+        if not valid.all():
+            Sigma_use = Sigma_all[np.ix_(valid, valid)]
+        else:
+            Sigma_use = Sigma_all
+
+        if Sigma_use.shape != (m, m):
             raise ValueError("`Sigma` must be an (m×m) covariance for the valid tests.")
-        denom2 = float(w @ (Sigma @ w))
+        denom2 = float(w @ (Sigma_use @ w))
     elif rho is not None:
         rho = float(rho)
         if not (-1.0/(m-1) < rho < 1.0):
@@ -677,47 +684,57 @@ class OLSResult(Protoresult):
                 self.inference[ic + '_average'] = np.nan
 
         obs_med = float(df_model_result['betas'].median())
-        null_meds = self.estimates_ystar.median(axis=0).to_numpy()
-
-        # two-sided via absolute value
-        self.inference['median_p'] = float(np.mean(np.abs(null_meds) >= abs(obs_med)))
-        
-        # Estimate rho from bootstrap p-values
-        # Convert p-values to z-scores across bootstrap draws
-        p_matrix = self.p_values.to_numpy()  # shape: (n_specs, n_draws)
-        if p_matrix.shape[1] > 1:  # Need multiple draws to estimate correlation
-            # Convert two-sided p-values to z-scores
-            z_matrix = np.zeros_like(p_matrix)
-            for i in range(p_matrix.shape[0]):
-                signs = np.sign(self.estimates.iloc[i, :].to_numpy())
-                z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
-            
-            # Calculate correlation matrix of z-scores across specifications.
-            # Use safe manual correlation computation that handles zero-variance rows
-            # without emitting platform-dependent warnings.
-            z_centered = z_matrix - z_matrix.mean(axis=1, keepdims=True)
-            z_std = np.std(z_matrix, axis=1, keepdims=True)
-            # Avoid divide-by-zero: replace zero std with 1 (correlation undefined, set to NaN)
-            z_std_safe = np.where(z_std > 1e-14, z_std, 1.0)
-            z_normalized = z_centered / z_std_safe
-            z_corr = np.dot(z_normalized, z_normalized.T) / z_matrix.shape[1]
-            # Set correlation to NaN where either row has zero variance
-            zero_var_rows = (z_std[:, 0] <= 1e-14)
-            z_corr[zero_var_rows, :] = np.nan
-            z_corr[:, zero_var_rows] = np.nan
-            
-            # Extract mean off-diagonal correlation as rho estimate
-            n_specs = z_corr.shape[0]
-            if n_specs > 1:
-                off_diag_sum = np.sum(z_corr) - np.trace(z_corr)
-                rho_estimate = off_diag_sum / (n_specs * (n_specs - 1))
-                # Clip to valid range
-                rho_estimate = np.clip(rho_estimate, -1.0 / (n_specs - 1) + 0.001, 0.999)
+        if inference:
+            null_meds = self.estimates_ystar.median(axis=0).to_numpy(dtype=float)
+            null_meds = null_meds[np.isfinite(null_meds)]
+            if null_meds.size == 0:
+                self.inference['median_p'] = np.nan
             else:
-                rho_estimate = None
+                self.inference['median_p'] = float(np.mean(np.abs(null_meds) >= abs(obs_med)))
         else:
-            rho_estimate = None
-            z_corr = None
+            self.inference['median_p'] = np.nan
+        
+        
+        # Estimate dependence under the NULL bootstrap (y_star), not the sampling bootstrap.
+        # We estimate correlation of null z's (diag=1) after dropping degenerate specs.
+        p_matrix = self.p_values_ystar.to_numpy(dtype=float)        # (n_specs, n_draws)
+        beta_matrix = self.estimates_ystar.to_numpy(dtype=float)    # (n_specs, n_draws)
+
+        R_hat = None
+        rho_estimate = None
+        z_corr = None
+        _keep_stouffer = None
+        self.inference['stouffer_keep_mask'] = None
+
+        if p_matrix.shape[1] > 1:
+            p_clip = np.clip(p_matrix, 1e-300, 1.0 - 1e-16)
+            z_matrix = np.sign(beta_matrix) * norm.isf(p_clip / 2.0)   # (n_specs, n_draws)
+            Z_null = z_matrix.T                                        # draws × specs
+
+            z_std = np.std(Z_null, axis=0, ddof=1)
+            keep = np.isfinite(z_std) & (z_std > 1e-14)
+            self.inference['stouffer_keep_mask'] = keep
+            if np.sum(keep) >= 2:
+                Zk = Z_null[:, keep]                                   # draws × m_eff
+                R_hat = np.corrcoef(Zk, rowvar=False)                  # (m_eff, m_eff)
+
+                m_eff = R_hat.shape[0]
+                rho_estimate = float((np.sum(R_hat) - np.trace(R_hat)) / (m_eff * (m_eff - 1)))
+
+                # Project to PSD (eigenvalue clipping) and add tiny ridge for stability
+                evals, evecs = np.linalg.eigh(R_hat)
+                evals[evals < 0.0] = 0.0
+                R_psd = (evecs * evals) @ evecs.T
+                R_psd = 0.5 * (R_psd + R_psd.T)
+                np.fill_diagonal(R_psd, 1.0)
+
+                z_corr = R_psd + 1e-12 * np.eye(R_psd.shape[0], dtype=R_psd.dtype)
+                _keep_stouffer = keep
+            else:
+                R_hat = None
+                rho_estimate = None
+                z_corr = None
+                _keep_stouffer = None
 
         self.inference['min_ns'] = df_model_result['betas'].min()
         self.inference['min'] = self.estimates.min().min()
@@ -779,92 +796,55 @@ class OLSResult(Protoresult):
         self.inference['pos_sig_p'] = self.__class__._empirical_p_two_sided(null_pos_sig, obs_pos_sig)
         self.inference['neg_sig_p'] = self.__class__._empirical_p_two_sided(null_neg_sig, obs_neg_sig)
 
-        # Estimate rho from bootstrap p-values
-        # Convert p-values to z-scores across bootstrap draws
-        p_matrix = self.p_values.to_numpy()  # shape: (n_specs, n_draws)
-        if p_matrix.shape[1] > 1:  # Need multiple draws to estimate correlation
-            # Convert two-sided p-values to z-scores
-            z_matrix = np.zeros_like(p_matrix)
-            for i in range(p_matrix.shape[0]):
-                signs = np.sign(self.estimates.iloc[i, :].to_numpy())
-                z_matrix[i, :] = signs * norm.isf(np.clip(p_matrix[i, :], 1e-300, 1 - 1e-16) / 2.0)
-            
-            # Calculate correlation matrix of z-scores across specifications.
+        # Stouffer's method with estimated null correlation (dependence correction)
+        if z_corr is not None and _keep_stouffer is not None:
+            p_obs = df_model_result['p_values'].to_numpy(dtype=float)[_keep_stouffer]
+            b_obs = df_model_result['betas'].to_numpy(dtype=float)[_keep_stouffer]
 
-            # Suppress numpy RuntimeWarnings emitted by np.corrcoef (divide/invalid)
-            # when any row has near-zero variance.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    z_corr = np.corrcoef(z_matrix)
-                    z_corr = np.nan_to_num(z_corr, nan=0.0)
-
-            
-            # Extract mean off-diagonal correlation as rho estimate
-            n_specs = z_corr.shape[0]
-            if n_specs > 1:
-                off_diag_sum = np.sum(z_corr) - np.trace(z_corr)
-                rho_estimate = off_diag_sum / (n_specs * (n_specs - 1))
-                # Clip to valid range
-                rho_estimate = np.clip(rho_estimate, -1.0 / (n_specs - 1) + 0.001, 0.999)
-            else:
-                rho_estimate = None
-        else:
-            rho_estimate = None
-            z_corr = None
-
-        # Stouffer's method with estimated covariance
-        # Use full correlation matrix (Sigma) to account for heterogeneous correlations
-        if z_corr is not None and p_matrix.shape[1] > 1:
-            # Attempt Stouffer with the raw estimated correlation matrix.
-            z_corr = np.asarray(z_corr, dtype=np.float64)
             try:
-                # Suppress numpy divide/invalid runtime warnings here —
-                # we emit a clearer UserWarning on failure below.
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    Z, p_one = stouffer_method(
-                        df_model_result['p_values'].to_numpy(),
+                    Z, _ = stouffer_method(
+                        p_obs,
                         two_sided=True,
-                        betas=df_model_result['betas'].to_numpy(),
+                        betas=b_obs,
                         Sigma=z_corr,
                     )
 
-                    # convert one-sided -> two-sided, numerically stable
-                    log_p_two = np.log(2.0) + norm.logsf(abs(Z))
-                    p_two = float(np.exp(log_p_two))
+                # Convert one-sided sf(Z) to two-sided p-value: p_two = 2 * sf(|Z|)
+                log_p_two = np.log(2.0) + norm.logsf(abs(Z))
+                p_two = float(np.exp(log_p_two))
 
-                    self.inference['Stouffers'] = (Z, p_two)
-
-                # Store results with covariance structure
-                self.inference['Stouffers'] = (Z, p_combined)
-                self.inference['correlation_matrix'] = z_corr
+                self.inference['Stouffers'] = (float(Z), p_two)
+                self.inference['correlation_matrix'] = R_hat
+                self.inference['Sigma_hat'] = z_corr
                 self.inference['mean_correlation'] = rho_estimate
+
             except ValueError as e:
-                # If Σ leads to nonpositive/nonfinite variance, fall back to independence
-                # Use project-style WARNING lines (consistent with other messages).
                 print(f"WARNING: Stouffer Σ path failed ({e}); falling back to independence assumption.")
-                Z, p_comb = stouffer_method(
-                    df_model_result['p_values'].to_numpy(),
+                Z, _ = stouffer_method(
+                    df_model_result['p_values'].to_numpy(dtype=float),
                     two_sided=True,
-                    betas=df_model_result['betas'].to_numpy(),
+                    betas=df_model_result['betas'].to_numpy(dtype=float),
                     warn=False,
                 )
                 log_p_two = np.log(2.0) + norm.logsf(abs(Z))
                 p_two = float(np.exp(log_p_two))
-                self.inference['Stouffers'] = (Z, p_two)
+                self.inference['Stouffers'] = (float(Z), p_two)
                 self.inference['correlation_matrix'] = None
+                self.inference['Sigma_hat'] = None
                 self.inference['mean_correlation'] = None
         else:
-            # Fall back to independence assumption
-            Z, p_comb = stouffer_method(
-                df_model_result['p_values'].to_numpy(),
+            # Independence assumption
+            Z, _ = stouffer_method(
+                df_model_result['p_values'].to_numpy(dtype=float),
                 two_sided=True,
-                betas=df_model_result['betas'].to_numpy(),
+                betas=df_model_result['betas'].to_numpy(dtype=float),
             )
             log_p_two = np.log(2.0) + norm.logsf(abs(Z))
             p_two = float(np.exp(log_p_two))
-            self.inference['Stouffers'] = (Z, p_two)
+            self.inference['Stouffers'] = (float(Z), p_two)
             self.inference['correlation_matrix'] = None
+            self.inference['Sigma_hat'] = None
             self.inference['mean_correlation'] = None
 
 
