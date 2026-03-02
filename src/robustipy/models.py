@@ -910,7 +910,7 @@ class OLSResult(Protoresult):
         self.inference['sig_ns'] = df_model_result['significant'].sum()
         self.inference['sig_prop_ns'] = df_model_result['significant'].mean()
         self.inference['sig'] = (self.p_values.stack() < 0.05).sum().sum()
-        self.inference['sig_prop'] = (self.p_values.stack() < 0.05).mean().mean()
+        self.inference['sig_prop'] = float((self.p_values.stack() < 0.05).mean())
 
         alpha = 0.05
         obs_sig = int((self.p_values.stack() < alpha).sum())
