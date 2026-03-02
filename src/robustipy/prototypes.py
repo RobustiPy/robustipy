@@ -379,7 +379,9 @@ class BaseRobust(Protomodel):
             if not isinstance(seed, int):
                 raise TypeError("seed must be an integer")
             if (seed<0) or (seed>2 ** 31 - 1):
-                raise ValueError(f"seed must be between 0 and {seed>2 ** 31 - 1}, current value is {seed}.")
+                raise ValueError(
+                    f"seed must be between 0 and {2 ** 31 - 1}, current value is {seed}."
+                )
             np.random.seed(seed)
 
         # numeric columns check
