@@ -1127,7 +1127,8 @@ class OLSResult(Protoresult):
         result_obj: "OLSResult",
         left_prefix: str,
         right_prefix: str
-    ) -> MergedResult:
+    ) -> "MergedResult":
+        
         """
         Merge this OLSResult with another, tagging each spec by prefix.
 
