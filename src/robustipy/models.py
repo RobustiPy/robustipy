@@ -2459,7 +2459,9 @@ class LRobust(BaseRobust):
         controls : list of str
             Names of optional control variables to include in every spec.
         group : str, optional
-            *Currently ignored.* Placeholder for future fixed-effect demeaning.
+            Grouping variable used for grouped cross-validation and cluster
+            bootstrap resampling. Logistic fixed-effects demeaning is not
+            currently implemented.
         draws : int, default=None
             Number of bootstrap resamples per specification.
         sample_size : int, optional
