@@ -2653,7 +2653,7 @@ class LRobust(BaseRobust):
             # Store all modeling results in an OLSResult object
             self.results = OLSResult(
                 y=self.y[0],
-                x=self.x,
+                x=self.x[0],
                 data=self.data,
                 specs=specs,
                 all_predictors=all_predictors,
