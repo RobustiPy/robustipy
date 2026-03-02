@@ -142,7 +142,8 @@ def make_inquiry(
     in_jupyter = _running_in_jupyter()
     in_real_tty = _is_real_tty()
     use_inquirer = in_real_tty and _HAS_INQUIRERPY
-    if in_real_tty and not _HAS_INQUIRERPY:
+    needs_prompt = any(v is None for v in (draws, kfolds, oos_metric, n_cpu, seed))
+    if in_real_tty and not _HAS_INQUIRERPY and needs_prompt:
         warnings.warn(
             "InquirerPy is unavailable; falling back to standard input prompts.",
             UserWarning
