@@ -2361,7 +2361,7 @@ class LRobust(BaseRobust):
 
         oos_metric_name : str
             Out-of-sample metric to compute (if kfold > 1). Options:
-            'mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy', or 'imv'.
+            'mcfaddens-r2', 'pseudo-r2', 'rmse', 'cross-entropy', or 'imv'.
 
         Returns
         -------
@@ -2454,7 +2454,7 @@ class LRobust(BaseRobust):
                     k_rmse = root_mean_squared_error(y_true, y_pred)
                     metric.append(k_rmse)
 
-                elif oos_metric_name == 'mcfadden-r2':
+                elif oos_metric_name in {'mcfaddens-r2', 'mcfadden-r2'}:
                     k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.iloc[train]))
                     metric.append(k_r2)
 
@@ -2545,7 +2545,7 @@ class LRobust(BaseRobust):
         kfold : int, default=None
             Folds for out-of-sample CV; set to 0 to disable.
         oos_metric : default None.
-            Options:    {'pseudo-r2', 'mcfadden-r2', 'imv', 'rmse','cross-entropy'}.
+            Options:    {'pseudo-r2', 'mcfaddens-r2', 'imv', 'rmse','cross-entropy'}.
             Metric to compute on held-out folds.
         n_cpu : int, optional
             Number of parallel jobs; defaults to all available.
@@ -2600,6 +2600,8 @@ class LRobust(BaseRobust):
 
         self.seed = seed
         self.data = self.data.copy()
+        if oos_metric == 'mcfadden-r2':
+            oos_metric = 'mcfaddens-r2'
 
         # Logistic fixed-effects demeaning is not implemented. If `group` is
         # provided, we still use it for grouped CV/bootstrap resampling, but do
@@ -2624,7 +2626,7 @@ class LRobust(BaseRobust):
             oos_metric=oos_metric,
             n_cpu=n_cpu,
             seed=seed,
-            valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse', 'cross-entropy', 'imv'],
+            valid_oos_metrics=['pseudo-r2', 'mcfaddens-r2', 'rmse', 'cross-entropy', 'imv'],
             threshold=threshold
         )
 
