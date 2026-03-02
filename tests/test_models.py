@@ -70,6 +70,46 @@ def test_olsrobust_fit(simple_data):
     assert hasattr(results, 'summary_df')
     assert isinstance(results, OLSResult)
 
+def test_ols_loglikelihood_scale_invariant(simple_data):
+    """
+    OLS likelihood metric used for reporting should be invariant to scaling y.
+    Raw log-likelihood should still shift under scaling.
+    """
+    data_1 = simple_data.copy()
+    data_2 = simple_data.copy()
+    data_2['y'] = 10.0 * data_2['y']
+
+    model_1 = OLSRobust(y=['y'], x=['x1'], data=data_1)
+    model_1.fit(controls=['control1', 'control2'], kfold=2, draws=5, n_cpu=1, seed=123)
+    res_1 = model_1.get_results()
+
+    model_2 = OLSRobust(y=['y'], x=['x1'], data=data_2)
+    model_2.fit(controls=['control1', 'control2'], kfold=2, draws=5, n_cpu=1, seed=123)
+    res_2 = model_2.get_results()
+
+    for col in ['ll', 'll_raw', 'll_null', 'll_gain', 'll_gain_per_obs', 'nobs']:
+        assert col in res_1.summary_df.columns
+        assert col in res_2.summary_df.columns
+
+    assert np.allclose(
+        res_1.summary_df['ll_gain_per_obs'].to_numpy(dtype=float),
+        res_2.summary_df['ll_gain_per_obs'].to_numpy(dtype=float),
+        rtol=1e-10,
+        atol=1e-10
+    )
+    assert np.allclose(
+        res_1.summary_df['ll'].to_numpy(dtype=float),
+        res_2.summary_df['ll'].to_numpy(dtype=float),
+        rtol=1e-10,
+        atol=1e-10
+    )
+    assert not np.allclose(
+        res_1.summary_df['ll_raw'].to_numpy(dtype=float),
+        res_2.summary_df['ll_raw'].to_numpy(dtype=float),
+        rtol=1e-10,
+        atol=1e-10
+    )
+
 def test_model_merge(simple_data):
     """
     Test merging of two OLSResult objects via OLSResult.merge().
@@ -461,4 +501,3 @@ def test_fit_group_column_name_is_non_string_and_group_not_string_raises_typeerr
 
     with pytest.raises(TypeError, match="'group' must be a string"):
         model.fit(controls=['control1'], group=123, kfold=2, draws=10, n_cpu=1)
-

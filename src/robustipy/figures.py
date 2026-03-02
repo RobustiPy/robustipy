@@ -325,7 +325,8 @@ def plot_hexbin_log(
     results_object : object
         Must expose:
           - `all_b`/all_b_exp: list/array of full-sample coefficient arrays
-          - `summary_df['ll']`: corresponding log-likelihood values
+          - `summary_df['ll']` or `summary_df['ll_gain_per_obs']`: corresponding
+            likelihood metric values
     ax : matplotlib.axes.Axes
         The axes on which to draw the hex-bin.
     fig : matplotlib.figure.Figure
@@ -341,9 +342,16 @@ def plot_hexbin_log(
     -------
     None
     """
+    if 'll_gain_per_obs' in results_object.summary_df.columns:
+        ll_values = results_object.summary_df['ll_gain_per_obs']
+        y_label = r'Null-Relative Log-Likelihood Gain (per obs)'
+    else:
+        ll_values = results_object.summary_df['ll']
+        y_label = r'Full Model Log Likelihood'
+
     if oddsratio is True:
         image = ax.hexbin(results_object.all_b_exp,
-                          results_object.summary_df['ll'],
+                          ll_values,
                           cmap=colormap,
                           gridsize=20,
                           mincnt=1,
@@ -351,7 +359,7 @@ def plot_hexbin_log(
                           )
     else:
         image = ax.hexbin([arr[0][0] for arr in results_object.all_b.copy()],
-                          results_object.summary_df['ll'],
+                          ll_values,
                           cmap=colormap,
                           gridsize=20,
                           mincnt=1,
@@ -371,7 +379,7 @@ def plot_hexbin_log(
         cb.set_ticklabels([f'{tick:.0f}' for tick in ticks])
     
     cb.ax.set_title('Count')
-    axis_formatter(ax, r'Full Model Log Likelihood', r'Full-Sample Estimand', title)
+    axis_formatter(ax, y_label, r'Full-Sample Estimand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))

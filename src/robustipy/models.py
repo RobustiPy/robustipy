@@ -503,6 +503,11 @@ class OLSResult(Protoresult):
         aic_array: list[float],
         bic_array: list[float],
         hqic_array: list[float],
+        ll_raw_array: Optional[list[float]] = None,
+        ll_null_array: Optional[list[float]] = None,
+        ll_gain_array: Optional[list[float]] = None,
+        ll_gain_per_obs_array: Optional[list[float]] = None,
+        nobs_array: Optional[list[int]] = None,
         av_k_metric_array: list[float] | None = None,
         model_name: str,
         name_av_k_metric: str | None = None,
@@ -546,9 +551,15 @@ class OLSResult(Protoresult):
         r2i_array
             In-sample R² for each spec.
         ll_array
-            Log-likelihood for each spec.
+            Primary likelihood metric for each spec. For OLS this is the
+            null-relative log-likelihood gain per observation; for logistic it
+            is the raw full-model log-likelihood.
         aic_array, bic_array, hqic_array
             Information criteria per spec.
+        ll_raw_array, ll_null_array, ll_gain_array, ll_gain_per_obs_array
+            Optional detailed OLS likelihood diagnostics.
+        nobs_array
+            Optional number of observations used in each spec.
         av_k_metric_array
             Out-of-sample metric (e.g. CV R²) per spec.
         model_name
@@ -581,6 +592,16 @@ class OLSResult(Protoresult):
         self.summary_df['aic'] = pd.Series(aic_array)
         self.summary_df['bic'] = pd.Series(bic_array)
         self.summary_df['hqic'] = pd.Series(hqic_array)
+        if ll_raw_array is not None:
+            self.summary_df['ll_raw'] = pd.Series(ll_raw_array)
+        if ll_null_array is not None:
+            self.summary_df['ll_null'] = pd.Series(ll_null_array)
+        if ll_gain_array is not None:
+            self.summary_df['ll_gain'] = pd.Series(ll_gain_array)
+        if ll_gain_per_obs_array is not None:
+            self.summary_df['ll_gain_per_obs'] = pd.Series(ll_gain_per_obs_array)
+        if nobs_array is not None:
+            self.summary_df['nobs'] = pd.Series(nobs_array)
         self._compute_inference()
         self.summary_df['av_k_metric'] = pd.Series(av_k_metric_array)
         self.summary_df['spec_name'] = self.specs_names
@@ -982,11 +1003,33 @@ class OLSResult(Protoresult):
             print(f"Min AIC: {round(self.summary_df['aic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['aic'].idxmin()])}")
             print(f"Min BIC: {round(self.summary_df['bic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['bic'].idxmin()])}")
             print(f"Min HQIC: {round(self.summary_df['hqic'].min(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['hqic'].idxmin()])}")
-            print(f"Max Log Likelihood: {round(self.summary_df['ll'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
-            print(
-                f"Min Log Likelihood: {self.summary_df['ll'].min():.{digits}f}, "
-                f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}"
-            )
+            if 'll_gain_per_obs' in self.summary_df.columns:
+                ll_col = 'll_gain_per_obs'
+                print(
+                    "Max Relative Log-Likelihood Gain (per obs): "
+                    f"{round(self.summary_df[ll_col].max(), digits)}, "
+                    f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df[ll_col].idxmax()])}"
+                )
+                print(
+                    "Min Relative Log-Likelihood Gain (per obs): "
+                    f"{self.summary_df[ll_col].min():.{digits}f}, "
+                    f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df[ll_col].idxmin()])}"
+                )
+                if 'll_raw' in self.summary_df.columns:
+                    print(
+                        f"Max Raw Log Likelihood: {round(self.summary_df['ll_raw'].max(), digits)}, "
+                        f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll_raw'].idxmax()])}"
+                    )
+                    print(
+                        f"Min Raw Log Likelihood: {self.summary_df['ll_raw'].min():.{digits}f}, "
+                        f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll_raw'].idxmin()])}"
+                    )
+            else:
+                print(f"Max Log Likelihood: {round(self.summary_df['ll'].max(), digits)}, Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmax()])}")
+                print(
+                    f"Min Log Likelihood: {self.summary_df['ll'].min():.{digits}f}, "
+                    f"Specs: {list(self.summary_df['spec_name'].loc[self.summary_df['ll'].idxmin()])}"
+                )
             print(
                 f"Max {'Adj-' if 'OLS' in self.model_name else 'Pseudo-'}R²: "
                 f"{self.summary_df['r2'].max():.{digits}f}, "
@@ -1510,6 +1553,11 @@ class OLSRobust(BaseRobust):
             list_r2_array = []
             list_r2i_array = []
             list_ll_array = []
+            list_ll_raw_array = []
+            list_ll_null_array = []
+            list_ll_gain_array = []
+            list_ll_gain_per_obs_array = []
+            list_nobs_array = []
             list_aic_array = []
             list_bic_array = []
             list_hqic_array = []
@@ -1535,6 +1583,11 @@ class OLSRobust(BaseRobust):
                 r2_array = np.empty([space_n, draws])
                 r2i_array = np.empty([space_n])
                 ll_array = np.empty([space_n])
+                ll_raw_array = np.empty([space_n])
+                ll_null_array = np.empty([space_n])
+                ll_gain_array = np.empty([space_n])
+                ll_gain_per_obs_array = np.empty([space_n])
+                nobs_array = np.empty([space_n], dtype=int)
                 aic_array = np.empty([space_n])
                 bic_array = np.empty([space_n])
                 hqic_array = np.empty([space_n])
@@ -1570,12 +1623,16 @@ class OLSRobust(BaseRobust):
                         )
                         
                     # Fit the full sample OLS mode
-                    (b_all, p_all, r2_i, ll_i,
-                     aic_i, bic_i, hqic_i,
-                     av_k_metric_i) = self._full_sample_OLS(comb,
-                                                            kfold=kfold,
-                                                            group=group,
-                                                            oos_metric_name=self.oos_metric_name)
+                    (
+                        b_all, p_all, r2_i, ll_i,
+                        aic_i, bic_i, hqic_i, av_k_metric_i,
+                        ll_raw_i, ll_null_i, ll_gain_i, ll_gain_per_obs_i, nobs_i
+                    ) = self._full_sample_OLS(
+                        comb,
+                        kfold=kfold,
+                        group=group,
+                        oos_metric_name=self.oos_metric_name
+                    )
                     # Calculate pseudo-outcome residuals for bootstrap
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                     seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
@@ -1602,6 +1659,11 @@ class OLSRobust(BaseRobust):
                     r2_array[index, :] = r2_list
                     r2i_array[index] = r2_i
                     ll_array[index] = ll_i
+                    ll_raw_array[index] = ll_raw_i
+                    ll_null_array[index] = ll_null_i
+                    ll_gain_array[index] = ll_gain_i
+                    ll_gain_per_obs_array[index] = ll_gain_per_obs_i
+                    nobs_array[index] = nobs_i
                     aic_array[index] = aic_i
                     bic_array[index] = bic_i
                     hqic_array[index] = hqic_i
@@ -1618,6 +1680,11 @@ class OLSRobust(BaseRobust):
                 list_r2_array.append(r2_array)
                 list_r2i_array.append(r2i_array)
                 list_ll_array.append(ll_array)
+                list_ll_raw_array.append(ll_raw_array)
+                list_ll_null_array.append(ll_null_array)
+                list_ll_gain_array.append(ll_gain_array)
+                list_ll_gain_per_obs_array.append(ll_gain_per_obs_array)
+                list_nobs_array.append(nobs_array)
                 list_aic_array.append(aic_array)
                 list_bic_array.append(bic_array)
                 list_hqic_array.append(hqic_array)
@@ -1642,6 +1709,11 @@ class OLSRobust(BaseRobust):
                 r2_values=np.vstack(list_r2_array),
                 r2i_array=np.hstack(list_r2i_array),
                 ll_array=np.hstack(list_ll_array),
+                ll_raw_array=np.hstack(list_ll_raw_array),
+                ll_null_array=np.hstack(list_ll_null_array),
+                ll_gain_array=np.hstack(list_ll_gain_array),
+                ll_gain_per_obs_array=np.hstack(list_ll_gain_per_obs_array),
+                nobs_array=np.hstack(list_nobs_array),
                 aic_array=np.hstack(list_aic_array),
                 bic_array=np.hstack(list_bic_array),
                 hqic_array=np.hstack(list_hqic_array),
@@ -1667,6 +1739,11 @@ class OLSRobust(BaseRobust):
             r2_array = np.empty([space_n, draws])
             r2i_array = np.empty([space_n])
             ll_array = np.empty([space_n])
+            ll_raw_array = np.empty([space_n])
+            ll_null_array = np.empty([space_n])
+            ll_gain_array = np.empty([space_n])
+            ll_gain_per_obs_array = np.empty([space_n])
+            nobs_array = np.empty([space_n], dtype=int)
             aic_array = np.empty([space_n])
             bic_array = np.empty([space_n])
             hqic_array = np.empty([space_n])
@@ -1720,12 +1797,16 @@ class OLSRobust(BaseRobust):
                     comb = group_demean(comb, group=group)
                 
                 # Fit model on full sample
-                (b_all, p_all, r2_i, ll_i,
-                 aic_i, bic_i, hqic_i,
-                 av_k_metric_i) = self._full_sample_OLS(comb,
-                                                        kfold=kfold,
-                                                        group=group,
-                                                        oos_metric_name=self.oos_metric_name)
+                (
+                    b_all, p_all, r2_i, ll_i,
+                    aic_i, bic_i, hqic_i, av_k_metric_i,
+                    ll_raw_i, ll_null_i, ll_gain_i, ll_gain_per_obs_i, nobs_i
+                ) = self._full_sample_OLS(
+                    comb,
+                    kfold=kfold,
+                    group=group,
+                    oos_metric_name=self.oos_metric_name
+                )
                  
                 # Calculate pseudo-outcome residuals for bootstrapping
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
@@ -1753,6 +1834,11 @@ class OLSRobust(BaseRobust):
                 r2_array[index, :] = r2_list
                 r2i_array[index] = r2_i
                 ll_array[index] = ll_i
+                ll_raw_array[index] = ll_raw_i
+                ll_null_array[index] = ll_null_i
+                ll_gain_array[index] = ll_gain_i
+                ll_gain_per_obs_array[index] = ll_gain_per_obs_i
+                nobs_array[index] = nobs_i
                 aic_array[index] = aic_i
                 bic_array[index] = bic_i
                 hqic_array[index] = hqic_i
@@ -1778,6 +1864,11 @@ class OLSRobust(BaseRobust):
                                 r2_values=r2_array,
                                 r2i_array=r2i_array,
                                 ll_array=ll_array,
+                                ll_raw_array=ll_raw_array,
+                                ll_null_array=ll_null_array,
+                                ll_gain_array=ll_gain_array,
+                                ll_gain_per_obs_array=ll_gain_per_obs_array,
+                                nobs_array=nobs_array,
                                 aic_array=aic_array,
                                 bic_array=bic_array,
                                 hqic_array=hqic_array,
@@ -1843,8 +1934,18 @@ class OLSRobust(BaseRobust):
             Full-sample p-values.
         r2 : float
             In-sample R².
-        ll : float
-            Log-likelihood.
+        ll_metric : float
+            Scale-invariant null-relative log-likelihood gain per observation.
+        ll_raw : float
+            Raw Gaussian log-likelihood of the full model.
+        ll_null : float
+            Raw Gaussian log-likelihood of the intercept-only model.
+        ll_gain : float
+            Difference ll_raw - ll_null.
+        ll_gain_per_obs : float
+            ll_gain divided by nobs.
+        nobs : int
+            Number of observations used in this specification.
         aic : float
             Akaike Information Criterion.
         bic : float
@@ -1921,11 +2022,16 @@ class OLSRobust(BaseRobust):
             out['b'],
             out['p'],
             out['r2'],
-            out['ll'][0][0],
-            out['aic'][0][0],
-            out['bic'][0][0],
-            out['hqic'][0][0],
-            av_k_metric
+            out['ll_gain_per_obs'],
+            out['aic'],
+            out['bic'],
+            out['hqic'],
+            av_k_metric,
+            out['ll'],
+            out['ll_null'],
+            out['ll_gain'],
+            out['ll_gain_per_obs'],
+            out['nobs'],
         )
             
     def _strap_OLS(

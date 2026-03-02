@@ -792,9 +792,9 @@ def all_subsets(ss):
                       range(0, len(ss) + 1)))
 
 
-def make_aic(ll: float, n: int) -> float:
-    # Calculate Akaike Information Criterion (AIC).
-    return (-2.0 * ll) + (2 * n)
+def make_aic(ll: float, k: int) -> float:
+    # Calculate Akaike Information Criterion (AIC): -2*ll + 2*k.
+    return (-2.0 * ll) + (2 * k)
 
 def make_bic(ll: float, n: int, k: int) -> float:
     # Calculate Bayesian Information Criterion (BIC).
@@ -836,7 +836,7 @@ def logistic_regression_sm(y, x) -> dict:
             'p': [[x] for x in result.pvalues.values],
             'r2': r2,
             'll': ll,
-            'aic': make_aic(ll, n),
+            'aic': make_aic(ll, k),
             'bic': make_bic(ll, n, k),
             'hqic': make_hqic(ll, n, k)
             }
@@ -944,9 +944,26 @@ def simple_ols(y, x) -> dict:
         R2 = 1 - e.var() / y.var()
         R2adj = 1 - (1 - R2) * ((nobs - 1) / (nobs - ncoef))
 
-        # Log-likelihood of model under Gaussian errors
-        ll = (-(nobs / 2) * (1 + np.log(2 * np.pi)) -
-              (nobs / 2) * np.log(abs(np.dot(e.T, e) / nobs)))
+        # Log-likelihood of model under Gaussian errors.
+        # Use clipped variances to avoid -inf/inf when residual variance is ~0.
+        tiny = np.finfo(float).tiny
+        rss = float(np.sum(e * e))
+        sigma2_full = max(rss / nobs, tiny)
+        ll = float(
+            -(nobs / 2) * (1 + np.log(2 * np.pi))
+            - (nobs / 2) * np.log(sigma2_full)
+        )
+
+        # Null (intercept-only) Gaussian model on the same sample.
+        y_centered = y - np.mean(y)
+        tss = float(np.sum(y_centered * y_centered))
+        sigma2_null = max(tss / nobs, tiny)
+        ll_null = float(
+            -(nobs / 2) * (1 + np.log(2 * np.pi))
+            - (nobs / 2) * np.log(sigma2_null)
+        )
+        ll_gain = float(ll - ll_null)  # scale-invariant w.r.t. y -> c*y
+        ll_gain_per_obs = float(ll_gain / nobs)
 
 
     return {
@@ -954,7 +971,12 @@ def simple_ols(y, x) -> dict:
         'p': p,
         'r2': R2adj,
         'll': ll,
-        'aic': make_aic(ll, nobs),
+        'll_null': ll_null,
+        'll_gain': ll_gain,
+        'll_gain_per_obs': ll_gain_per_obs,
+        'nobs': int(nobs),
+        'ncoef': int(ncoef),
+        'aic': make_aic(ll, ncoef),
         'bic': make_bic(ll, nobs, ncoef),
         'hqic': make_hqic(ll, nobs, ncoef)
     }
