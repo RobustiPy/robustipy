@@ -864,7 +864,7 @@ class OLSResult(Protoresult):
                 Z_obs = float(np.dot(w, z_obs) / denom)
 
                 # Combined null statistics for calibration (vectorized)
-                Z_null = (Z_null_specs @ w) / denom   # (n_draws,)
+                Z_null = (Z_null_specs @ w) / denom
 
                 # Two-sided null-calibrated p-value with +1 correction
                 B = int(Z_null.shape[0])
