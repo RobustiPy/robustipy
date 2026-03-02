@@ -2120,6 +2120,12 @@ class OLSRobust(BaseRobust):
             metric = []
 
             if group:
+                n_groups = pd.Series(x_temp[group]).nunique(dropna=False)
+                if kfold > n_groups:
+                    raise ValueError(
+                        f"kfold={kfold} cannot exceed number of unique groups "
+                        f"({n_groups}) for grouped OLS CV."
+                    )
                 k_fold = GroupKFold(kfold)
 
                 for k, (train, test) in enumerate(k_fold.split(x, y, groups=x_temp[group])):
