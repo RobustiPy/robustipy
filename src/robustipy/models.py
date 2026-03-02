@@ -8,12 +8,7 @@ analysis, along with utilities for model merging, plotting, and Bayesian model a
 from __future__ import annotations
 import _pickle
 import warnings
-import inquirer
-from inquirer.themes import GreenPassion
-from inquirer.errors import ValidationError
 from typing import Any, Optional, Sequence, List, Tuple, Union
-from multiprocessing import cpu_count
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -45,14 +40,6 @@ from robustipy.utils import (
     make_inquiry,
     stripped_ols
 )
-import warnings
-from typing import List, Tuple
-import pandas as pd
-
-
-import warnings
-import pandas as pd
-from typing import List, Tuple
 
 
 def _progress_iter(iterable, *, total: int, description: str = "Working..."):
