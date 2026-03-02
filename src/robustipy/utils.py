@@ -1602,7 +1602,7 @@ def sample_z_masks(
     seed: Optional[int] = None
 ) -> List[int]:
     """
-    Uniformly sample `n_masks` bit-masks from the non-empty power-set of
+    Uniformly sample `n_masks` bit-masks from the power-set of
     `n_z` items **without** enumerating the 2^n_z possibilities.
 
     Returns
@@ -1612,8 +1612,8 @@ def sample_z_masks(
     """
     full_space = (1 << n_z)
     if n_masks >= full_space:
-        # exhaustive: 1 … (2^n_y − 1)
-        return list(range(1, full_space))
+        # exhaustive: 0 … (2^n_z − 1), including the null specification
+        return list(range(full_space))
 
     rng   = np.random.default_rng(seed)
     masks = rng.choice(
