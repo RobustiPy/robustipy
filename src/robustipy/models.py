@@ -2295,10 +2295,21 @@ class LRobust(BaseRobust):
         """
 
         # TODO: Implement Fixed Effects Logistic Regression (FE)
-        
-        # Split into response (y) and predictors (x)
+
+        # Split into response (y) and predictors (x). If `group` is provided,
+        # exclude it from the model matrix but use it for grouped CV splits.
         y = comb_var.iloc[:, [0]]
-        x = comb_var.drop(comb_var.columns[0], axis=1)
+        x_temp = comb_var.drop(comb_var.columns[0], axis=1)
+        if group is not None:
+            if group not in x_temp.columns:
+                raise ValueError(
+                    f"Grouping column '{group}' must be present in comb_var when group CV is requested."
+                )
+            groups = x_temp[group]
+            x = x_temp.drop(columns=[group])
+        else:
+            groups = None
+            x = x_temp
 
         # Fit logistic regression on the full sample
         out = logistic_regression_sm(y=y, x=x)
@@ -2308,10 +2319,20 @@ class LRobust(BaseRobust):
 
         # Perform k-fold cross-validation if requested
         if kfold:
-            k_fold = KFold(kfold)
+            if group is not None:
+                n_groups = pd.Series(groups).nunique(dropna=False)
+                if kfold > n_groups:
+                    raise ValueError(
+                        f"kfold={kfold} cannot exceed number of unique groups ({n_groups})."
+                    )
+                k_fold = GroupKFold(n_splits=kfold)
+                split_iter = k_fold.split(x, y, groups=groups)
+            else:
+                k_fold = KFold(kfold)
+                split_iter = k_fold.split(x, y)
             metric = []
 
-            for k, (train, test) in enumerate(k_fold.split(x, y)):
+            for _, (train, test) in enumerate(split_iter):
                 # Fit model on training fold
                 out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
 
@@ -2469,13 +2490,13 @@ class LRobust(BaseRobust):
         self.seed = seed
         self.data = self.data.copy()
 
-        # Logistic fixed-effects path is not implemented yet; keep API stable by
-        # accepting `group` but running the standard (non-grouped) workflow.
-        group_requested = group is not None
-        if group_requested:
+        # Logistic fixed-effects demeaning is not implemented. If `group` is
+        # provided, we still use it for grouped CV/bootstrap resampling, but do
+        # not demean y/x/z.
+        if group is not None:
             warnings.warn(
-                "[LRobust] `group` is currently unsupported for logistic fixed-effects models "
-                "and will be ignored for this run.",
+                "[LRobust] Logistic fixed-effects demeaning is unsupported; "
+                "`group` will be used for grouped CV/bootstrap resampling only (no demeaning).",
                 UserWarning
             )
 
@@ -2495,8 +2516,6 @@ class LRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse', 'cross-entropy', 'imv'],
             threshold=threshold
         )
-        if group_requested:
-            group = None
 
         # Set seed for reproducibility
         np.random.seed(self.seed)
@@ -2562,10 +2581,9 @@ class LRobust(BaseRobust):
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
 
-            # Preprocess data for SHAP values
+            # Preprocess data for SHAP values. Do not demean for logistic models.
             if group:
                 SHAP_comb = self.data[self.y + self.x + [group] + controls]
-                SHAP_comb = group_demean(SHAP_comb, group=group)
             else:
                 SHAP_comb = self.data[self.y + self.x + controls]
 
@@ -2597,9 +2615,9 @@ class LRobust(BaseRobust):
                 comb = comb.dropna().reset_index(drop=True).copy()
 
                 if group:
-                    comb = group_demean(comb, group=group)
-
-                X_design = comb.drop(columns=comb.columns[0])  # Drop y column
+                    X_design = comb.drop(columns=[comb.columns[0], group], errors='ignore')
+                else:
+                    X_design = comb.drop(columns=comb.columns[0])  # Drop y column
                 self._check_colinearity(X_design)
 
                 # Estimate full-sample model metrics
@@ -2687,7 +2705,7 @@ class LRobust(BaseRobust):
         comb_var : pandas.DataFrame
             DataFrame with `y` in first column and features in remaining columns.
         group : str, optional
-            *Ignored.* Placeholder for future grouping logic.
+            Grouping variable name used for cluster bootstrap resampling.
         sample_size : int
             Number of rows to sample with replacement.
         seed : int
