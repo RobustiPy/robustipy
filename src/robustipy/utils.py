@@ -116,7 +116,7 @@ def make_inquiry(
     if model_name == 'OLS Robust':
         oos_metric_choices = ['pseudo-r2', 'rmse']
     elif model_name == 'Logistic Regression Robust':
-        oos_metric_choices = ['mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy']
+        oos_metric_choices = ['mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy', 'imv']
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
