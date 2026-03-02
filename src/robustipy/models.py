@@ -620,7 +620,7 @@ class OLSResult(Protoresult):
             return _pickle.load(f)
 
 
-    def _compute_inference(self) -> pd.DataFrame:
+    def _compute_inference(self) -> None:
         """
         Compute summary statistics of the bootstrap coefficient distribution.
 
