@@ -2134,11 +2134,16 @@ class OLSRobust(BaseRobust):
             x = x.drop(samp_df.columns[0], axis=1)
 
         else:
-            # Stratified sampling at the group level
-            np.random.seed(seed)
-            idx = np.random.choice(temp_data[group].unique(), sample_size)
-
-            select = temp_data[temp_data[group].isin(idx)]
+            # Cluster bootstrap at the group level:
+            # sample groups with replacement and keep multiplicity.
+            # (Using `isin` would collapse duplicate sampled groups.)
+            unique_groups = temp_data[group].unique()
+            rng = np.random.default_rng(seed)
+            sampled_groups = rng.choice(unique_groups, size=len(unique_groups), replace=True)
+            group_lookup = {
+                g: df_g for g, df_g in temp_data.groupby(group, sort=False, observed=True)
+            }
+            select = pd.concat([group_lookup[g] for g in sampled_groups], ignore_index=True)
 
             # Remove singleton groups (with only one observation)
             no_singleton = select[select.groupby(group).transform('size') > 1]
