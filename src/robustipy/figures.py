@@ -1587,6 +1587,8 @@ def plot_results(
     # Clean up file extension and sanitize spec input
     ext = ext.strip()
     specs = _sanitize_specs(specs, max_len=6)
+    # Use a safe filename prefix even when caller passes project_name=None.
+    project_stem = project_name or "no_project_name"
 
     # Handle odds ratio transformation for logistic regression models
     if oddsratio is True:
@@ -1727,9 +1729,9 @@ def plot_results(
 
         # Save the full panel figure
         if ext == 'png':
-            plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight', dpi=800)
+            plt.savefig(os.path.join(outdir, project_stem + '_all.' + ext), bbox_inches='tight', dpi=800)
         else:
-            plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
+            plt.savefig(os.path.join(outdir, project_stem + '_all.' + ext), bbox_inches='tight')
 
     else:
         # Plot reduced layout when y is multivariate
@@ -1748,51 +1750,51 @@ def plot_results(
                    title='c.', despine_left=True)
 
         # Save the full panel figure
-        plt.savefig(os.path.join(outdir, project_name + '_all.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_all.' + ext), bbox_inches='tight')
 
     # Plot and save individual panels
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_hexbin_r2(results_object, ax, fig, oddsratio, colormap)
-    plt.savefig(os.path.join(outdir, project_name + '_R2hexbin.' + ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_stem + '_R2hexbin.' + ext), bbox_inches='tight')
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     plot_kfolds(results_object=results_object, colormap=colormap, ax=ax, despine_left=False)
-    plt.savefig(os.path.join(outdir, project_name + '_OOS.' + ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_stem + '_OOS.' + ext), bbox_inches='tight')
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(12, 7))
     plot_curve(results_object=results_object, loess=loess, ci=ci,
                oddsratio=oddsratio, highlights=highlights, specs=specs, ax=ax, colormap=colormap)
-    plt.savefig(os.path.join(outdir, project_name + '_curve.' + ext), bbox_inches='tight')
+    plt.savefig(os.path.join(outdir, project_stem + '_curve.' + ext), bbox_inches='tight')
     plt.close(fig)
 
     # Additional subplots only if y is univariate
     if max(len(t) for t in results_object.y_name) == 1:
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_hexbin_log(results_object, ax, fig, oddsratio, colormap)
-        plt.savefig(os.path.join(outdir, project_name + '_LLhexbin.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_LLhexbin.' + ext), bbox_inches='tight')
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
         feature_order = shap_violin(ax, shap_vals, shap_x, shap_cols, clear_yticklabels=False, cmap=colormap)
-        plt.savefig(os.path.join(outdir, project_name + '_SHAP.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_SHAP.' + ext), bbox_inches='tight')
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bma(results_object, colormap, ax, feature_order)
-        plt.savefig(os.path.join(outdir, project_name + '_BMA.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_BMA.' + ext), bbox_inches='tight')
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_ic(results_object=results_object, ic=ic, specs=specs, ax=ax,
                 colormap=colormap, title='g.', despine_left=False)
-        plt.savefig(os.path.join(outdir, project_name + '_IC.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_IC.' + ext), bbox_inches='tight')
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.5, 5))
         plot_bdist(results_object=results_object, specs=specs, ax=ax,
                    oddsratio=oddsratio, despine_left=False, colormap=colormap,
                    highlights=highlights, legend_bool=False)
-        plt.savefig(os.path.join(outdir, project_name + '_bdist.' + ext), bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, project_stem + '_bdist.' + ext), bbox_inches='tight')
         plt.close(fig)
