@@ -2464,33 +2464,18 @@ class LRobust(BaseRobust):
         self.seed = seed
         self.data = self.data.copy()
 
-        # Ensure a constant term in the design matrix
-
-        if group:
-            # With group demeaning, an intercept is not identified. Drop any existing constant.
-            if "const" in self.data.columns:
-                self.data = self.data.drop(columns=["const"])
-            if "const" in self.x:
-                self.x = [c for c in self.x if c != "const"]
-            if "const" in controls:
-                controls = [c for c in controls if c != "const"]
+        # Logistic fixed-effects path is not implemented yet; keep API stable by
+        # accepting `group` but running the standard (non-grouped) workflow.
+        group_requested = group is not None
+        if group_requested:
             warnings.warn(
-                "[LRobust] Group fixed effects requested: dropping constant term "
-                "before demeaning so t/p are identified.",
+                "[LRobust] `group` is currently unsupported for logistic fixed-effects models "
+                "and will be ignored for this run.",
                 UserWarning
             )
-            invariant = _find_group_invariant_columns(self.data, self.x + controls, group)
-            inv_x = [c for c in invariant if c in self.x]
-            inv_controls = [c for c in invariant if c in controls]
-            if inv_x or inv_controls:
-                warnings.warn(
-                    "[LRobust] These variables are constant within each group and "
-                    "are not identified under group demeaning. t/p will be NaN for them: "
-                    f"x={inv_x!r}, controls={inv_controls!r}.",
-                    UserWarning
-                )
-        else:
-            self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
+
+        # Ensure a single constant term in the design matrix.
+        self.x, controls = _ensure_single_constant(self.data, self.y, self.x, controls)
 
 
         # Validate modeling parameters
@@ -2505,6 +2490,8 @@ class LRobust(BaseRobust):
             valid_oos_metrics=['pseudo-r2', 'mcfadden-r2', 'rmse', 'cross-entropy', 'imv'],
             threshold=threshold
         )
+        if group_requested:
+            group = None
 
         # Set seed for reproducibility
         np.random.seed(self.seed)
