@@ -134,9 +134,13 @@ def make_inquiry(
     if model_name == 'OLS Robust':
         oos_metric_choices = ['pseudo-r2', 'rmse']
     elif model_name == 'Logistic Regression Robust':
-        oos_metric_choices = ['mcfadden-r2', 'pseudo-r2', 'rmse', 'cross-entropy', 'imv']
+        oos_metric_choices = ['mcfaddens-r2', 'pseudo-r2', 'rmse', 'cross-entropy', 'imv']
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
+
+    # Backward-compatibility alias normalization.
+    if model_name == 'Logistic Regression Robust' and oos_metric == 'mcfadden-r2':
+        oos_metric = 'mcfaddens-r2'
 
     # 2) Check interactive status:
     in_jupyter = _running_in_jupyter()

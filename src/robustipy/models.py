@@ -1064,7 +1064,7 @@ class OLSResult(Protoresult):
         print(f"Number of specifications: {len(self.specs_names)}")
 
         # Print model robustness metrics
-        print_separator("2.Model Robustness Metrics")
+        print_separator("2. Model Robustness Metrics")
         print('2.1 Inference Metrics')
         print_separator()
 
