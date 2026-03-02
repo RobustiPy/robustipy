@@ -255,8 +255,9 @@ class BaseRobust(Protomodel):
         group : str or None
             Grouping variable name, if any.
         """
-        
-        cols_to_check = self.y + self.x + ( [group] if group else [] ) + controls
+
+        # Group identifiers may be string/categorical; only model covariates must be numeric.
+        cols_to_check = self.y + self.x + controls
         _check_numeric_columns(self.data, cols_to_check)
 
     def _check_colinearity(self, X: pd.DataFrame):
@@ -384,8 +385,8 @@ class BaseRobust(Protomodel):
                 )
             np.random.seed(seed)
 
-        # numeric columns check
-        cols_to_check = self.y + self.x + ([group] if group else []) + controls
+        # Group identifiers may be string/categorical; only model covariates must be numeric.
+        cols_to_check = self.y + self.x + controls
         _check_numeric_columns(self.data, cols_to_check)
         
         # Disallow overlap between x and controls
