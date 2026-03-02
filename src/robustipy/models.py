@@ -20,7 +20,7 @@ from joblib import Parallel, delayed
 from rich.progress import track
 from scipy.stats import norm
 from sklearn.metrics import log_loss, root_mean_squared_error
-from sklearn.model_selection import GroupKFold, KFold, train_test_split
+from sklearn.model_selection import GroupKFold, KFold, StratifiedKFold, train_test_split
 from statsmodels.tools.tools import add_constant
 
 from robustipy.figures import plot_results
@@ -2418,17 +2418,30 @@ class LRobust(BaseRobust):
                 k_fold = GroupKFold(n_splits=kfold)
                 split_iter = k_fold.split(x, y, groups=groups)
             else:
-                k_fold = KFold(kfold)
-                split_iter = k_fold.split(x, y)
+                y_vec = y.iloc[:, 0].to_numpy()
+                class_counts = pd.Series(y_vec).value_counts(dropna=False)
+                if class_counts.shape[0] < 2:
+                    raise ValueError(
+                        "Logistic cross-validation requires at least two outcome classes "
+                        "after preprocessing."
+                    )
+                min_class_count = int(class_counts.min())
+                if kfold > min_class_count:
+                    raise ValueError(
+                        f"kfold={kfold} cannot exceed the minority-class count "
+                        f"({min_class_count}) for stratified logistic CV."
+                    )
+                k_fold = StratifiedKFold(n_splits=kfold, shuffle=True, random_state=self.seed)
+                split_iter = k_fold.split(x, y_vec)
             metric = []
 
             for _, (train, test) in enumerate(split_iter):
                 # Fit model on training fold
-                out_k = logistic_regression_sm(y=y.loc[train], x=x.loc[train])
+                out_k = logistic_regression_sm(y=y.iloc[train], x=x.iloc[train])
 
                 # Predict on test fold
-                y_pred = self._predict_LR(x.loc[test], out_k['b'])
-                y_true = y.loc[test]
+                y_pred = self._predict_LR(x.iloc[test], out_k['b'])
+                y_true = y.iloc[test]
 
                 # Evaluate prediction accuracy using selected OOS metric
                 if oos_metric_name == 'rmse':
@@ -2436,11 +2449,11 @@ class LRobust(BaseRobust):
                     metric.append(k_rmse)
 
                 elif oos_metric_name == 'mcfadden-r2':
-                    k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.loc[train]))
+                    k_r2 = mcfadden_r2(y_true, y_pred, np.mean(y.iloc[train]))
                     metric.append(k_r2)
 
                 elif oos_metric_name == 'pseudo-r2':
-                    k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.loc[train]))
+                    k_r2 = pseudo_r2(y_true, y_pred, np.mean(y.iloc[train]))
                     metric.append(k_r2)
 
                 elif oos_metric_name == 'cross-entropy':
