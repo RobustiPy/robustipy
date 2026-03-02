@@ -15,6 +15,24 @@ from multiprocessing import cpu_count
 import os
 import sys
 
+try:
+    from InquirerPy import inquirer
+    from InquirerPy.validator import ValidationError
+    from InquirerPy.themes import GreenPassion
+    _HAS_INQUIRERPY = True
+except ImportError:
+    inquirer = None
+    GreenPassion = None
+
+    class ValidationError(Exception):
+        """Fallback so IntegerRangeValidator can raise a typed error safely."""
+
+        def __init__(self, *args, reason: str = ""):
+            super().__init__(reason)
+            self.reason = reason
+
+    _HAS_INQUIRERPY = False
+
 
 class IntegerRangeValidator:
     """
@@ -123,6 +141,12 @@ def make_inquiry(
     # 2) Check interactive status:
     in_jupyter = _running_in_jupyter()
     in_real_tty = _is_real_tty()
+    use_inquirer = in_real_tty and _HAS_INQUIRERPY
+    if in_real_tty and not _HAS_INQUIRERPY:
+        warnings.warn(
+            "InquirerPy is unavailable; falling back to standard input prompts.",
+            UserWarning
+        )
 
     # 3) Helper: pure‐Python loop for integer input in [min_val, max_val]:
     def _ask_integer(prompt_text: str, min_val: int, max_val: int) -> int:
@@ -172,7 +196,7 @@ def make_inquiry(
     # 5) If draws is missing, decide which prompt to run:
     # ───────────────────────────────────────────────────────────────
     if draws is None:
-        if in_real_tty:
+        if use_inquirer:
             # (a) Real TTY: use inquirer.Text with IntegerRangeValidator
             question_draws = [
                 inquirer.Text(
@@ -183,8 +207,8 @@ def make_inquiry(
             ]
             # inquirer.prompt(...) returns a dict; we extract and convert to int
             draws = int(inquirer.prompt(question_draws, theme=GreenPassion())['draws_inq'])
-        elif in_jupyter:
-            # (b) Jupyter: fall back to pure input() + validator
+        elif in_jupyter or in_real_tty:
+            # (b) Jupyter or real TTY fallback: pure input() + validator
             draws = _ask_integer("Enter number of bootstrap draws", 2, 1000000)
         else:
             # (c) Neither TTY nor Jupyter: use default
@@ -196,7 +220,7 @@ def make_inquiry(
     if kfolds is None:
         # The maximum valid folds is len(data[y]); we compute it now:
         max_k = len(data[y])
-        if in_real_tty:
+        if use_inquirer:
             question_kfolds = [
                 inquirer.Text(
                     'kfolds_inq',
@@ -205,7 +229,7 @@ def make_inquiry(
                 )
             ]
             kfolds = int(inquirer.prompt(question_kfolds, theme=GreenPassion())['kfolds_inq'])
-        elif in_jupyter:
+        elif in_jupyter or in_real_tty:
             kfolds = _ask_integer("Enter number of folds for cross-validation", 2, max_k)
         else:
             kfolds = 10
@@ -214,7 +238,7 @@ def make_inquiry(
     # 7) If oos_metric is missing, prompt the user to choose one:
     # ───────────────────────────────────────────────────────────────
     if oos_metric is None:
-        if in_real_tty:
+        if use_inquirer:
             question_oos = [
                 inquirer.List(
                     'oos_inq',
@@ -224,7 +248,7 @@ def make_inquiry(
                 )
             ]
             oos_metric = inquirer.prompt(question_oos, theme=GreenPassion())['oos_inq']
-        elif in_jupyter:
+        elif in_jupyter or in_real_tty:
             oos_metric = _ask_choice("Select the out-of-sample evaluation metric:", oos_metric_choices)
         else:
             oos_metric = 'pseudo-r2'
@@ -234,7 +258,7 @@ def make_inquiry(
     # ───────────────────────────────────────────────────────────────
     if n_cpu is None:
         default_cpus = max(1, cpu_count() - 1)
-        if in_real_tty:
+        if use_inquirer:
             question_ncpu = [
                 inquirer.List(
                     'ncpu_inq',
@@ -255,8 +279,8 @@ def make_inquiry(
                     )
                 ]
                 n_cpu = int(inquirer.prompt(question_ncpu2, theme=GreenPassion())['ncpu_inq'])
-        elif in_jupyter:
-            # In Jupyter, ask via input() if default is OK:
+        elif in_jupyter or in_real_tty:
+            # Jupyter/TTY fallback without InquirerPy: ask via input().
             ans = input(f"You haven’t specified the number of CPUs. Is {default_cpus} okay? (yes/no): ").strip().lower()
             if ans in ('y', 'yes'):
                 n_cpu = default_cpus
@@ -288,7 +312,7 @@ def make_inquiry(
                 continue
             return val
     if seed is None:
-        if in_real_tty:
+        if use_inquirer:
             question_seed = [
                 inquirer.Text(
                     'seed_inq',
@@ -297,7 +321,7 @@ def make_inquiry(
                 )
             ]
             seed = int(inquirer.prompt(question_seed, theme=GreenPassion())['seed_inq'])
-        elif in_jupyter:
+        elif in_jupyter or in_real_tty:
             seed = _ask_seed_input("Enter integer seed for reproducibility", SEED_MIN, SEED_MAX)
         else:
             seed = 192735
