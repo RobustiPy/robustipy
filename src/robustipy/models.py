@@ -187,6 +187,62 @@ def _cluster_bootstrap_by_rows(
     return pd.concat(sampled_frames, ignore_index=True)
 
 
+def _cluster_bootstrap_singleton_safe(
+    temp_data: pd.DataFrame,
+    group: str,
+    seed: int,
+    target_rows: int,
+    min_rows_after_filter: int,
+    max_attempts: int = 8,
+) -> tuple[pd.DataFrame, bool, int, int, int]:
+    """
+    Draw grouped bootstrap samples and remove singleton groups when possible.
+
+    If singleton filtering repeatedly yields too few rows, fall back to the
+    unfiltered grouped bootstrap sample to avoid hard crashes.
+
+    Returns
+    -------
+    sample_df : pd.DataFrame
+        Chosen sample (filtered or fallback unfiltered).
+    used_filtered : bool
+        True when the returned sample passed singleton filtering.
+    filtered_rows : int
+        Number of rows in the last singleton-filtered sample.
+    selected_rows : int
+        Number of rows in the corresponding unfiltered sample.
+    attempts_used : int
+        Number of attempts performed.
+    """
+    min_rows_after_filter = max(1, int(min_rows_after_filter))
+    max_attempts = max(1, int(max_attempts))
+
+    last_selected = None
+    last_filtered = None
+
+    for attempt in range(max_attempts):
+        attempt_seed = int(seed) + attempt
+        selected = _cluster_bootstrap_by_rows(
+            temp_data=temp_data,
+            group=group,
+            seed=attempt_seed,
+            target_rows=target_rows,
+        )
+        group_sizes = selected.groupby(group)[group].transform("size")
+        filtered = selected.loc[group_sizes > 1].copy()
+
+        last_selected = selected
+        last_filtered = filtered
+
+        if len(filtered) >= min_rows_after_filter:
+            return filtered, True, len(filtered), len(selected), attempt + 1
+
+    # Singleton filtering remained too aggressive; use clustered sample as fallback.
+    assert last_selected is not None
+    filtered_rows = 0 if last_filtered is None else len(last_filtered)
+    return last_selected.copy(), False, filtered_rows, len(last_selected), max_attempts
+
+
 def stouffer_method(
     p_values,
     *,
@@ -2168,26 +2224,29 @@ class OLSRobust(BaseRobust):
             x = x.drop(samp_df.columns[0], axis=1)
 
         else:
-            # Cluster bootstrap at the group level with a row target.
-            select = _cluster_bootstrap_by_rows(
+            n_predictors = temp_data.drop(
+                columns=[temp_data.columns[0], "y_star", group],
+                errors="ignore"
+            ).shape[1]
+            min_rows = max(5, n_predictors + 2)
+
+            # Cluster bootstrap with singleton guard.
+            sample_df, used_filtered, n_filtered, n_selected, attempts_used = _cluster_bootstrap_singleton_safe(
                 temp_data=temp_data,
                 group=group,
                 seed=seed,
-                target_rows=sample_size
+                target_rows=sample_size,
+                min_rows_after_filter=min_rows,
             )
-
-            # Remove singleton groups (with only one observation)
-            no_singleton = select[select.groupby(group).transform('size') > 1]
-
-            if len(no_singleton) < 5:
+            if not used_filtered:
                 warnings.warn(
-                    f"Bootstrap sample size is only {len(no_singleton)} after removing singleton groups "
-                    f"(groups with a single observation). This may lead to unstable or unreliable estimates.",
+                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows}) after "
+                    f"{attempts_used} attempt(s); falling back to unfiltered grouped sample ({n_selected} rows).",
                     UserWarning
                 )
 
             # Drop grouping variable and extract y, y_star, and x
-            no_singleton = no_singleton.drop(columns=[group])
+            no_singleton = sample_df.drop(columns=[group])
 
             y = no_singleton.iloc[:, [0]]
 
@@ -2759,15 +2818,28 @@ class LRobust(BaseRobust):
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
         else:
-            # Cluster bootstrap at the group level with a row target.
-            select = _cluster_bootstrap_by_rows(
+            n_predictors = temp_data.drop(
+                columns=[temp_data.columns[0], group],
+                errors="ignore"
+            ).shape[1]
+            min_rows = max(5, n_predictors + 2)
+
+            # Cluster bootstrap with singleton guard.
+            sample_df, used_filtered, n_filtered, n_selected, attempts_used = _cluster_bootstrap_singleton_safe(
                 temp_data=temp_data,
                 group=group,
                 seed=seed,
-                target_rows=sample_size
+                target_rows=sample_size,
+                min_rows_after_filter=min_rows,
             )
-            no_singleton = select[select.groupby(group).transform('size') > 1]
-            no_singleton = no_singleton.drop(columns=[group])
+            if not used_filtered:
+                warnings.warn(
+                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows}) after "
+                    f"{attempts_used} attempt(s); falling back to unfiltered grouped sample ({n_selected} rows).",
+                    UserWarning
+                )
+
+            no_singleton = sample_df.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
             x = no_singleton.drop(no_singleton.columns[0], axis=1)
         output = logistic_regression_sm(y, x)
