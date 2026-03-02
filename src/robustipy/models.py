@@ -693,7 +693,7 @@ class OLSResult(Protoresult):
         _keep_stouffer = None
         self.inference['stouffer_keep_mask'] = None
 
-        if p_matrix.shape[1] > 1:
+        if (p_matrix.ndim == 2) and (p_matrix.shape[1] > 1):
             p_clip = np.clip(p_matrix, 1e-300, 1.0 - 1e-16)
             z_matrix = np.sign(beta_matrix) * norm.isf(p_clip / 2.0)   # (n_specs, n_draws)
             Z_null = z_matrix.T                                        # draws × specs
@@ -783,56 +783,97 @@ class OLSResult(Protoresult):
         self.inference['pos_sig_p'] = self.__class__._empirical_p_two_sided(null_pos_sig, obs_pos_sig)
         self.inference['neg_sig_p'] = self.__class__._empirical_p_two_sided(null_neg_sig, obs_neg_sig)
 
-        # Stouffer's method with estimated null correlation (dependence correction)
-        if z_corr is not None and _keep_stouffer is not None:
-            p_obs = df_model_result['p_values'].to_numpy(dtype=float)[_keep_stouffer]
-            b_obs = df_model_result['betas'].to_numpy(dtype=float)[_keep_stouffer]
+        # ----------------------------
+        # Stouffer (NULL-calibrated)
+        # ----------------------------
+        # We compute:
+        #   Z_obs = (w^T z_obs) / sqrt(w^T Sigma_hat w)
+        # and calibrate p via the null draws:
+        #   p = (1 + #{ |Z_null| >= |Z_obs| }) / (B + 1)
+        #
+        # where z_null are computed from (p_values_ystar, estimates_ystar).
+        #
+        # Note: Sigma_hat is estimated from null z's (already in z_corr).
+        # If z_corr is unavailable, we fall back to independence denom.
 
-            try:
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    Z, _ = stouffer_method(
-                        p_obs,
-                        two_sided=True,
-                        betas=b_obs,
-                        Sigma=z_corr,
-                    )
+        # Observed per-spec p and beta (full-sample, not bootstrap)
+        p_obs_all = df_model_result['p_values'].to_numpy(dtype=float)
+        b_obs_all = df_model_result['betas'].to_numpy(dtype=float)
 
-                # Convert one-sided sf(Z) to two-sided p-value: p_two = 2 * sf(|Z|)
-                log_p_two = np.log(2.0) + norm.logsf(abs(Z))
-                p_two = float(np.exp(log_p_two))
+        # Valid mask for observed quantities
+        obs_valid = np.isfinite(p_obs_all) & (p_obs_all >= 0.0) & (p_obs_all <= 1.0) & np.isfinite(b_obs_all)
 
-                self.inference['Stouffers'] = (float(Z), p_two)
-                self.inference['correlation_matrix'] = R_hat
-                self.inference['Sigma_hat'] = z_corr
-                self.inference['mean_correlation'] = rho_estimate
-
-            except ValueError as e:
-                print(f"WARNING: Stouffer Σ path failed ({e}); falling back to independence assumption.")
-                Z, _ = stouffer_method(
-                    df_model_result['p_values'].to_numpy(dtype=float),
-                    two_sided=True,
-                    betas=df_model_result['betas'].to_numpy(dtype=float),
-                    warn=False,
-                )
-                log_p_two = np.log(2.0) + norm.logsf(abs(Z))
-                p_two = float(np.exp(log_p_two))
-                self.inference['Stouffers'] = (float(Z), p_two)
-                self.inference['correlation_matrix'] = None
-                self.inference['Sigma_hat'] = None
-                self.inference['mean_correlation'] = None
+        # Use the same "keep" mask you computed from null z-variance if available,
+        # but intersect with observed validity.
+        keep_null = self.inference.get('stouffer_keep_mask', None)
+        if keep_null is None:
+            keep = obs_valid
         else:
-            # Independence assumption
-            Z, _ = stouffer_method(
-                df_model_result['p_values'].to_numpy(dtype=float),
-                two_sided=True,
-                betas=df_model_result['betas'].to_numpy(dtype=float),
-            )
-            log_p_two = np.log(2.0) + norm.logsf(abs(Z))
-            p_two = float(np.exp(log_p_two))
-            self.inference['Stouffers'] = (float(Z), p_two)
+            keep = obs_valid & keep_null
+
+        if np.sum(keep) == 0:
+            self.inference['Stouffers'] = (np.nan, np.nan)
             self.inference['correlation_matrix'] = None
             self.inference['Sigma_hat'] = None
             self.inference['mean_correlation'] = None
+        else:
+            # ---- observed z (signed, two-sided) with clipping
+            p_clip_obs = np.clip(p_obs_all[keep], 1e-300, 1.0 - 1e-16)
+            z_obs = np.sign(b_obs_all[keep]) * norm.isf(p_clip_obs / 2.0)
+
+            # If no null draws (all-NaN), Stouffer cannot be null-calibrated
+            if (p_matrix.size == 0) or (p_matrix.shape[1] < 1) or np.isnan(p_matrix).all():
+                # Fallback: just report the Z statistic with asymptotic p (diagnostic only)
+                w = np.ones_like(z_obs, dtype=float)
+                denom = float(np.sqrt(np.dot(w, w)))
+                Z_obs = float(np.dot(w, z_obs) / denom)
+                p_two = float(2.0 * norm.sf(abs(Z_obs)))
+                self.inference['Stouffers'] = (Z_obs, p_two)
+                self.inference['correlation_matrix'] = None
+                self.inference['Sigma_hat'] = None
+                self.inference['mean_correlation'] = None
+            else:
+                # Build null z scores (signed) for all specs/draws
+                p_clip_null = np.clip(p_matrix, 1e-300, 1.0 - 1e-16)
+                z_matrix = np.sign(beta_matrix) * norm.isf(p_clip_null / 2.0)   # (n_specs, n_draws)
+
+                # Keep only the selected specs (columns after transpose)
+                Z_null_specs = z_matrix.T[:, keep]   # (n_draws, m_eff)
+
+                # Weights (currently uniform; if you later add weights, replace here)
+                w = np.ones(Z_null_specs.shape[1], dtype=float)
+
+                # Denominator:
+                # - if z_corr exists and matches kept specs, use it
+                # - else fall back to independence
+                denom = None
+                if z_corr is not None and _keep_stouffer is not None:
+                    # _keep_stouffer corresponds to the mask used when building z_corr.
+                    # We must ensure we are using the same kept specs subset.
+                    # Here, we require keep == _keep_stouffer on the indices considered.
+                    # If they differ (because obs_valid removed some), we fall back to independence.
+                    if np.array_equal(keep, _keep_stouffer):
+                        denom2 = float(w @ (z_corr @ w))
+                        if np.isfinite(denom2) and denom2 > 0.0:
+                            denom = float(np.sqrt(denom2))
+
+                if denom is None:
+                    denom = float(np.sqrt(np.dot(w, w)))
+
+                # Combined observed statistic
+                Z_obs = float(np.dot(w, z_obs) / denom)
+
+                # Combined null statistics for calibration (vectorized)
+                Z_null = (Z_null_specs @ w) / denom   # (n_draws,)
+
+                # Two-sided null-calibrated p-value with +1 correction
+                B = int(Z_null.shape[0])
+                p_two = float((1.0 + np.sum(np.abs(Z_null) >= abs(Z_obs))) / (B + 1.0))
+
+                self.inference['Stouffers'] = (Z_obs, p_two)
+                self.inference['correlation_matrix'] = R_hat
+                self.inference['Sigma_hat'] = z_corr
+                self.inference['mean_correlation'] = rho_estimate
 
 
     def summary(self, digits=3) -> None:
