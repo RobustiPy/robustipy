@@ -1757,8 +1757,7 @@ def plot_results(
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
-    plot_bdist(results_object=results_object, specs=specs, ax=ax,
-               oddsratio=oddsratio, despine_left=False, colormap=colormap)
+    plot_kfolds(results_object=results_object, colormap=colormap, ax=ax, despine_left=False)
     plt.savefig(os.path.join(outdir, project_name + '_OOS.' + ext), bbox_inches='tight')
     plt.close(fig)
 
