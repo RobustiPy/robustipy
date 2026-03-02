@@ -137,6 +137,20 @@ def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=Non
     return outputs
 
 
+def _spec_bitmask(spec: Sequence[str], control_positions: dict[str, int]) -> int:
+    """
+    Encode a control specification into an integer bitmask.
+
+    The i-th control variable in `control_positions` maps to bit i.
+    """
+    mask = 0
+    for name in spec:
+        pos = control_positions.get(name)
+        if pos is not None:
+            mask |= (1 << pos)
+    return mask
+
+
 def stouffer_method(
     p_values,
     *,
@@ -1558,6 +1572,24 @@ class OLSRobust(BaseRobust):
         else:
             space_n = space_size(controls)
             z_specs = all_subsets(controls)
+        z_specs = [tuple(spec) for spec in z_specs]
+        space_n = len(z_specs)
+
+        # Cache predictor slices by control-spec bitmask to avoid repeated
+        # DataFrame slicing in large specification spaces.
+        control_positions = {name: idx for idx, name in enumerate(controls)}
+        predictor_prefix = self.x + ([group] if group else [])
+        base_predictors_df = self.data[predictor_prefix + controls]
+        spec_predictor_cache: dict[int, pd.DataFrame] = {}
+
+        def _get_predictors_for_spec(spec_tuple: tuple[str, ...]) -> pd.DataFrame:
+            mask = _spec_bitmask(spec_tuple, control_positions)
+            cached = spec_predictor_cache.get(mask)
+            if cached is None:
+                cols = predictor_prefix + list(spec_tuple)
+                cached = base_predictors_df.loc[:, cols]
+                spec_predictor_cache[mask] = cached
+            return cached
 
         # Count y-composite specifications (1 if single y)
         n_y_comps = len(getattr(self, "y_specs", [None]))
@@ -1576,7 +1608,6 @@ class OLSRobust(BaseRobust):
 
         # Delegate to single or multiple y logic
         if len(self.y) > 1:
-            z_specs = list(z_specs)
             # Initialize containers to collect results across all composite outcomes
             list_all_predictors = []
             list_b_array = []
@@ -1627,18 +1658,9 @@ class OLSRobust(BaseRobust):
                 av_k_metric_array = np.empty([space_n])
                 
                 # Loop over all z-specs (control combinations)
-                for spec, index in zip(z_specs, range(0, space_n)):
-                    
-                    # Build dataframe with x + spec + optional group
-                    if len(spec) == 0:
-                        comb = self.data[self.x]
-                    else:
-                        comb = self.data[self.x + list(spec)]
-                    if group:
-                        comb = self.data[self.x + [group] + list(spec)]
-                        
-                    # Add the outcome column and clean
-                    comb = pd.concat([y, comb], axis=1)
+                for index, spec in enumerate(z_specs):
+                    spec_predictors = _get_predictors_for_spec(spec)
+                    comb = pd.concat([y, spec_predictors], axis=1)
                     comb = comb.dropna()
                     comb = comb.reset_index(drop=True).copy()
 
@@ -1807,19 +1829,16 @@ class OLSRobust(BaseRobust):
             # Generate shared bootstrap seeds ONCE for all specifications
             # This ensures all specs use the same bootstrap samples, creating proper correlation
             shared_seeds = np.random.randint(0, 2 ** 32 - 1, size=draws, dtype=np.int64)
+            y_single_df = self.data[self.y]
             
             # Loop over all z-specs (combinations of control variables)
-            for spec, index in _progress_iter(
-                zip(z_specs, range(0, space_n)),
+            for index, spec in _progress_iter(
+                enumerate(z_specs),
                 total=space_n,
                 description="Control specs",
             ):
-                if 0 == len(spec):
-                    comb = self.data[self.y + self.x]
-                else:
-                    comb = self.data[self.y + self.x + list(spec)]
-                if group:
-                    comb = self.data[self.y + self.x + [group] + list(spec)]
+                spec_predictors = _get_predictors_for_spec(spec)
+                comb = pd.concat([y_single_df, spec_predictors], axis=1)
 
                  # Clean combined dataset
                 comb = comb.dropna()
@@ -2512,7 +2531,23 @@ class LRobust(BaseRobust):
             raise NotImplementedError("Not implemented yet for logistic regression")  # TODO: Add multi-y logistic support
 
         else:
-            space_n = space_size(controls)  # Number of control variable combinations
+            z_specs = [tuple(spec) for spec in all_subsets(controls)]
+            space_n = len(z_specs)
+            control_positions = {name: idx for idx, name in enumerate(controls)}
+            predictor_prefix = self.x + ([group] if group else [])
+            base_predictors_df = self.data[predictor_prefix + controls]
+            y_single_df = self.data[self.y]
+            spec_predictor_cache: dict[int, pd.DataFrame] = {}
+
+            def _get_lr_predictors_for_spec(spec_tuple: tuple[str, ...]) -> pd.DataFrame:
+                mask = _spec_bitmask(spec_tuple, control_positions)
+                cached = spec_predictor_cache.get(mask)
+                if cached is None:
+                    cols = predictor_prefix + list(spec_tuple)
+                    cached = base_predictors_df.loc[:, cols]
+                    spec_predictor_cache[mask] = cached
+                return cached
+
             notebook_draws_bar = _make_notebook_draws_bar(
                 total=space_n * draws,
                 description="Bootstrap draws"
@@ -2559,20 +2594,13 @@ class LRobust(BaseRobust):
             shap_return = [explainer.shap_values(x_test), x_test]
 
             # Loop through all subsets of control variables
-            for spec, index in _progress_iter(
-                zip(all_subsets(controls), range(0, space_n)),
+            for index, spec in _progress_iter(
+                enumerate(z_specs),
                 total=space_n,
                 description="Control specs",
             ):
-
-                # Subset the data according to the current control combination
-                if len(spec) == 0:
-                    comb = self.data[self.y + self.x]
-                else:
-                    comb = self.data[self.y + self.x + list(spec)]
-
-                if group:
-                    comb = self.data[self.y + self.x + [group] + list(spec)]
+                spec_predictors = _get_lr_predictors_for_spec(spec)
+                comb = pd.concat([y_single_df, spec_predictors], axis=1)
 
                 comb = comb.dropna().reset_index(drop=True).copy()
 
