@@ -1645,7 +1645,6 @@ class OLSRobust(BaseRobust):
         # Delegate to single or multiple y logic
         if len(self.y) > 1:
             # Initialize containers to collect results across all composite outcomes
-            list_all_predictors = []
             list_b_array = []
             list_p_array = []
             list_b_array_ystar = []
@@ -1763,7 +1762,6 @@ class OLSRobust(BaseRobust):
                     p_all_list.append(p_all)
 
                 # Store arrays across all y-specs
-                list_all_predictors.append(all_predictors)
                 list_b_array.append(b_array)
                 list_p_array.append(p_array)
                 list_b_array_ystar.append(b_array_ystar)
@@ -1787,7 +1785,7 @@ class OLSRobust(BaseRobust):
                 x=self.x,
                 data=self.data,
                 specs=specs,
-                all_predictors=list_all_predictors,
+                all_predictors=all_predictors,
                 controls=controls,
                 draws=draws,
                 kfold=kfold,
