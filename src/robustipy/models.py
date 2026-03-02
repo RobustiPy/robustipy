@@ -7,6 +7,7 @@ analysis, along with utilities for model merging, plotting, and Bayesian model a
 
 from __future__ import annotations
 import _pickle
+import os
 import warnings
 from typing import Any, Optional, Sequence, List, Tuple, Union
 import matplotlib.pyplot as plt
@@ -64,9 +65,24 @@ def _in_jupyter() -> bool:
     """True when running inside a Jupyter kernel."""
     try:
         from IPython import get_ipython
-        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+        ip = get_ipython()
+        if ip is None:
+            return bool(os.environ.get("JPY_PARENT_PID"))
+        shell_name = ip.__class__.__name__
+        if shell_name == "ZMQInteractiveShell":
+            return True
+        if hasattr(ip, "kernel"):
+            return True
+        cfg = getattr(ip, "config", {})
+        if isinstance(cfg, dict):
+            if "IPKernelApp" in cfg:
+                return True
+        else:
+            if "IPKernelApp" in str(cfg):
+                return True
+        return bool(os.environ.get("JPY_PARENT_PID"))
     except (ImportError, AttributeError):
-        return False
+        return bool(os.environ.get("JPY_PARENT_PID"))
 
 
 def _make_notebook_draws_bar(*, total: int, description: str):
@@ -104,7 +120,9 @@ def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=Non
     outputs = []
     if len(seeds) == 0:
         return outputs
-    batch_size = max(32, int(n_cpu) * 4)
+    # Keep batches modest so notebook bars visibly tick during long specs.
+    cpu = max(1, int(n_cpu))
+    batch_size = max(8, cpu)
     for start in range(0, len(seeds), batch_size):
         seed_batch = seeds[start:start + batch_size]
         batch_output = Parallel(n_jobs=n_cpu)(
@@ -114,6 +132,8 @@ def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=Non
         outputs.extend(batch_output)
         if draws_bar is not None:
             draws_bar.update(len(batch_output))
+            if hasattr(draws_bar, "refresh"):
+                draws_bar.refresh()
     return outputs
 
 
@@ -121,7 +141,7 @@ def stouffer_method(
     p_values,
     *,
     two_sided=True,
-    betas=None,                 # required if two_sided=True (for direction)
+    betas=None,                 # if missing with two_sided=True, use unsigned z's
     weights=None,               # optional Stouffer weights
     rho=None,                   # optional common correlation among z's
     Sigma=None,                 # optional full covariance of z; overrides rho
@@ -155,12 +175,15 @@ def stouffer_method(
     # ---- 2) prepare aligned betas / weights (after omission)
     if two_sided:
         if betas is None:
-            raise ValueError("`betas` must be provided when two_sided=True.")
-        b_all = np.asarray(betas, dtype=np.float64)
-        b = b_all[valid] if not valid.all() else b_all
-        if b.shape != p.shape:
-            raise ValueError("`betas` length must match the number of valid p-values.")
-        signs = np.sign(b)  # zeros give sign 0 -> z=0
+            if warn:
+                print("WARNING: `betas` not provided; using unsigned two-sided z-scores.")
+            signs = np.ones(m, dtype=np.float64)
+        else:
+            b_all = np.asarray(betas, dtype=np.float64)
+            b = b_all[valid] if not valid.all() else b_all
+            if b.shape != p.shape:
+                raise ValueError("`betas` length must match the number of valid p-values.")
+            signs = np.sign(b)  # zeros give sign 0 -> z=0
     else:
         signs = None
 
@@ -308,6 +331,7 @@ class MergedResult(Protoresult):
     def plot(
         self,
         loess: bool = True,
+        ci: float = 1,
         specs: Optional[List[List[str]]] = None,
         colormap: str = 'viridis',
         figsize: Tuple[int, int] = (16, 14),
@@ -345,9 +369,6 @@ class MergedResult(Protoresult):
         matplotlib.figure.Figure:
             Plot showing the regression results.
         """
-        
-        fig, ax = plt.subplots(figsize=figsize)
-
         if specs is not None and len(specs) == 0:
             specs = None
         if specs is not None:
@@ -358,20 +379,32 @@ class MergedResult(Protoresult):
             if not all(frozenset(spec) in self.specs_names.to_list() for spec in specs):
                 raise TypeError("All specifications in 'specs' must be in the valid computed specifications.")
 
-        plot_results(
-            results_object=self,
-            loess=loess,
-            ci=ci,
-            specs=specs,
-            ax=ax,
-            colormap=colormap,
-            ext=ext,
-            figpath=figpath,
-            project_name=project_name,
-            highlights=highlights,
-            oddsratio=oddsratio
+        warnings.warn(
+            "MergedResult plotting is not supported yet. "
+            "Plot each constituent OLSResult separately.",
+            UserWarning
         )
-        return fig
+        return None
+
+    def summary(self, digits: int = 3) -> None:
+        """
+        Print a compact summary for merged OLS-style results.
+        """
+        print("==============================")
+        print("Merged Model Summary")
+        print("==============================")
+        print(f"Dependent variable: {self.y_name}")
+        print(f"Number of specifications: {len(self.specs_names)}")
+        print("==============================")
+        print("Coefficient Distribution")
+        print("==============================")
+        est = self.estimates
+        print(f"Median β: {est.stack().median():.{digits}f}")
+        print(f"Min β: {est.min().min():.{digits}f}")
+        print(f"Max β: {est.max().max():.{digits}f}")
+        if hasattr(self, "r2_values") and isinstance(self.r2_values, pd.DataFrame):
+            print(f"Median R²: {self.r2_values.stack().median():.{digits}f}")
+        print("==============================")
 
     def merge(
         self,
@@ -2513,7 +2546,7 @@ class LRobust(BaseRobust):
 
             # Split data for training and testing
             x_train, x_test, y_train, _ = train_test_split(
-                SHAP_comb[self.x + controls].drop(columns=['const']),
+                SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
                 SHAP_comb[self.y],
                 test_size=0.2,
                 random_state=self.seed

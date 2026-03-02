@@ -73,18 +73,12 @@ def test_simple_ols_against_statsmodels(dummy_data):
     )
 
     # Information criteria:
-    # nobs = number of observations, ncoef = number of coefficients (after adding 'const')
-    nobs = y.shape[0]              # e.g., 100
-    ncoef = x.shape[1]             # e.g., 3 (x1, x2, const)
-    offset = 2 * nobs - 2 * ncoef  # For example: 2*100 - 2*3 = 194
-
-    # AIC from simple_ols must have the offset subtracted:
-    aic_custom  = result_custom['aic'][0][0] - offset
+    aic_custom = result_custom['aic']
     np.testing.assert_allclose(aic_custom, sm_model.aic, rtol=1e-6, 
                                err_msg="AIC does not match", verbose=True)
 
     # BIC can be compared directly:
-    bic_custom  = result_custom['bic'][0][0]
+    bic_custom = result_custom['bic']
     np.testing.assert_allclose(bic_custom, sm_model.bic, rtol=1e-6, 
                                err_msg="BIC does not match", verbose=True)
 
@@ -107,7 +101,10 @@ def test_output_keys(dummy_data):
     y = dummy_data[['y']]
     x = dummy_data[['x1', 'x2']]
     result = simple_ols(y, x)
-    expected_keys = {'b', 'p', 'r2', 'll', 'aic', 'bic', 'hqic'}
+    expected_keys = {
+        'b', 'p', 'r2', 'll', 'll_null', 'll_gain', 'll_gain_per_obs',
+        'nobs', 'ncoef', 'aic', 'bic', 'hqic'
+    }
     assert set(result.keys()) == expected_keys
 
 def test_output_shapes(dummy_data):

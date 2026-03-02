@@ -1,5 +1,6 @@
 # Module containing utility functions for the library
 from typing import Optional, List, Tuple, Iterable, Sequence, Union
+import copy
 import numpy as np
 import random
 import warnings
@@ -11,6 +12,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from multiprocessing import cpu_count
+import os
 import sys
 
 
@@ -52,10 +54,24 @@ def _running_in_jupyter() -> bool:
     """
     try:
         from IPython import get_ipython
-        shell = get_ipython().__class__.__name__
-        return shell == "ZMQInteractiveShell"
+        ip = get_ipython()
+        if ip is None:
+            return bool(os.environ.get("JPY_PARENT_PID"))
+        shell = ip.__class__.__name__
+        if shell == "ZMQInteractiveShell":
+            return True
+        if hasattr(ip, "kernel"):
+            return True
+        cfg = getattr(ip, "config", {})
+        if isinstance(cfg, dict):
+            if "IPKernelApp" in cfg:
+                return True
+        else:
+            if "IPKernelApp" in str(cfg):
+                return True
+        return bool(os.environ.get("JPY_PARENT_PID"))
     except (ImportError, AttributeError):
-        return False
+        return bool(os.environ.get("JPY_PARENT_PID"))
 
 def _is_real_tty() -> bool:
     """
@@ -548,7 +564,8 @@ def concat_results(objs: List["OLSResult"], de_dupe=True) -> "OLSResult":
     # ───────────────────────────────────────────────────────────
     # 2) Start by “copying” the first OLSResult into `merged`
     # ───────────────────────────────────────────────────────────
-    merged: OLSResult = objs[0]
+    # Work on a deep copy so callers don't get in-place mutation of the first result.
+    merged: OLSResult = copy.deepcopy(objs[0])
 
     # Helper: for a given OLSResult `r`, build a list of length = number of specs
     # that repeats r.y_name (whether scalar or list) once per spec.
