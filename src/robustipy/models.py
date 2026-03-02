@@ -822,12 +822,18 @@ class OLSResult(Protoresult):
                 # Suppress numpy divide/invalid runtime warnings here —
                 # we emit a clearer UserWarning on failure below.
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    Z, p_combined = stouffer_method(
+                    Z, p_one = stouffer_method(
                         df_model_result['p_values'].to_numpy(),
                         two_sided=True,
                         betas=df_model_result['betas'].to_numpy(),
                         Sigma=z_corr,
                     )
+
+                    # convert one-sided -> two-sided, numerically stable
+                    log_p_two = np.log(2.0) + norm.logsf(abs(Z))
+                    p_two = float(np.exp(log_p_two))
+
+                    self.inference['Stouffers'] = (Z, p_two)
 
                 # Store results with covariance structure
                 self.inference['Stouffers'] = (Z, p_combined)
