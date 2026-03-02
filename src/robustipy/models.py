@@ -375,10 +375,10 @@ class MergedResult(Protoresult):
 
     def merge(
         self,
-        result_obj: OLSResult,
+        result_obj: "OLSResult",
         left_prefix: str,
         right_prefix: str,
-    ) -> MergedResult:
+    ) -> "MergedResult":
         """
         Merge the current OLSResult object with another, tagging each specification
         with a prefix to indicate origin.
