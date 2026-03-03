@@ -7,9 +7,8 @@ def sim5(project_name):
 
     # 1. Simulation parameters
     n, p = 1000, 5
-    np.random.seed(192735)
     Σ_X = np.eye(p)
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(192735)
 
     # 2. Draw covariates X and error ε
     X = rng.multivariate_normal(mean=np.zeros(p), cov=Σ_X, size=n)
@@ -34,14 +33,16 @@ def sim5(project_name):
 
     # 6. Fit robust OLS
     model = OLSRobust(y=Y, x=['x1'], data=df)
-    model.fit(controls=z, draws=1000, kfold=10, rescale_y=True, rescale_x=True, rescale_z=True)
+    model.fit(controls=z, draws=1000, kfold=10,
+              rescale_y=True, seed=192735,
+              rescale_x=True, rescale_z=True)
 
     # 7. Retrieve and plot results
     res = model.get_results()
     res.plot(
         loess=False,
         specs=[['y1', 'y2', 'z1', 'z2'],
-               ['y3', 'y4', 'z3', 'z4']],
+               ['y4', 'z4']],
         figsize=(16, 8),
         figpath='../figures',
         project_name=project_name

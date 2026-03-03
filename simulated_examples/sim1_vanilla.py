@@ -5,9 +5,8 @@ from robustipy.models import OLSRobust
 
 def sim1(project_name):
     # 1. Setup
-    np.random.seed(192735)
     n = 100
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(192735)
     z = [f"z{i}" for i in range(1, 5)]
 
     # 2. Simulate covariates
