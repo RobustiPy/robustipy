@@ -865,11 +865,15 @@ def plot_curve(
     if inset:
         median_inf = results_object.inference['median']
         z_score = results_object.inference['Stouffers'][0]
+        if np.isnan(z_score):
+            median_line = f'Median: {median_inf:.3f}'
+        else:
+            median_line = f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
         info_text = (
             f'Specifications: {n}\n'
             f'Bootstraps: {results_object.draws}\n'
             f'Folds: {results_object.kfold}\n'
-            f'Median: {median_inf:.3f} (Z: {z_score:.3f})'
+            f'{median_line}'
         )
         ax.text(0.05, 0.95, info_text, transform=ax.transAxes, va='top', ha='left',
                 fontsize=9, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=1'))
