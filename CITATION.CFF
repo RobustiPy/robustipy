@@ -10,7 +10,7 @@ authors:
   - family-names: Rahal
     given-names: Charles
 title: "Introducing RobustiPy: An efficient next generation multiversal library with model selection, averaging, resampling, and explainable artificial intelligence"
-version: 1.0.0
+version: 1.0.3
 doi: 10.48550/arXiv.2411.10314
-date-released: 2025-06-25
+date-released: 2025-03-04
 url: https://arxiv.org/abs/2506.19958
