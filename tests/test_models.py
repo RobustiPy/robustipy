@@ -299,6 +299,50 @@ def test_stouffer_method():
     z, combined_p = stouffer_method(p_values)
     assert combined_p < max(p_values)
 
+
+def test_stouffer_method_null_calibrated():
+    """
+    When null draws are supplied, stouffer_method should use null-calibrated
+    Monte Carlo p-values (not asymptotic-only p-values).
+    """
+    p_obs = np.array([0.01, 0.02, 0.03], dtype=float)
+    b_obs = np.array([1.0, 1.0, 1.0], dtype=float)
+
+    # n_specs x n_draws
+    p_null = np.array([
+        [0.4, 0.5, 0.6, 0.7, 0.8],
+        [0.3, 0.6, 0.5, 0.7, 0.2],
+        [0.2, 0.4, 0.6, 0.8, 0.9],
+    ], dtype=float)
+    b_null = np.array([
+        [1.0, -1.0, 1.0, -1.0, 1.0],
+        [1.0, 1.0, -1.0, -1.0, 1.0],
+        [1.0, -1.0, 1.0, 1.0, -1.0],
+    ], dtype=float)
+
+    z_null_cal, p_null_cal = stouffer_method(
+        p_obs,
+        two_sided=True,
+        betas=b_obs,
+        p_values_ystar=p_null,
+        betas_ystar=b_null,
+        warn=False,
+    )
+    z_asym, p_asym = stouffer_method(
+        p_obs,
+        two_sided=True,
+        betas=b_obs,
+        warn=False,
+    )
+
+    # Monte Carlo p must be on the (B+1) grid with B=5 -> step size 1/6.
+    assert p_null_cal == pytest.approx(1.0 / 6.0)
+    # Null-calibrated and asymptotic p-values should differ on this setup.
+    assert abs(p_null_cal - p_asym) > 1e-3
+    # Both runs should produce finite Z.
+    assert np.isfinite(z_null_cal)
+    assert np.isfinite(z_asym)
+
 # ----------------------------------------------------------------------------
 #                 Tests for .summary() and .get_results()
 # ----------------------------------------------------------------------------

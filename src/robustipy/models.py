@@ -248,122 +248,196 @@ def stouffer_method(
     *,
     two_sided=True,
     betas=None,                 # if missing with two_sided=True, use unsigned z's
-    weights=None,               # optional Stouffer weights
-    rho=None,                   # optional common correlation among z's
-    Sigma=None,                 # optional full covariance of z; overrides rho
+    p_values_ystar=None,        # null/bootstrap p-values, shape (n_specs, n_draws)
+    betas_ystar=None,           # null/bootstrap betas, shape (n_specs, n_draws)
+    weights=None,               # optional Stouffer weights (per spec)
     clip_floor=1e-300,          # must be >= np.finfo(float).tiny
     na_action="omit",
     warn: bool = True
 ):
     """
-    Combine p-values via Stouffer's Z-method with numerical safeguards.
-    Returns (Z, p_one_sided) where p_one_sided = sf(Z).
+    Combine p-values via a Stouffer test aligned with OLSResult._compute_inference.
+
+    Behavior
+    --------
+    - Uses observed full-sample p-values/betas for Z_obs.
+    - If null draws (`p_values_ystar`, `betas_ystar`) are supplied, calibrates
+      p via two-sided Monte Carlo:
+          p = (1 + #{|Z_null| >= |Z_obs|}) / (B + 1)
+      with dependence estimated from null z-vectors (PSD projection + ridge).
+    - If null draws are unavailable, falls back to asymptotic two-sided p-value
+      based on Z_obs.
+
+    Returns
+    -------
+    tuple[float, float]
+        (Z_obs, p_value). For two_sided=True this is a two-sided p-value.
     """
     import numpy as np
     from scipy.stats import norm
 
-    # ---- 0) inputs to arrays
-    p_all = np.asarray(p_values, dtype=np.float64)
+    # ---- 0) observed inputs
+    p_obs_all = np.asarray(p_values, dtype=np.float64).reshape(-1)
+    n_specs = p_obs_all.size
+    if n_specs == 0:
+        raise ValueError("`p_values` must contain at least one element.")
 
-    # ---- 1) validate p and optionally omit invalid
-    valid = np.isfinite(p_all) & (p_all >= 0.0) & (p_all <= 1.0)
-    if not valid.all():
+    if betas is None:
+        if warn and two_sided:
+            print("WARNING: `betas` not provided; using unsigned z-scores for observed statistics.")
+        b_obs_all = np.ones(n_specs, dtype=np.float64)
+    else:
+        b_obs_all = np.asarray(betas, dtype=np.float64).reshape(-1)
+        if b_obs_all.size != n_specs:
+            raise ValueError("`betas` length must match `p_values` length.")
+
+    # ---- 1) validate observed p and optionally omit invalid
+    obs_valid = np.isfinite(p_obs_all) & (p_obs_all >= 0.0) & (p_obs_all <= 1.0) & np.isfinite(b_obs_all)
+    if not obs_valid.all() and na_action == "raise":
+        bad = np.where(~obs_valid)[0].tolist()
+        raise ValueError(f"Invalid observed inputs at indices {bad}.")
+
+    # ---- 2) prepare null matrices (optional) and keep mask from null variability
+    p_matrix = None
+    beta_matrix = None
+    keep_null = None
+    z_corr = None
+
+    if (p_values_ystar is not None) and (betas_ystar is not None):
+        p_matrix = np.asarray(p_values_ystar, dtype=np.float64)
+        beta_matrix = np.asarray(betas_ystar, dtype=np.float64)
+
+        if p_matrix.shape != beta_matrix.shape:
+            raise ValueError("`p_values_ystar` and `betas_ystar` must have identical shape.")
+        if p_matrix.ndim != 2:
+            raise ValueError("`p_values_ystar` and `betas_ystar` must be 2D (n_specs, n_draws).")
+
+        # Accept transposed input if obvious.
+        if p_matrix.shape[0] != n_specs and p_matrix.shape[1] == n_specs:
+            p_matrix = p_matrix.T
+            beta_matrix = beta_matrix.T
+
+        if p_matrix.shape[0] != n_specs:
+            raise ValueError("Null matrices must have n_specs rows matching observed p-values.")
+
+        if p_matrix.shape[1] > 1:
+            floor_min = np.finfo(float).tiny
+            clip_floor_eff = max(float(clip_floor), floor_min) if (clip_floor is not None and np.isfinite(clip_floor) and clip_floor > 0.0) else floor_min
+            clip_ceiling = 1.0 - 1e-16
+            p_clip_null = np.clip(p_matrix, clip_floor_eff, clip_ceiling)
+
+            if two_sided:
+                z_matrix = np.sign(beta_matrix) * norm.isf(p_clip_null / 2.0)
+            else:
+                z_matrix = norm.isf(p_clip_null)
+
+            # draws x specs
+            Z_null_all = z_matrix.T
+            z_std = np.std(Z_null_all, axis=0, ddof=1)
+            keep_null = np.isfinite(z_std) & (z_std > 1e-14)
+
+            if np.sum(keep_null) >= 2:
+                Zk = Z_null_all[:, keep_null]
+                R_hat = np.corrcoef(Zk, rowvar=False)
+
+                evals, evecs = np.linalg.eigh(R_hat)
+                evals[evals < 0.0] = 0.0
+                R_psd = (evecs * evals) @ evecs.T
+                R_psd = 0.5 * (R_psd + R_psd.T)
+                np.fill_diagonal(R_psd, 1.0)
+                z_corr = R_psd + 1e-12 * np.eye(R_psd.shape[0], dtype=R_psd.dtype)
+
+    # ---- 3) final keep mask
+    if keep_null is None:
+        keep = obs_valid.copy()
+    else:
+        keep = obs_valid & keep_null
+
+    if np.sum(keep) == 0:
         if na_action == "raise":
-            bad = np.where(~valid)[0].tolist()
-            raise ValueError(f"Invalid p-values at indices {bad}.")
-        p = p_all[valid]
-        if p.size == 0:
-            raise ValueError("No valid p-values after filtering.")
-    else:
-        p = p_all
-    m = p.size
+            raise ValueError("No valid tests available after applying observed/null filtering.")
+        return np.nan, np.nan
 
-    # ---- 2) prepare aligned betas / weights (after omission)
-    if two_sided:
-        if betas is None:
-            if warn:
-                print("WARNING: `betas` not provided; using unsigned two-sided z-scores.")
-            signs = np.ones(m, dtype=np.float64)
-        else:
-            b_all = np.asarray(betas, dtype=np.float64)
-            b = b_all[valid] if not valid.all() else b_all
-            if b.shape != p.shape:
-                raise ValueError("`betas` length must match the number of valid p-values.")
-            signs = np.sign(b)  # zeros give sign 0 -> z=0
-    else:
-        signs = None
-
-    if weights is None:
-        w = np.ones(m, dtype=np.float64)
-    else:
-        w_all = np.asarray(weights, dtype=np.float64)
-        w = w_all[valid] if not valid.all() else w_all
-        if w.shape != (m,):
-            raise ValueError("`weights` must have the same length as valid p-values.")
-        if not np.all(np.isfinite(w)):
-            raise ValueError("`weights` must be finite.")
-        if not np.any(w != 0.0):
-            raise ValueError("At least one weight must be nonzero.")
-
-    # ---- 3) clip p away from {0,1} at a safe floor/ceiling
+    # ---- 4) prepare observed z
     floor_min = np.finfo(float).tiny
     if clip_floor is None or not np.isfinite(clip_floor) or clip_floor <= 0.0:
-        clip_floor = floor_min
+        clip_floor_eff = floor_min
     else:
-        clip_floor = max(float(clip_floor), floor_min)
+        clip_floor_eff = max(float(clip_floor), floor_min)
     clip_ceiling = 1.0 - 1e-16
 
-    n_zeros = int(np.sum(p == 0.0))
-    n_ones  = int(np.sum(p == 1.0))
+    p_kept = p_obs_all[keep]
+    b_kept = b_obs_all[keep]
+
+    n_zeros = int(np.sum(p_kept == 0.0))
+    n_ones  = int(np.sum(p_kept == 1.0))
     if warn and (n_zeros or n_ones):
         print(f"WARNING: clipping {n_zeros} p=0 and {n_ones} p=1 to "
-              f"[{clip_floor:g}, {clip_ceiling:g}].")
-    p = np.clip(p, clip_floor, clip_ceiling)
+              f"[{clip_floor_eff:g}, {clip_ceiling:g}].")
+    p_kept = np.clip(p_kept, clip_floor_eff, clip_ceiling)
 
-    # ---- 4) map to z-scores (two-sided with direction vs one-sided)
     if two_sided:
-        z = signs * norm.isf(p / 2.0)
+        z_obs = np.sign(b_kept) * norm.isf(p_kept / 2.0)
     else:
-        z = norm.isf(p)
+        z_obs = norm.isf(p_kept)
 
-    # Guard against any residual inf/-inf due to extreme p
-    if not np.all(np.isfinite(z)):
-        # Numerical cap: Φ^{-1}(1 - 5e-300) ≈ 37
+    # Guard against residual inf/-inf due to extreme p
+    if not np.all(np.isfinite(z_obs)):
         Z_MAX = 37.0
         if warn:
             print("WARNING: non-finite z encountered; clipping z to ±37.")
-        z = np.clip(z, -Z_MAX, Z_MAX)
+        z_obs = np.clip(z_obs, -Z_MAX, Z_MAX)
 
-    # ---- 5) variance denominator under dependence
-    if Sigma is not None:
-        Sigma_all = np.asarray(Sigma, dtype=np.float64)
-
-        # If we omitted invalid p-values, we must take the matching principal submatrix.
-        if not valid.all():
-            Sigma_use = Sigma_all[np.ix_(valid, valid)]
-        else:
-            Sigma_use = Sigma_all
-
-        if Sigma_use.shape != (m, m):
-            raise ValueError("`Sigma` must be an (m×m) covariance for the valid tests.")
-        denom2 = float(w @ (Sigma_use @ w))
-    elif rho is not None:
-        rho = float(rho)
-        if not (-1.0/(m-1) < rho < 1.0):
-            raise ValueError(f"`rho` must lie in (-1/(m-1), 1); got {rho}.")
-        # Equal-correlation Σ = (1-ρ)I + ρ 11^T
-        denom2 = (1.0 - rho) * float(w @ w) + rho * float(np.sum(w))**2
+    # ---- 5) weights (aligned to kept specs)
+    if weights is None:
+        w = np.ones(int(np.sum(keep)), dtype=np.float64)
     else:
-        denom2 = float(w @ w)
+        w_all = np.asarray(weights, dtype=np.float64).reshape(-1)
+        if w_all.size != n_specs:
+            raise ValueError("`weights` must have same length as observed p-values.")
+        if not np.all(np.isfinite(w_all)):
+            raise ValueError("`weights` must be finite.")
+        w = w_all[keep]
+        if not np.any(w != 0.0):
+            raise ValueError("At least one kept weight must be nonzero.")
 
-    if not np.isfinite(denom2) or denom2 <= 0.0:
-        raise ValueError("Nonpositive or nonfinite variance under supplied Σ/ρ/weights.")
+    # ---- 6) denominator (mirrors _compute_inference behavior)
+    denom = None
+    if (z_corr is not None) and (keep_null is not None) and np.array_equal(keep, keep_null):
+        denom2 = float(w @ (z_corr @ w))
+        if np.isfinite(denom2) and denom2 > 0.0:
+            denom = float(np.sqrt(denom2))
+    if denom is None:
+        denom = float(np.sqrt(float(np.dot(w, w))))
 
-    # ---- 6) combined statistic and one-sided p
-    Z = float(np.dot(w, z) / np.sqrt(denom2))
-    p_combined = float(norm.sf(Z))
+    Z_obs = float(np.dot(w, z_obs) / denom)
 
-    return Z, p_combined
+    # ---- 7) p-value: null-calibrated if null draws exist; else asymptotic fallback
+    has_null = (
+        (p_matrix is not None) and (beta_matrix is not None) and
+        (p_matrix.size > 0) and (p_matrix.shape[1] >= 1) and
+        (not np.isnan(p_matrix).all())
+    )
+    if not has_null:
+        if two_sided:
+            p_val = float(2.0 * norm.sf(abs(Z_obs)))
+        else:
+            p_val = float(norm.sf(Z_obs))
+        return Z_obs, p_val
+
+    # Null z matrix aligned to kept specs
+    p_clip_null = np.clip(p_matrix, clip_floor_eff, clip_ceiling)
+    if two_sided:
+        z_null_matrix = np.sign(beta_matrix) * norm.isf(p_clip_null / 2.0)
+    else:
+        z_null_matrix = norm.isf(p_clip_null)
+
+    Z_null_specs = z_null_matrix.T[:, keep]  # draws x kept_specs
+    Z_null = (Z_null_specs @ w) / denom
+    B = int(Z_null.shape[0])
+    p_val = float((1.0 + np.sum(np.abs(Z_null) >= abs(Z_obs))) / (B + 1.0))
+
+    return Z_obs, p_val
 
 
 
