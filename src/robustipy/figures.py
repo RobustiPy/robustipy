@@ -418,7 +418,7 @@ def shap_violin(
     feature_names : list of str, optional
         Names of each feature. Default: None (will infer or auto‐label).
     max_display : int, default=10
-        Maximum number of top features (by mean(|SHAP|)) to show.
+        Maximum number of top features (by mean absolute SHAP value) to show.
     color : str or sequence, optional
         Single color for all points when no feature values given.
     alpha : float, default=1.0
@@ -492,7 +492,7 @@ def shap_violin(
     if max_display is None:
         max_display = 20
         
-    # Order features by mean(|SHAP|) importance
+    # Order features by mean absolute SHAP importance
     feature_order = np.argsort(np.sum(np.abs(shap_values), axis=0))
     feature_order = feature_order[-min(max_display, len(feature_order)):]
     

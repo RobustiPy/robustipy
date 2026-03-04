@@ -258,15 +258,15 @@ def stouffer_method(
     """
     Combine p-values via a Stouffer test aligned with OLSResult._compute_inference.
 
-    Behavior
-    --------
-    - Uses observed full-sample p-values/betas for Z_obs.
-    - If null draws (`p_values_ystar`, `betas_ystar`) are supplied, calibrates
-      p via two-sided Monte Carlo:
-          p = (1 + #{|Z_null| >= |Z_obs|}) / (B + 1)
-      with dependence estimated from null z-vectors (PSD projection + ridge).
-    - If null draws are unavailable, falls back to asymptotic two-sided p-value
-      based on Z_obs.
+    Uses observed full-sample p-values and coefficients to compute ``Z_obs``.
+    If null draws (``p_values_ystar`` and ``betas_ystar``) are supplied, the
+    p-value is calibrated by two-sided Monte Carlo:
+
+    ``p = (1 + sum(abs(Z_null) >= abs(Z_obs))) / (B + 1)``.
+
+    Dependence is estimated from null z-vectors (PSD projection + ridge). If
+    null draws are unavailable, the method falls back to an asymptotic two-sided
+    p-value based on ``Z_obs``.
 
     Returns
     -------
@@ -1610,7 +1610,7 @@ class OLSRobust(BaseRobust):
             Metric to evaluate out-of-sample performance when kfold is set.
         n_cpu : int, optional
             Number of parallel processes to use. Defaults to all available CPUs minus one if None.
-                seed : int, optional
+        seed : int, optional
             Random seed for reproducibility. Propagated to all random operations.
         composite_sample : int, optional
             If set, draw this many bootstrap samples **before** applying specification variation;

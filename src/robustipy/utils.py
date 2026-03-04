@@ -567,14 +567,24 @@ def _find_group_invariant_columns(
 
 def concat_results(objs: List["OLSResult"], de_dupe=True) -> "OLSResult":
     """
-     Core routine: take a list of OLSResult objects and stack them into one OLSResult.
-     All per‐spec fields (estimates, p_values, specs_names, etc.) are concatenated,
-     and any exact duplicates in (y_name, x_name, spec) are dropped in lockstep.
-     accepts: de_dupe: bool, default True
-        If True, drop exact duplicates in (y_name, x_name, spec) triplets.
-     This function assumes each element of `objs` is already an OLSResult (not the wrapper class).
-     We defer the import of OLSResult until inside the function to avoid circular‐import errors.
-     """
+    Concatenate multiple ``OLSResult`` objects into a single result object.
+
+    Per-specification fields (for example estimates, p-values, and spec names)
+    are concatenated in lockstep. When ``de_dupe=True``, exact duplicates in
+    ``(y_name, x_name, spec)`` triplets are removed across all per-spec fields.
+
+    Parameters
+    ----------
+    objs : list of OLSResult
+        Result objects to stack.
+    de_dupe : bool, default=True
+        If True, drop exact duplicate ``(y_name, x_name, spec)`` triplets.
+
+    Returns
+    -------
+    OLSResult
+        A merged ``OLSResult`` containing all stacked specifications.
+    """
 
     # ───────────────────────────────────────────────────────────
     # 1) Delay import of OLSResult until we actually need it
@@ -1175,24 +1185,20 @@ def get_colormap_colors(
         num_colors: int = 3,
         colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
 ) -> List[str]:
-    r"""
-    Return \(\texttt{num_colors}\) evenly spaced colors from a Matplotlib colormap.
+    """
+    Return ``num_colors`` evenly spaced colors from a Matplotlib colormap.
 
     Parameters
     ----------
     num_colors : int, optional
-        The number of colors to return. Must satisfy
-        \[
-            1 \;\le\; \texttt{num_colors},
-        \]
-        Defaults to 3.
+        Number of colors to return. Must be >= 1. Defaults to 3.
     colormap : str or matplotlib.colors.Colormap, optional
         Colormap name or object to sample from. Defaults to 'viridis'.
 
     Returns
     -------
     List[str]
-        A list of hexadecimal color strings of length exactly \(\texttt{num_colors}\).
+        Hexadecimal color strings of length exactly ``num_colors``.
 
     Raises
     ------
