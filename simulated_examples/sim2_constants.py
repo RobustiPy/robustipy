@@ -3,7 +3,7 @@ import pandas as pd
 from robustipy.models import OLSRobust
 
 
-def sim3(project_name):
+def sim2(project_name):
     """Simulation with fixed coefficients and multiple focal regressors."""
     # 1) Setup & seeds
     np.random.seed(192735)
@@ -39,17 +39,17 @@ def sim3(project_name):
     y = ['y1']
     x = ['x1', 'z1']     # multiple focal regressors
     z = ['z2', 'z3','z4', 'z5', 'z6', 'z7']
-    sim3 = OLSRobust(y=y, x=x, data=data)
-    sim3.fit(controls=z, draws=1000, kfold=10, seed=192735)
+    sim2 = OLSRobust(y=y, x=x, data=data)
+    sim2.fit(controls=z, draws=1000, kfold=10, seed=192735)
 
     # 7) Retrieve, plot, and summarize results
-    sim3_results = sim3.get_results()
-    sim3_results.plot(specs=[['z4', 'z5']],
+    sim2_results = sim2.get_results()
+    sim2_results.plot(specs=[['z4', 'z5']],
                       ic='hqic', figsize=(16, 16),
                       figpath='../figures',
                       ext='pdf', project_name=project_name)
-    sim3_results.summary()
+    sim2_results.summary()
 
 
 if __name__ == "__main__":
-    sim3('sim3_example')
+    sim2('sim2_example')

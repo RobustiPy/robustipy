@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from robustipy.models import OLSRobust
 
-def sim2(project_name):
+def sim3(project_name):
     """Longitudinal/panel-style simulation with group-level heterogeneity."""
     # 1) Setup & seeds
     np.random.seed(192735)
@@ -51,21 +51,18 @@ def sim2(project_name):
     data['group'] = group_list
 
     # 6) Fit robust OLS with grouping & rescaling
-    sim = OLSRobust(y=['y'], x=['x1'], data=data)
-    sim.fit(controls=['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7'],
-            group='group',
-            #draws=1000,
-            #kfold=10,
-            rescale_y=True,
-            rescale_z=True,
+    sim3 = OLSRobust(y=['y'], x=['x1'], data=data)
+    sim3.fit(controls=['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7'],
+            group='group', draws=1000, kfold=10,
+            rescale_y=True, rescale_z=True,
             seed=192735)
 
     # 7) Retrieve, plot, and summarize results
-    results = sim.get_results()
+    results = sim3.get_results()
     results.plot(specs=[['z1', 'z2', 'z3']], ic='hqic',
                  figpath='../figures',
                  figsize=(16, 16), ext='pdf', project_name=project_name)
     results.summary()
 
 if __name__ == '__main__':
-    sim2('sim2_example')
+    sim3('sim2_example')
