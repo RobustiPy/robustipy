@@ -16,10 +16,8 @@ def sim5(project_name):
 
     # 3. Stack β‐vectors into a (4×p) matrix
     B = np.array([
-        [0.20, 0.50, -0.40, -0.10, 0.20],
-        [0.30, 0.40, -0.35, -0.10, 0.20],
-        [0.15, 0.60, -0.45, -0.10, 0.20],
-        [0.40, 0.30, -0.50, -0.10, 0.20],
+        [0.20, 0.50, -0.40, -0.10, 0.20], [0.30, 0.40, -0.35, -0.10, 0.20],
+        [0.15, 0.60, -0.45, -0.10, 0.20], [0.40, 0.30, -0.50, -0.10, 0.20],
     ])  # shape = (4, p)
 
     # 4. Build DataFrame and generate outcomes y₁…y₄ and controls z₁…z₄
@@ -33,20 +31,15 @@ def sim5(project_name):
 
     # 6. Fit robust OLS
     model = OLSRobust(y=Y, x=['x1'], data=df)
-    model.fit(controls=z, draws=1000, kfold=10,
-              rescale_y=True, seed=192735,
-              rescale_x=True, rescale_z=True)
+    model.fit(controls=z, draws=1000, kfold=10, rescale_y=True,
+              rescale_x=True, rescale_z=True, seed=192735)
 
     # 7. Retrieve and plot results
     res = model.get_results()
     res.plot(
         loess=False,
-        specs=[['y1', 'y2', 'z1', 'z2'],
-               ['y4', 'z4']],
-        figsize=(16, 8),
-        figpath='../figures',
-        project_name=project_name
-    )
+        specs=[['y1', 'y2', 'z1', 'z2'], ['y4', 'z4']],
+        figsize=(16, 8), figpath='../figures', project_name=project_name)
     res.summary()
 
 if __name__ == "__main__":
