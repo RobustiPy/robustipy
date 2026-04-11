@@ -10,7 +10,7 @@ Welcome to RobustiPy's documentation!
    :maxdepth: 3
    :caption: Contents:
 
-   robustipy
+   modules
 
 Indices and tables
 ==================
