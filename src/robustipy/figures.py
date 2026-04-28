@@ -69,6 +69,29 @@ def _legend_side_from_hist(ax, *, tau: float = 0.6) -> str:
     return 'upper left'  # default / tie
 
 
+def _right_align_axes_to(reference_ax: plt.Axes, *axes: plt.Axes) -> None:
+    """
+    Right-align one or more axes to the plotting box of ``reference_ax``.
+    """
+    ref_pos = reference_ax.get_position()
+    for ax in axes:
+        pos = ax.get_position()
+        ax.set_position([ref_pos.x1 - pos.width, pos.y0, pos.width, pos.height])
+
+
+def _set_axes_horizontal_span(x0: float, x1: float, *axes: plt.Axes) -> None:
+    """
+    Set a shared horizontal span for one or more axes while preserving their
+    current vertical placement.
+    """
+    if x1 <= x0:
+        raise ValueError("x1 must be greater than x0.")
+    width = x1 - x0
+    for ax in axes:
+        pos = ax.get_position()
+        ax.set_position([x0, pos.y0, width, pos.height])
+
+
 def axis_formatter(
         ax: plt.Axes,
         ylabel: str,
@@ -344,7 +367,7 @@ def plot_hexbin_log(
     """
     if 'll_gain_per_obs' in results_object.summary_df.columns:
         ll_values = results_object.summary_df['ll_gain_per_obs']
-        y_label = r'Null-Relative Log-Likelihood Gain (per obs)'
+        y_label = r'Null-Relative Log-Likelihood Gain'
     else:
         ll_values = results_object.summary_df['ll']
         y_label = r'Full Model Log Likelihood'
@@ -382,7 +405,7 @@ def plot_hexbin_log(
     axis_formatter(ax, y_label, r'Full-Sample Estimand', title)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
-    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.0f'))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.3g'))
     sns.despine(ax=ax)
 
 
@@ -1705,17 +1728,22 @@ def plot_results(
             cbar_width=cbar_width,
             cbar_width_fig=cbar_width_fig
         )
-        # If spec matrix is dots (not heatmap), align panel h horizontally with g.
         n_specs = len(results_object.specs_names)
         use_heatmap = (
             spec_matrix_bins is not None
             and spec_matrix_bins > 0
             and n_specs > spec_matrix_threshold
         )
-        if not use_heatmap:
-            pos_g = ax7.get_position()
-            pos_h = ax8.get_position()
-            ax8.set_position([pos_g.x0, pos_h.y0, pos_g.width, pos_h.height])
+        right_x1 = ax5.get_position().x1
+        expanded_left_x0 = ax6_cbar_spacer.get_position().x0
+        # Panel g can always expand into the blank spacer to the right of f.
+        _set_axes_horizontal_span(expanded_left_x0, right_x1, ax7)
+        # Panel h can only expand when the lower row is a dot plot; when a
+        # heatmap is used, keep h aligned to the e-panel column.
+        if use_heatmap:
+            _right_align_axes_to(ax5, ax8)
+        else:
+            _set_axes_horizontal_span(expanded_left_x0, right_x1, ax8)
         locator = mticker.MaxNLocator(5)
         ax6.xaxis.set_major_locator(locator)
         ax6m.xaxis.set_major_locator(locator)
