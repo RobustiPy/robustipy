@@ -298,3 +298,68 @@ def test_plot_results_type3_uses_control_order_for_bma(tmp_path, mock_results_ob
     assert len(captured_feature_orders) >= 1
     for order in captured_feature_orders:
         assert set(order) == set(mock_results_object.controls)
+
+
+@pytest.mark.parametrize(
+    ("spec_matrix_threshold", "spec_matrix_bins", "expect_h_expanded"),
+    [
+        (128, 128, True),   # dot matrix
+        (2, 4, False),      # heatmap
+    ],
+)
+def test_plot_results_right_column_flush_with_e_panel(
+    tmp_path,
+    mock_results_object,
+    spec_matrix_threshold,
+    spec_matrix_bins,
+    expect_h_expanded,
+):
+    """
+    Panel g should widen left while staying flush with e; panel h should do the
+    same only for the dot-matrix layout.
+    """
+    plt.close("all")
+
+    with patch("matplotlib.pyplot.savefig"):
+        plot_results(
+            results_object=mock_results_object,
+            loess=True,
+            specs=[],
+            ic="hqic",
+            colormap="Spectral_r",
+            figsize=(8, 8),
+            ext="png",
+            figpath=tmp_path,
+            project_name="layout_alignment",
+            spec_matrix_threshold=spec_matrix_threshold,
+            spec_matrix_bins=spec_matrix_bins,
+        )
+
+    target_fig = None
+    for fig_num in plt.get_fignums():
+        fig = plt.figure(fig_num)
+        titles = {ax.get_title(loc="left") for ax in fig.axes}
+        if {"e.", "f.", "g.", "h."}.issubset(titles):
+            target_fig = fig
+            break
+
+    assert target_fig is not None, "Could not find the combined plot figure."
+
+    axes_by_title = {
+        ax.get_title(loc="left"): ax
+        for ax in target_fig.axes
+        if ax.get_title(loc="left")
+    }
+    e_pos = axes_by_title["e."].get_position()
+    g_pos = axes_by_title["g."].get_position()
+    h_pos = axes_by_title["h."].get_position()
+
+    assert g_pos.x1 == pytest.approx(e_pos.x1)
+    assert g_pos.x0 < e_pos.x0
+    assert h_pos.x1 == pytest.approx(e_pos.x1)
+    if expect_h_expanded:
+        assert h_pos.x0 < e_pos.x0
+    else:
+        assert h_pos.x0 == pytest.approx(e_pos.x0)
+
+    plt.close("all")
