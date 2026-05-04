@@ -172,19 +172,21 @@ def _cluster_bootstrap_by_rows(
 
     target_rows = max(1, int(target_rows))
     rng = np.random.default_rng(seed)
-    group_lookup = {
-        g: df_g for g, df_g in temp_data.groupby(group, sort=False, observed=True)
+    group_positions = {
+        g: np.asarray(indexes, dtype=np.intp)
+        for g, indexes in temp_data.groupby(group, sort=False, observed=True).indices.items()
     }
 
-    sampled_frames = []
+    sampled_positions = []
     n_rows = 0
     while n_rows < target_rows:
         g = rng.choice(unique_groups)
-        df_g = group_lookup[g]
-        sampled_frames.append(df_g)
-        n_rows += len(df_g)
+        positions = group_positions[g]
+        sampled_positions.append(positions)
+        n_rows += positions.size
 
-    return pd.concat(sampled_frames, ignore_index=True)
+    row_positions = np.concatenate(sampled_positions)
+    return temp_data.iloc[row_positions].reset_index(drop=True)
 
 
 def _cluster_bootstrap_singleton_safe(
