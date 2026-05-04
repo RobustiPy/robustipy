@@ -12,7 +12,8 @@ import pandas as pd
 import numpy as np
 from robustipy.models import (
     OLSRobust, LRobust, OLSResult,
-    stouffer_method, MergedResult
+    stouffer_method, MergedResult,
+    _cluster_bootstrap_by_rows
 )
 from robustipy.prototypes import MissingValueWarning, BaseRobust
 
@@ -109,6 +110,54 @@ def test_ols_loglikelihood_scale_invariant(simple_data):
         rtol=1e-10,
         atol=1e-10
     )
+
+def test_cluster_bootstrap_samples_whole_groups_by_position():
+    """
+    Grouped bootstrap should match the previous concat-based implementation
+    exactly for a fixed seed while avoiding concat in production code.
+    """
+    data = pd.DataFrame({
+        'group': ['a', 'a', 'b', 'c', 'c', 'c'],
+        'row_id': [0, 1, 2, 3, 4, 5],
+        'value': [10, 11, 12, 13, 14, 15],
+    })
+
+    sample = _cluster_bootstrap_by_rows(
+        temp_data=data,
+        group='group',
+        seed=123,
+        target_rows=10,
+    )
+    unique_groups = data['group'].unique()
+    rng = np.random.default_rng(123)
+    group_lookup = {
+        group_name: group_df
+        for group_name, group_df in data.groupby('group', sort=False, observed=True)
+    }
+    sampled_frames = []
+    n_rows = 0
+    while n_rows < 10:
+        group_name = rng.choice(unique_groups)
+        group_df = group_lookup[group_name]
+        sampled_frames.append(group_df)
+        n_rows += len(group_df)
+    expected = pd.concat(sampled_frames, ignore_index=True)
+
+    pd.testing.assert_frame_equal(sample, expected)
+    assert len(sample) >= 10
+    assert list(sample.columns) == list(data.columns)
+    assert sample.index.tolist() == list(range(len(sample)))
+
+    original_rows = {
+        group_name: tuple(group_df['row_id'])
+        for group_name, group_df in data.groupby('group', sort=False)
+    }
+    for group_name, group_df in sample.groupby('group', sort=False):
+        rows = tuple(group_df['row_id'])
+        original = original_rows[group_name]
+        assert len(rows) % len(original) == 0
+        for start in range(0, len(rows), len(original)):
+            assert rows[start:start + len(original)] == original
 
 def test_model_merge(simple_data):
     """
