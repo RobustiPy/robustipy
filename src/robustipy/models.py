@@ -114,26 +114,46 @@ def _make_notebook_draws_bar(*, total: int, description: str):
 
 def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=None):
     """
-    Execute bootstrap seeds in batches so notebook progress can advance during a
-    specification (instead of waiting for all draws in that spec).
+    Execute bootstrap seeds while preserving seed order and allowing notebook
+    progress to advance during a specification.
     """
     outputs = []
     if len(seeds) == 0:
         return outputs
-    # Keep batches modest so notebook bars visibly tick during long specs.
+
     cpu = max(1, int(n_cpu))
-    batch_size = max(8, cpu)
-    for start in range(0, len(seeds), batch_size):
-        seed_batch = seeds[start:start + batch_size]
-        batch_output = Parallel(n_jobs=n_cpu)(
-            delayed(run_one_seed)(int(seed))
-            for seed in seed_batch
-        )
-        outputs.extend(batch_output)
-        if draws_bar is not None:
-            draws_bar.update(len(batch_output))
-            if hasattr(draws_bar, "refresh"):
-                draws_bar.refresh()
+    progress_batch_size = max(8, cpu)
+
+    def _update_draws_bar(n: int) -> None:
+        if draws_bar is None or n <= 0:
+            return
+        draws_bar.update(n)
+        if hasattr(draws_bar, "refresh"):
+            draws_bar.refresh()
+
+    if cpu == 1:
+        pending_progress = 0
+        for seed in seeds:
+            outputs.append(run_one_seed(int(seed)))
+            pending_progress += 1
+            if pending_progress >= progress_batch_size:
+                _update_draws_bar(pending_progress)
+                pending_progress = 0
+        _update_draws_bar(pending_progress)
+        return outputs
+
+    parallel_output = Parallel(n_jobs=n_cpu, return_as="generator")(
+        delayed(run_one_seed)(int(seed))
+        for seed in seeds
+    )
+    pending_progress = 0
+    for output in parallel_output:
+        outputs.append(output)
+        pending_progress += 1
+        if pending_progress >= progress_batch_size:
+            _update_draws_bar(pending_progress)
+            pending_progress = 0
+    _update_draws_bar(pending_progress)
     return outputs
 
 
@@ -151,11 +171,38 @@ def _spec_bitmask(spec: Sequence[str], control_positions: dict[str, int]) -> int
     return mask
 
 
+def _make_group_bootstrap_lookup(
+    temp_data: pd.DataFrame,
+    group: str
+) -> tuple[np.ndarray, dict[Any, np.ndarray]]:
+    """Precompute the group order and row positions used by grouped bootstrap."""
+    unique_groups = temp_data[group].unique()
+    if unique_groups.size == 0:
+        raise ValueError(f"No groups available in column '{group}'.")
+
+    group_positions = {
+        g: np.asarray(indexes, dtype=np.intp)
+        for g, indexes in temp_data.groupby(group, sort=False, observed=True).indices.items()
+    }
+    return unique_groups, group_positions
+
+
+def _prepare_ols_bootstrap_data(
+    comb_var: pd.DataFrame,
+    y_star: np.ndarray
+) -> pd.DataFrame:
+    """Build the OLS bootstrap DataFrame once per spec instead of once per draw."""
+    temp_data = comb_var.copy()
+    temp_data['y_star'] = y_star
+    return temp_data
+
+
 def _cluster_bootstrap_by_rows(
     temp_data: pd.DataFrame,
     group: str,
     seed: int,
-    target_rows: int
+    target_rows: int,
+    group_lookup: Optional[tuple[np.ndarray, dict[Any, np.ndarray]]] = None,
 ) -> pd.DataFrame:
     """
     Draw a cluster bootstrap sample by repeatedly sampling groups (with replacement)
@@ -166,16 +213,12 @@ def _cluster_bootstrap_by_rows(
     - Preserves cluster integrity (whole groups are appended each draw).
     - Output may exceed `target_rows` due to whole-cluster appends.
     """
-    unique_groups = temp_data[group].unique()
-    if unique_groups.size == 0:
-        raise ValueError(f"No groups available in column '{group}'.")
+    if group_lookup is None:
+        group_lookup = _make_group_bootstrap_lookup(temp_data, group)
+    unique_groups, group_positions = group_lookup
 
     target_rows = max(1, int(target_rows))
     rng = np.random.default_rng(seed)
-    group_positions = {
-        g: np.asarray(indexes, dtype=np.intp)
-        for g, indexes in temp_data.groupby(group, sort=False, observed=True).indices.items()
-    }
 
     sampled_positions = []
     n_rows = 0
@@ -196,6 +239,7 @@ def _cluster_bootstrap_singleton_safe(
     target_rows: int,
     min_rows_after_filter: int,
     max_attempts: int = 8,
+    group_lookup: Optional[tuple[np.ndarray, dict[Any, np.ndarray]]] = None,
 ) -> tuple[pd.DataFrame, bool, int, int, int]:
     """
     Draw grouped bootstrap samples and remove singleton groups when possible.
@@ -229,6 +273,7 @@ def _cluster_bootstrap_singleton_safe(
             group=group,
             seed=attempt_seed,
             target_rows=target_rows,
+            group_lookup=group_lookup,
         )
         group_sizes = selected.groupby(group)[group].transform("size")
         filtered = selected.loc[group_sizes > 1].copy()
@@ -1857,10 +1902,31 @@ class OLSRobust(BaseRobust):
                     )
                     # Calculate pseudo-outcome residuals for bootstrap
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                    bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
+                    group_bootstrap_lookup = (
+                        _make_group_bootstrap_lookup(bootstrap_data, group)
+                        if group else None
+                    )
+                    if group:
+                        n_predictors = bootstrap_data.drop(
+                            columns=[bootstrap_data.columns[0], "y_star", group],
+                            errors="ignore"
+                        ).shape[1]
+                        min_rows_after_filter = max(5, n_predictors + 2)
+                    else:
+                        min_rows_after_filter = None
                     seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
                     # Run bootstrap regressions in parallel
                     def _run_one_seed(seed_i: int):
-                        return self._strap_OLS(comb, group, sample_size, seed_i, y_star)
+                        return self._strap_OLS(
+                            bootstrap_data,
+                            group,
+                            sample_size,
+                            seed_i,
+                            None,
+                            group_bootstrap_lookup=group_bootstrap_lookup,
+                            min_rows_after_filter=min_rows_after_filter,
+                        )
 
                     bootstrap_out = _run_parallel_seed_batches(
                         seeds=seeds,
@@ -2028,11 +2094,32 @@ class OLSRobust(BaseRobust):
                  
                 # Calculate pseudo-outcome residuals for bootstrapping
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
+                bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
+                group_bootstrap_lookup = (
+                    _make_group_bootstrap_lookup(bootstrap_data, group)
+                    if group else None
+                )
+                if group:
+                    n_predictors = bootstrap_data.drop(
+                        columns=[bootstrap_data.columns[0], "y_star", group],
+                        errors="ignore"
+                    ).shape[1]
+                    min_rows_after_filter = max(5, n_predictors + 2)
+                else:
+                    min_rows_after_filter = None
                 
                 # Bootstrap OLS model draws in parallel using SHARED seeds
                 # All specs use the same seeds to create proper correlation structure
                 def _run_one_seed(seed_i: int):
-                    return self._strap_OLS(comb, group, sample_size, seed_i, y_star)
+                    return self._strap_OLS(
+                        bootstrap_data,
+                        group,
+                        sample_size,
+                        seed_i,
+                        None,
+                        group_bootstrap_lookup=group_bootstrap_lookup,
+                        min_rows_after_filter=min_rows_after_filter,
+                    )
 
                 bootstrap_out = _run_parallel_seed_batches(
                     seeds=shared_seeds,
@@ -2264,7 +2351,9 @@ class OLSRobust(BaseRobust):
         group: Optional[str],
         sample_size: int,
         seed: int,
-        y_star: np.ndarray
+        y_star: Optional[np.ndarray],
+        group_bootstrap_lookup: Optional[tuple[np.ndarray, dict[Any, np.ndarray]]] = None,
+        min_rows_after_filter: Optional[int] = None,
     ) -> tuple:
         """
         Call stripped_ols() over a random sample of the data containing y, x, and controls.
@@ -2279,8 +2368,11 @@ class OLSRobust(BaseRobust):
             Number of observations in bootstrap sample.
         seed : int
             Random seed for resampling.
-        y_star : array-like
+        y_star : array-like, optional
             Pseudo-outcome residuals for stratified bootstrap.
+            If None, ``comb_var`` is expected to already include a ``y_star``
+            column. This optimized path is output-equivalent to passing
+            ``comb_var`` and ``y_star`` separately.
 
         Returns
         -------
@@ -2292,8 +2384,10 @@ class OLSRobust(BaseRobust):
             In-sample R² for the bootstrap sample.
         """
 
-        temp_data = comb_var.copy()
-        temp_data['y_star'] = y_star
+        if y_star is None:
+            temp_data = comb_var
+        else:
+            temp_data = _prepare_ols_bootstrap_data(comb_var, y_star)
 
         if group is None:
             # Sample randomly from full data (no group structure)
@@ -2302,15 +2396,15 @@ class OLSRobust(BaseRobust):
             y = samp_df.iloc[:, [0]]
             y_star = samp_df.iloc[:, [-1]]
 
-            x = samp_df.drop(['y_star'], axis=1)
-            x = x.drop(samp_df.columns[0], axis=1)
+            x = samp_df.drop(columns=[samp_df.columns[0], 'y_star'])
 
         else:
-            n_predictors = temp_data.drop(
-                columns=[temp_data.columns[0], "y_star", group],
-                errors="ignore"
-            ).shape[1]
-            min_rows = max(5, n_predictors + 2)
+            if min_rows_after_filter is None:
+                n_predictors = temp_data.drop(
+                    columns=[temp_data.columns[0], "y_star", group],
+                    errors="ignore"
+                ).shape[1]
+                min_rows_after_filter = max(5, n_predictors + 2)
 
             # Cluster bootstrap with singleton guard.
             sample_df, used_filtered, n_filtered, n_selected, attempts_used = _cluster_bootstrap_singleton_safe(
@@ -2318,11 +2412,12 @@ class OLSRobust(BaseRobust):
                 group=group,
                 seed=seed,
                 target_rows=sample_size,
-                min_rows_after_filter=min_rows,
+                min_rows_after_filter=min_rows_after_filter,
+                group_lookup=group_bootstrap_lookup,
             )
             if not used_filtered:
                 warnings.warn(
-                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows}) after "
+                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows_after_filter}) after "
                     f"{attempts_used} attempt(s); falling back to unfiltered grouped sample ({n_selected} rows).",
                     UserWarning
                 )
@@ -2334,8 +2429,7 @@ class OLSRobust(BaseRobust):
 
             y_star = no_singleton.iloc[:, no_singleton.columns.get_loc('y_star')].to_frame()
 
-            x = no_singleton.drop(['y_star'], axis=1)
-            x = x.drop(no_singleton.columns[0], axis=1)
+            x = no_singleton.drop(columns=[no_singleton.columns[0], 'y_star'])
 
         # Fit standard OLS and y_star model
         # When using group-demeaning (fixed effects), don't add const since intercept is absorbed
@@ -2821,8 +2915,27 @@ class LRobust(BaseRobust):
 
                 # Bootstrap sampling (parallelized)
                 seeds = np.random.randint(0, 2**32 - 1, size=draws, dtype=np.int64)
+                group_bootstrap_lookup = (
+                    _make_group_bootstrap_lookup(comb, group)
+                    if group else None
+                )
+                if group:
+                    n_predictors = comb.drop(
+                        columns=[comb.columns[0], group],
+                        errors="ignore"
+                    ).shape[1]
+                    min_rows_after_filter = max(5, n_predictors + 2)
+                else:
+                    min_rows_after_filter = None
                 def _run_one_seed(seed_i: int):
-                    return self._strap_regression(comb, group, sample_size, seed_i)
+                    return self._strap_regression(
+                        comb,
+                        group,
+                        sample_size,
+                        seed_i,
+                        group_bootstrap_lookup=group_bootstrap_lookup,
+                        min_rows_after_filter=min_rows_after_filter,
+                    )
 
                 bootstrap_out = _run_parallel_seed_batches(
                     seeds=seeds,
@@ -2884,7 +2997,9 @@ class LRobust(BaseRobust):
         comb_var: pd.DataFrame,
         group: Optional[str],
         sample_size: int,
-        seed: int
+        seed: int,
+        group_bootstrap_lookup: Optional[tuple[np.ndarray, dict[Any, np.ndarray]]] = None,
+        min_rows_after_filter: Optional[int] = None,
     ) -> Tuple[float, float, float]:
         """
         Perform one bootstrap draw of logistic regression.
@@ -2909,17 +3024,18 @@ class LRobust(BaseRobust):
         r2 : float
             In-sample pseudo-R² of this bootstrap sample.
         """
-        temp_data = comb_var.copy()
+        temp_data = comb_var
         if group is None:
             samp_df = temp_data.sample(n=sample_size, replace=True, random_state=seed)
             y = samp_df.iloc[:, [0]]
             x = samp_df.drop(samp_df.columns[0], axis=1)
         else:
-            n_predictors = temp_data.drop(
-                columns=[temp_data.columns[0], group],
-                errors="ignore"
-            ).shape[1]
-            min_rows = max(5, n_predictors + 2)
+            if min_rows_after_filter is None:
+                n_predictors = temp_data.drop(
+                    columns=[temp_data.columns[0], group],
+                    errors="ignore"
+                ).shape[1]
+                min_rows_after_filter = max(5, n_predictors + 2)
 
             # Cluster bootstrap with singleton guard.
             sample_df, used_filtered, n_filtered, n_selected, attempts_used = _cluster_bootstrap_singleton_safe(
@@ -2927,17 +3043,18 @@ class LRobust(BaseRobust):
                 group=group,
                 seed=seed,
                 target_rows=sample_size,
-                min_rows_after_filter=min_rows,
+                min_rows_after_filter=min_rows_after_filter,
+                group_lookup=group_bootstrap_lookup,
             )
             if not used_filtered:
                 warnings.warn(
-                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows}) after "
+                    f"Grouped bootstrap singleton filtering kept {n_filtered} rows (< {min_rows_after_filter}) after "
                     f"{attempts_used} attempt(s); falling back to unfiltered grouped sample ({n_selected} rows).",
                     UserWarning
                 )
 
             no_singleton = sample_df.drop(columns=[group])
             y = no_singleton.iloc[:, [0]]
-            x = no_singleton.drop(no_singleton.columns[0], axis=1)
+            x = no_singleton.drop(columns=no_singleton.columns[0])
         output = logistic_regression_sm(y, x)
         return output['b'][0][0], output['p'][0][0], output['r2']
