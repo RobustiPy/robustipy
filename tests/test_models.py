@@ -13,7 +13,12 @@ import numpy as np
 from robustipy.models import (
     OLSRobust, LRobust, OLSResult,
     stouffer_method, MergedResult,
-    _cluster_bootstrap_by_rows
+    _cluster_bootstrap_by_rows,
+    _make_group_bootstrap_lookup,
+    _prepare_non_group_ols_bootstrap_arrays,
+    _prepare_ols_bootstrap_data,
+    _strap_non_group_OLS_arrays,
+    _run_parallel_seed_batches
 )
 from robustipy.prototypes import MissingValueWarning, BaseRobust
 
@@ -158,6 +163,301 @@ def test_cluster_bootstrap_samples_whole_groups_by_position():
         assert len(rows) % len(original) == 0
         for start in range(0, len(rows), len(original)):
             assert rows[start:start + len(original)] == original
+
+def test_cluster_bootstrap_precomputed_lookup_matches_old_concat():
+    """
+    Precomputing group row positions should not change grouped bootstrap samples.
+    """
+    data = pd.DataFrame({
+        'group': ['a', 'a', 'b', 'c', 'c', 'c'],
+        'row_id': [0, 1, 2, 3, 4, 5],
+        'value': [10, 11, 12, 13, 14, 15],
+    })
+
+    group_lookup = _make_group_bootstrap_lookup(data, 'group')
+    sample = _cluster_bootstrap_by_rows(
+        temp_data=data,
+        group='group',
+        seed=321,
+        target_rows=10,
+        group_lookup=group_lookup,
+    )
+
+    unique_groups = data['group'].unique()
+    rng = np.random.default_rng(321)
+    old_lookup = {
+        group_name: group_df
+        for group_name, group_df in data.groupby('group', sort=False, observed=True)
+    }
+    sampled_frames = []
+    n_rows = 0
+    while n_rows < 10:
+        group_name = rng.choice(unique_groups)
+        group_df = old_lookup[group_name]
+        sampled_frames.append(group_df)
+        n_rows += len(group_df)
+    expected = pd.concat(sampled_frames, ignore_index=True)
+
+    pd.testing.assert_frame_equal(sample, expected)
+
+def test_ols_bootstrap_optimized_path_matches_legacy(simple_data):
+    """
+    Prebuilt OLS bootstrap data and precomputed group lookup should not change
+    one-draw bootstrap outputs.
+    """
+    comb = simple_data[['y', 'x1', 'group', 'control1']].reset_index(drop=True).copy()
+    y_star = pd.DataFrame(
+        comb.iloc[:, 0].to_numpy() - (0.25 * comb.iloc[:, 1].to_numpy())
+    )
+    model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
+
+    legacy = model._strap_OLS(
+        comb,
+        group='group',
+        sample_size=len(comb),
+        seed=123,
+        y_star=y_star,
+    )
+
+    bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
+    group_lookup = _make_group_bootstrap_lookup(bootstrap_data, 'group')
+    optimized = model._strap_OLS(
+        bootstrap_data,
+        group='group',
+        sample_size=len(comb),
+        seed=123,
+        y_star=None,
+        group_bootstrap_lookup=group_lookup,
+        min_rows_after_filter=5,
+    )
+
+    np.testing.assert_allclose(optimized, legacy, equal_nan=True)
+
+def test_ols_non_group_bootstrap_optimized_path_matches_legacy(simple_data):
+    """
+    The non-grouped OLS bootstrap path should produce the same one-draw output
+    after replacing pandas sample and prebuilding y_star.
+    """
+    comb = simple_data[['y', 'x1', 'control1']].reset_index(drop=True).copy()
+    y_star = pd.DataFrame(
+        comb.iloc[:, 0].to_numpy() - (0.25 * comb.iloc[:, 1].to_numpy())
+    )
+    model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
+
+    legacy = model._strap_OLS(
+        comb,
+        group=None,
+        sample_size=len(comb),
+        seed=123,
+        y_star=y_star,
+    )
+
+    bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
+    optimized = model._strap_OLS(
+        bootstrap_data,
+        group=None,
+        sample_size=len(comb),
+        seed=123,
+        y_star=None,
+    )
+
+    np.testing.assert_allclose(optimized, legacy, equal_nan=True)
+
+def test_ols_non_group_array_bootstrap_matches_pandas_path(simple_data):
+    """
+    Precomputed-array non-grouped OLS bootstrap should match the pandas sample
+    path exactly for fixed seeds.
+    """
+    comb = simple_data[['y', 'x1', 'control1']].reset_index(drop=True).copy()
+    y_star = pd.DataFrame(
+        comb.iloc[:, 0].to_numpy() - (0.25 * comb.iloc[:, 1].to_numpy())
+    )
+    bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
+    bootstrap_arrays = _prepare_non_group_ols_bootstrap_arrays(bootstrap_data)
+    model = OLSRobust(y=['y'], x=['x1'], data=simple_data)
+
+    for seed in [0, 1, 123, 192735]:
+        pandas_path = model._strap_OLS(
+            bootstrap_data,
+            group=None,
+            sample_size=len(comb),
+            seed=seed,
+            y_star=None,
+        )
+        array_path = _strap_non_group_OLS_arrays(
+            *bootstrap_arrays,
+            sample_size=len(comb),
+            seed=seed,
+        )
+
+        np.testing.assert_allclose(array_path, pandas_path, rtol=0, atol=0, equal_nan=True)
+
+def test_logistic_non_group_bootstrap_matches_pandas_sample(binary_data):
+    """
+    Logistic non-grouped bootstrap should match the previous pandas sample
+    row draw for a fixed seed.
+    """
+    from robustipy.utils import logistic_regression_sm
+
+    comb = binary_data[['binary_y', 'x1', 'control1']].reset_index(drop=True).copy()
+    model = LRobust(y=['binary_y'], x=['x1'], data=binary_data)
+
+    actual = model._strap_regression(
+        comb,
+        group=None,
+        sample_size=len(comb),
+        seed=123,
+    )
+
+    samp_df = comb.sample(n=len(comb), replace=True, random_state=123)
+    y = samp_df.iloc[:, [0]]
+    x = samp_df.drop(samp_df.columns[0], axis=1)
+    expected_output = logistic_regression_sm(y, x)
+    expected = (
+        expected_output['b'][0][0],
+        expected_output['p'][0][0],
+        expected_output['r2'],
+    )
+
+    np.testing.assert_allclose(actual, expected, equal_nan=True)
+
+def test_logistic_group_bootstrap_precomputed_lookup_matches_default(binary_data):
+    """
+    Logistic grouped bootstrap should not change when the group lookup is
+    precomputed once per spec.
+    """
+    comb = binary_data[['binary_y', 'x1', 'group', 'control1']].reset_index(drop=True).copy()
+    model = LRobust(y=['binary_y'], x=['x1'], data=binary_data)
+
+    default = model._strap_regression(
+        comb,
+        group='group',
+        sample_size=len(comb),
+        seed=123,
+    )
+
+    group_lookup = _make_group_bootstrap_lookup(comb, 'group')
+    optimized = model._strap_regression(
+        comb,
+        group='group',
+        sample_size=len(comb),
+        seed=123,
+        group_bootstrap_lookup=group_lookup,
+        min_rows_after_filter=5,
+    )
+
+    np.testing.assert_allclose(optimized, default, equal_nan=True)
+
+def test_parallel_seed_runner_matches_old_batch_order():
+    """
+    Streaming joblib dispatch should preserve the old batched output order.
+    """
+    seeds = np.arange(17, dtype=np.int64) + 10
+
+    def run_one_seed(seed):
+        return (seed, seed * seed)
+
+    def old_batched_runner():
+        outputs = []
+        batch_size = max(8, 2)
+        for start in range(0, len(seeds), batch_size):
+            seed_batch = seeds[start:start + batch_size]
+            batch_output = [
+                run_one_seed(int(seed))
+                for seed in seed_batch
+            ]
+            outputs.extend(batch_output)
+        return outputs
+
+    expected = old_batched_runner()
+    actual = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=run_one_seed,
+    )
+    batched = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=run_one_seed,
+        dispatch_mode="batched",
+    )
+    chunked = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=run_one_seed,
+        dispatch_mode="chunked",
+        task_batch_size=5,
+    )
+    serial = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=1,
+        run_one_seed=run_one_seed,
+    )
+
+    assert actual == expected
+    assert batched == expected
+    assert chunked == expected
+    assert serial == expected
+
+def test_parallel_seed_runner_throttles_progress_updates():
+    """
+    Progress updates should be batched so notebooks do not receive one IOPub
+    message per bootstrap draw.
+    """
+    seeds = np.arange(17, dtype=np.int64) + 10
+
+    class DummyBar:
+        def __init__(self):
+            self.updates = []
+            self.refresh_count = 0
+
+        def update(self, n):
+            self.updates.append(n)
+
+        def refresh(self):
+            self.refresh_count += 1
+
+    bar = DummyBar()
+    out = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=lambda seed: seed,
+        draws_bar=bar,
+    )
+
+    assert out == [int(seed) for seed in seeds]
+    assert sum(bar.updates) == len(seeds)
+    assert bar.updates == [8, 8, 1]
+    assert bar.refresh_count == 0
+
+    batched_bar = DummyBar()
+    batched_out = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=lambda seed: seed,
+        draws_bar=batched_bar,
+        dispatch_mode="batched",
+    )
+
+    assert batched_out == [int(seed) for seed in seeds]
+    assert sum(batched_bar.updates) == len(seeds)
+    assert batched_bar.updates == [8, 8, 1]
+    assert batched_bar.refresh_count == 0
+
+    chunked_bar = DummyBar()
+    chunked_out = _run_parallel_seed_batches(
+        seeds=seeds,
+        n_cpu=2,
+        run_one_seed=lambda seed: seed,
+        draws_bar=chunked_bar,
+        dispatch_mode="chunked",
+        task_batch_size=5,
+    )
+
+    assert chunked_out == [int(seed) for seed in seeds]
+    assert sum(chunked_bar.updates) == len(seeds)
+    assert chunked_bar.updates == [5, 5, 5, 2]
+    assert chunked_bar.refresh_count == 0
 
 def test_model_merge(simple_data):
     """

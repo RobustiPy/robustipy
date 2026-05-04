@@ -18,7 +18,7 @@ import sys
 import sklearn
 from joblib import Parallel, delayed
 from rich.progress import track
-from scipy.stats import norm
+from scipy.stats import norm, t as student_t
 from sklearn.metrics import log_loss, root_mean_squared_error
 from sklearn.model_selection import GroupKFold, KFold, StratifiedKFold, train_test_split
 from statsmodels.tools.tools import add_constant
@@ -101,7 +101,7 @@ def _make_notebook_draws_bar(*, total: int, description: str):
         desc=description,
         leave=True,
         miniters=1,
-        mininterval=0.2,
+        mininterval=1.0,
         smoothing=0,
         unit="draw",
         unit_scale=False,
@@ -112,7 +112,15 @@ def _make_notebook_draws_bar(*, total: int, description: str):
     )
 
 
-def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=None):
+def _run_parallel_seed_batches(
+    *,
+    seeds,
+    n_cpu: int,
+    run_one_seed,
+    draws_bar=None,
+    dispatch_mode: str = "streaming",
+    task_batch_size: Optional[int] = None,
+):
     """
     Execute bootstrap seeds while preserving seed order and allowing notebook
     progress to advance during a specification.
@@ -123,13 +131,13 @@ def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=Non
 
     cpu = max(1, int(n_cpu))
     progress_batch_size = max(8, cpu)
+    if dispatch_mode not in {"streaming", "batched", "chunked"}:
+        raise ValueError("dispatch_mode must be 'streaming', 'batched', or 'chunked'.")
 
     def _update_draws_bar(n: int) -> None:
         if draws_bar is None or n <= 0:
             return
         draws_bar.update(n)
-        if hasattr(draws_bar, "refresh"):
-            draws_bar.refresh()
 
     if cpu == 1:
         pending_progress = 0
@@ -140,6 +148,39 @@ def _run_parallel_seed_batches(*, seeds, n_cpu: int, run_one_seed, draws_bar=Non
                 _update_draws_bar(pending_progress)
                 pending_progress = 0
         _update_draws_bar(pending_progress)
+        return outputs
+
+    if dispatch_mode == "batched":
+        batch_size = max(8, cpu)
+        for start in range(0, len(seeds), batch_size):
+            seed_batch = seeds[start:start + batch_size]
+            batch_output = Parallel(n_jobs=n_cpu)(
+                delayed(run_one_seed)(int(seed))
+                for seed in seed_batch
+            )
+            outputs.extend(batch_output)
+            _update_draws_bar(len(batch_output))
+        return outputs
+
+    if dispatch_mode == "chunked":
+        if task_batch_size is None:
+            task_batch_size = max(32, int(np.ceil(len(seeds) / (cpu * 4))))
+        task_batch_size = max(1, int(task_batch_size))
+
+        def _run_seed_chunk(seed_chunk):
+            return [run_one_seed(int(seed)) for seed in seed_chunk]
+
+        seed_chunks = [
+            seeds[start:start + task_batch_size]
+            for start in range(0, len(seeds), task_batch_size)
+        ]
+        parallel_output = Parallel(n_jobs=n_cpu, return_as="generator")(
+            delayed(_run_seed_chunk)(seed_chunk)
+            for seed_chunk in seed_chunks
+        )
+        for batch_output in parallel_output:
+            outputs.extend(batch_output)
+            _update_draws_bar(len(batch_output))
         return outputs
 
     parallel_output = Parallel(n_jobs=n_cpu, return_as="generator")(
@@ -195,6 +236,78 @@ def _prepare_ols_bootstrap_data(
     temp_data = comb_var.copy()
     temp_data['y_star'] = y_star
     return temp_data
+
+
+def _prepare_non_group_ols_bootstrap_arrays(
+    temp_data: pd.DataFrame
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Precompute arrays for the non-grouped OLS bootstrap path."""
+    y_values = temp_data.iloc[:, [0]].to_numpy()
+    y_star_values = temp_data.iloc[:, [-1]].to_numpy()
+    x_df = temp_data.drop(columns=[temp_data.columns[0], 'y_star']).copy()
+    x_df['const'] = 1
+    x_values = x_df.to_numpy()
+    return y_values, y_star_values, x_values
+
+
+def _stripped_ols_arrays(y: np.ndarray, x: np.ndarray) -> dict:
+    """Array equivalent of stripped_ols() for pre-sampled numeric OLS data."""
+    if x.size == 0 or y.size == 0:
+        raise ValueError("Inputs must not be empty.")
+    with np.errstate(divide='ignore', invalid='ignore'):
+        try:
+            inv_xx = np.linalg.inv(np.dot(x.T, x))
+        except np.linalg.LinAlgError:
+            inv_xx = np.linalg.pinv(np.dot(x.T, x))
+        xy = np.dot(x.T, y)
+        b = np.dot(inv_xx, xy)
+        nobs = y.shape[0]
+        ncoef = x.shape[1]
+        df_e = nobs - ncoef
+        e = y - np.dot(x, b)
+        sse = np.dot(e.T, e) / df_e
+        se = np.sqrt(np.diagonal(sse * inv_xx))
+        se_col = se.reshape(-1, 1)
+        t_values = b / se_col
+        t_values = np.where(se_col == 0, np.nan, t_values)
+        p = np.where(
+            np.isfinite(t_values),
+            (1 - student_t.cdf(abs(t_values), df_e)) * 2,
+            np.nan
+        )
+        r2 = 1 - e.var() / y.var()
+        r2_adj = 1 - (1 - r2) * ((nobs - 1) / (nobs - ncoef))
+    return {'b': b, 'p': p, 'r2': r2_adj}
+
+
+def _strap_non_group_OLS_arrays(
+    y_values: np.ndarray,
+    y_star_values: np.ndarray,
+    x_values: np.ndarray,
+    sample_size: int,
+    seed: int,
+) -> tuple:
+    """Run one non-grouped OLS bootstrap draw from precomputed arrays."""
+    n_rows = y_values.shape[0]
+    row_positions = np.random.RandomState(seed).choice(
+        np.arange(n_rows),
+        size=sample_size,
+        replace=True,
+    )
+    y = np.asfortranarray(y_values[row_positions])
+    y_star = np.asfortranarray(y_star_values[row_positions])
+    x = np.asfortranarray(x_values[row_positions])
+
+    output = _stripped_ols_arrays(y=y, x=x)
+    output_ystar = _stripped_ols_arrays(y=y_star, x=x)
+
+    return (
+        output['b'][0][0],
+        output['p'][0][0],
+        output['r2'],
+        output_ystar['b'][0][0],
+        output_ystar['p'][0][0],
+    )
 
 
 def _cluster_bootstrap_by_rows(
@@ -1903,28 +2016,32 @@ class OLSRobust(BaseRobust):
                     # Calculate pseudo-outcome residuals for bootstrap
                     y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                     bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
-                    group_bootstrap_lookup = (
-                        _make_group_bootstrap_lookup(bootstrap_data, group)
-                        if group else None
-                    )
                     if group:
                         n_predictors = bootstrap_data.drop(
                             columns=[bootstrap_data.columns[0], "y_star", group],
                             errors="ignore"
                         ).shape[1]
                         min_rows_after_filter = max(5, n_predictors + 2)
+                        bootstrap_arrays = None
                     else:
                         min_rows_after_filter = None
+                        bootstrap_arrays = _prepare_non_group_ols_bootstrap_arrays(bootstrap_data)
                     seeds = np.random.randint(0, 2**31, size=draws, dtype=np.int64)
                     # Run bootstrap regressions in parallel
                     def _run_one_seed(seed_i: int):
+                        if group is None:
+                            assert bootstrap_arrays is not None
+                            return _strap_non_group_OLS_arrays(
+                                *bootstrap_arrays,
+                                sample_size=sample_size,
+                                seed=seed_i,
+                            )
                         return self._strap_OLS(
                             bootstrap_data,
                             group,
                             sample_size,
                             seed_i,
                             None,
-                            group_bootstrap_lookup=group_bootstrap_lookup,
                             min_rows_after_filter=min_rows_after_filter,
                         )
 
@@ -1932,7 +2049,8 @@ class OLSRobust(BaseRobust):
                         seeds=seeds,
                         n_cpu=n_cpu,
                         run_one_seed=_run_one_seed,
-                        draws_bar=notebook_draws_bar
+                        draws_bar=notebook_draws_bar,
+                        dispatch_mode="streaming" if group else "chunked",
                     )
                     b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*bootstrap_out)
                     
@@ -2095,29 +2213,33 @@ class OLSRobust(BaseRobust):
                 # Calculate pseudo-outcome residuals for bootstrapping
                 y_star = comb.iloc[:, [0]] - np.dot(comb.iloc[:, [1]], b_all[0][0])
                 bootstrap_data = _prepare_ols_bootstrap_data(comb, y_star)
-                group_bootstrap_lookup = (
-                    _make_group_bootstrap_lookup(bootstrap_data, group)
-                    if group else None
-                )
                 if group:
                     n_predictors = bootstrap_data.drop(
                         columns=[bootstrap_data.columns[0], "y_star", group],
                         errors="ignore"
                     ).shape[1]
                     min_rows_after_filter = max(5, n_predictors + 2)
+                    bootstrap_arrays = None
                 else:
                     min_rows_after_filter = None
+                    bootstrap_arrays = _prepare_non_group_ols_bootstrap_arrays(bootstrap_data)
                 
                 # Bootstrap OLS model draws in parallel using SHARED seeds
                 # All specs use the same seeds to create proper correlation structure
                 def _run_one_seed(seed_i: int):
+                    if group is None:
+                        assert bootstrap_arrays is not None
+                        return _strap_non_group_OLS_arrays(
+                            *bootstrap_arrays,
+                            sample_size=sample_size,
+                            seed=seed_i,
+                        )
                     return self._strap_OLS(
                         bootstrap_data,
                         group,
                         sample_size,
                         seed_i,
                         None,
-                        group_bootstrap_lookup=group_bootstrap_lookup,
                         min_rows_after_filter=min_rows_after_filter,
                     )
 
@@ -2125,7 +2247,8 @@ class OLSRobust(BaseRobust):
                     seeds=shared_seeds,
                     n_cpu=n_cpu,
                     run_one_seed=_run_one_seed,
-                    draws_bar=notebook_draws_bar
+                    draws_bar=notebook_draws_bar,
+                    dispatch_mode="streaming" if group else "chunked",
                 )
                 b_list, p_list, r2_list, b_list_ystar, p_list_ystar = zip(*bootstrap_out)
                 
