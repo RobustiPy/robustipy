@@ -10,10 +10,8 @@ import _pickle
 import os
 import warnings
 from typing import Any, Optional, Sequence, List, Tuple, Union
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shap
 import sys
 import sklearn
 from joblib import Parallel, delayed
@@ -23,7 +21,6 @@ from sklearn.metrics import log_loss, root_mean_squared_error
 from sklearn.model_selection import GroupKFold, KFold, StratifiedKFold, train_test_split
 from statsmodels.tools.tools import add_constant
 
-from robustipy.figures import plot_results
 from robustipy.prototypes import Protoresult, BaseRobust
 from robustipy.utils import (
     all_subsets,
@@ -133,6 +130,15 @@ def _run_parallel_seed_batches(
     progress_batch_size = max(8, cpu)
     if dispatch_mode not in {"streaming", "batched", "chunked"}:
         raise ValueError("dispatch_mode must be 'streaming', 'batched', or 'chunked'.")
+    parallel_kwargs = {
+        "n_jobs": cpu,
+        # Keep process parallelism for CPU-bound bootstrap fits, but disable
+        # joblib's automatic memmapping so large profiler runs do not accumulate
+        # thousands of temporary memmap folders.
+        "backend": "loky",
+        "max_nbytes": None,
+        "mmap_mode": None,
+    }
 
     def _update_draws_bar(n: int) -> None:
         if draws_bar is None or n <= 0:
@@ -154,7 +160,7 @@ def _run_parallel_seed_batches(
         batch_size = max(8, cpu)
         for start in range(0, len(seeds), batch_size):
             seed_batch = seeds[start:start + batch_size]
-            batch_output = Parallel(n_jobs=n_cpu)(
+            batch_output = Parallel(**parallel_kwargs)(
                 delayed(run_one_seed)(int(seed))
                 for seed in seed_batch
             )
@@ -174,7 +180,7 @@ def _run_parallel_seed_batches(
             seeds[start:start + task_batch_size]
             for start in range(0, len(seeds), task_batch_size)
         ]
-        parallel_output = Parallel(n_jobs=n_cpu, return_as="generator")(
+        parallel_output = Parallel(**parallel_kwargs, return_as="generator")(
             delayed(_run_seed_chunk)(seed_chunk)
             for seed_chunk in seed_chunks
         )
@@ -183,7 +189,7 @@ def _run_parallel_seed_batches(
             _update_draws_bar(len(batch_output))
         return outputs
 
-    parallel_output = Parallel(n_jobs=n_cpu, return_as="generator")(
+    parallel_output = Parallel(**parallel_kwargs, return_as="generator")(
         delayed(run_one_seed)(int(seed))
         for seed in seeds
     )
@@ -1500,6 +1506,7 @@ class OLSResult(Protoresult):
                 raise TypeError("All specifications in 'spec' must be in the valid computed specifications.")
         if ic not in valid_ic:
             raise ValueError(f"'ic' must be one of the following: {valid_ic}")
+        from robustipy.figures import plot_results
         return plot_results(results_object=self,
                             loess=loess,
                             specs=specs,
@@ -1747,6 +1754,7 @@ class OLSRobust(BaseRobust):
         rescale_y: Optional[bool] = False,
         rescale_x: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
+        compute_shap: bool = True,
         threshold: int = 1000000
     ) -> 'OLSRobust':
         """
@@ -1784,6 +1792,8 @@ class OLSRobust(BaseRobust):
             If True, rescale the x variable(s) to have mean 0 and standard deviation 1.
         rescale_z : bool, default=False
             If True, rescale the z variable(s) to have mean 0 and standard deviation 1.
+        compute_shap : bool, default=True
+            If True, compute SHAP values for plotting. Set False for fit-only profiling.
         threshold : int, default=1_000_000
             If the total number of model fits (specs × draws × folds) exceeds this number, a warning is raised.
 
@@ -2154,27 +2164,32 @@ class OLSRobust(BaseRobust):
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
             
-            # Prepare SHAP dataset (includes y, x, z, and optional group)
-            if group:
-                SHAP_comb = self.data[self.y + self.x + [group] + controls]
-                SHAP_comb = group_demean(SHAP_comb, group=group)
-            else:
-                SHAP_comb = self.data[self.y + self.x + controls]
-            SHAP_comb = SHAP_comb.dropna()
-            SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
-            
-            # Fit linear model for SHAP values
-            x_train, x_test, y_train, _ = train_test_split(SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
-                                                           SHAP_comb[self.y],
-                                                           test_size=0.2,
-                                                           random_state=self.seed
-                                                           )
-            model = sklearn.linear_model.LinearRegression()
-            model.fit(x_train, y_train)
-            
-            # Explain model predictions with SHAP
-            explainer = shap.LinearExplainer(model, x_train)
-            shap_return = [explainer.shap_values(x_test), x_test]
+            shap_return = None
+            if compute_shap:
+                import shap
+
+                # Prepare SHAP dataset (includes y, x, z, and optional group)
+                if group:
+                    SHAP_comb = self.data[self.y + self.x + [group] + controls]
+                    SHAP_comb = group_demean(SHAP_comb, group=group)
+                else:
+                    SHAP_comb = self.data[self.y + self.x + controls]
+                SHAP_comb = SHAP_comb.dropna()
+                SHAP_comb = SHAP_comb.reset_index(drop=True).copy()
+
+                # Fit linear model for SHAP values
+                x_train, x_test, y_train, _ = train_test_split(
+                    SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
+                    SHAP_comb[self.y],
+                    test_size=0.2,
+                    random_state=self.seed
+                )
+                model = sklearn.linear_model.LinearRegression()
+                model.fit(x_train, y_train)
+
+                # Explain model predictions with SHAP
+                explainer = shap.LinearExplainer(model, x_train)
+                shap_return = [explainer.shap_values(x_test), x_test]
             
             # Generate shared bootstrap seeds ONCE for all specifications
             # This ensures all specs use the same bootstrap samples, creating proper correlation
@@ -2818,6 +2833,7 @@ class LRobust(BaseRobust):
         rescale_x: Optional[bool] = False,
         rescale_y: Optional[bool] = False,
         rescale_z: Optional[bool] = False,
+        compute_shap: bool = True,
         threshold: int = 1000000
     ) -> 'LRobust':
         """
@@ -2850,6 +2866,8 @@ class LRobust(BaseRobust):
             Rescale the x variable.
         rescale_z  : bool, default=False
             Rescale the z variables.
+        compute_shap : bool, default=True
+            If True, compute SHAP values for plotting. Set False for fit-only profiling.
         threshold : int, default=1000000
             Warn if `draws * n_specs` exceeds this.
 
@@ -2987,27 +3005,31 @@ class LRobust(BaseRobust):
             hqic_array = np.empty([space_n])
             av_k_metric_array = np.empty([space_n])
 
-            # Preprocess data for SHAP values. Do not demean for logistic models.
-            if group:
-                SHAP_comb = self.data[self.y + self.x + [group] + controls]
-            else:
-                SHAP_comb = self.data[self.y + self.x + controls]
+            shap_return = None
+            if compute_shap:
+                import shap
 
-            SHAP_comb = SHAP_comb.dropna().reset_index(drop=True).copy()
+                # Preprocess data for SHAP values. Do not demean for logistic models.
+                if group:
+                    SHAP_comb = self.data[self.y + self.x + [group] + controls]
+                else:
+                    SHAP_comb = self.data[self.y + self.x + controls]
 
-            # Split data for training and testing
-            x_train, x_test, y_train, _ = train_test_split(
-                SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
-                SHAP_comb[self.y],
-                test_size=0.2,
-                random_state=self.seed
-            )
+                SHAP_comb = SHAP_comb.dropna().reset_index(drop=True).copy()
 
-            # Train logistic regression for SHAP explainability
-            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
-            model.fit(x_train, y_train.squeeze())
-            explainer = shap.LinearExplainer(model, x_train)
-            shap_return = [explainer.shap_values(x_test), x_test]
+                # Split data for training and testing
+                x_train, x_test, y_train, _ = train_test_split(
+                    SHAP_comb[self.x + controls].drop(columns=['const'], errors='ignore'),
+                    SHAP_comb[self.y],
+                    test_size=0.2,
+                    random_state=self.seed
+                )
+
+                # Train logistic regression for SHAP explainability
+                model = sklearn.linear_model.LogisticRegression(penalty="l2", C=0.1)
+                model.fit(x_train, y_train.squeeze())
+                explainer = shap.LinearExplainer(model, x_train)
+                shap_return = [explainer.shap_values(x_test), x_test]
 
             # Loop through all subsets of control variables
             for index, spec in _progress_iter(
