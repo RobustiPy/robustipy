@@ -150,6 +150,7 @@ share/
 etc/
 
 /data/
+.codex
 
 
 /src/docs/_build/
@@ -159,5 +160,6 @@ test.py
 /empirical_examples/figures
 /figures/*
 !/figures/union_example/
+/figures/union_example/*
 !/figures/union_example/union_example_all.png
 /tools
