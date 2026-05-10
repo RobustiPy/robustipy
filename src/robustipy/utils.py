@@ -5,11 +5,9 @@ import numpy as np
 import random
 import warnings
 import scipy
-import matplotlib
 import pandas as pd
 from itertools import chain, combinations
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from multiprocessing import cpu_count
 import os
@@ -1183,7 +1181,7 @@ def get_selection_key(specs: List[List[str]]) -> List[frozenset]:
 
 def get_colormap_colors(
         num_colors: int = 3,
-        colormap: Union[str, matplotlib.colors.Colormap] = 'viridis'
+        colormap: Union[str, object] = 'viridis'
 ) -> List[str]:
     """
     Return ``num_colors`` evenly spaced colors from a Matplotlib colormap.
@@ -1215,6 +1213,8 @@ def get_colormap_colors(
     # Validate bounds
     if num_colors < 1:
         raise ValueError(f"num_colors must be >= 1 (got {num_colors}).")
+
+    import matplotlib
 
     if isinstance(colormap, str):
         cmap = matplotlib.colormaps[colormap]
@@ -1253,8 +1253,10 @@ def get_colors(specs: List[List[str]], color_set_name: Optional[str] = 'Set1') -
     """
     if color_set_name is None:
         color_set_name = 'Set1'
-        
+
     if all(isinstance(ele, list) for ele in specs):
+        import matplotlib
+
         colorset = matplotlib.colormaps[color_set_name]
         colorset = colorset.resampled(len(specs))
         return colorset.colors
