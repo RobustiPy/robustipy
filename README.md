@@ -64,7 +64,7 @@ In a Python script (or Jupyter Notebook), import the `OLSRobust` class by runnin
 from robustipy.models import OLSRobust
 model_robust = OLSRobust(y=y, x=x, data=data)
 model_robust.fit(controls=c, # a list of control variables
-	         draws=1000, # number of bootstrap resamples
+	             draws=1000, # number of bootstrap resamples
                  kfold=10, # number of folds for OOS evaluation
                  seed=192735 # an optional but randomly chosen seed for consistent reproducibility
 )
