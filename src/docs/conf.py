@@ -15,7 +15,7 @@ author = 'Daniel Valdenegro Ibarra, Jiani Yan, Duiyi Dai, and Charles Rahal'
 from importlib.metadata import version
 
 project = "RobustiPy"
-release = version("robustipy")
+release = "1.0.4"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
