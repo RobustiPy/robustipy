@@ -12,7 +12,10 @@ import sys
 project = 'RobustiPy'
 copyright = ('2026, Daniel Valdenegro Ibarra, Jiani Yan, Duiyi Dai, and Charles Rahal')
 author = 'Daniel Valdenegro Ibarra, Jiani Yan, Duiyi Dai, and Charles Rahal'
-release = 'v1.0.3'
+from importlib.metadata import version
+
+project = "RobustiPy"
+release = version("robustipy")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
