@@ -90,7 +90,7 @@ To cite RobustiPy, please consider this reference:
 
 ```
 @misc{ibarra2025introducingrobustipyefficientgeneration,
-      title={Introducing RobustiPy: An efficient next generation multiversal library with model selection, averaging, resampling, and explainable artificial intelligence}, 
+      title={RobustiPy: An efficient next generation multiversal library with model selection, averaging, resampling, and explainable artificial intelligence}, 
       author={Daniel Valdenegro Ibarra and Jiani Yan and Duiyi Dai and Charles Rahal},
       year={2025},
       eprint={2506.19958},
