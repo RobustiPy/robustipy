@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from robustipy.models import OLSRobust, LRobust
 import multiprocessing
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 PROJECT_NAME = 'time_profiler'
 SEED = 192735
@@ -146,10 +146,15 @@ def time_profiler(estimator, progress_queue=None):
     for key, control_index, run, c_array, draws, estimator, folds in iter_jobs(estimator):
         if key in completed:
             continue
+        if progress_queue is not None:
+            progress_queue.put((
+                "start",
+                f"{estimator} c{control_index} r{run} d{draws} f{folds}",
+            ))
         runner(control_index, run, c_array, draws, estimator, folds)
         completed.add(key)
         if progress_queue is not None:
-            progress_queue.put(1)
+            progress_queue.put(("done", 1))
 
 
 def main(progress_queue=None):
@@ -161,21 +166,32 @@ def main(progress_queue=None):
 
 
 def child_main(progress_queue):
-    with open(os.devnull, 'w') as devnull:
-        with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
-            try:
+    try:
+        with open(os.devnull, 'w') as devnull:
+            with contextlib.redirect_stdout(devnull):
                 main(progress_queue=progress_queue)
-            except Exception:
-                sys.exit(1)
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
 
 
 def drain_progress_queue(progress_queue, progress_bar):
     drained = 0
     while True:
         try:
-            drained += progress_queue.get_nowait()
+            item = progress_queue.get_nowait()
         except queue.Empty:
             break
+        if isinstance(item, tuple):
+            event, payload = item
+            if event == "start":
+                progress_bar.set_postfix_str(payload, refresh=True)
+            elif event == "done":
+                drained += payload
+        else:
+            drained += item
     if drained:
         progress_bar.update(drained)
 
@@ -189,13 +205,21 @@ if __name__ == "__main__":
         desc="Profiler jobs",
         unit="job",
         dynamic_ncols=True,
+        file=sys.stderr,
+        disable=False,
+        mininterval=1.0,
+        smoothing=0,
     ) as progress_bar:
+        progress_bar.refresh()
         while progress_bar.n < total_jobs:
             progress_queue = multiprocessing.Queue()
             p = multiprocessing.Process(target=child_main, args=(progress_queue,))
             p.start()
             while p.is_alive():
                 drain_progress_queue(progress_queue, progress_bar)
+                completed_now = count_completed_jobs()
+                if completed_now > progress_bar.n:
+                    progress_bar.update(completed_now - progress_bar.n)
                 time.sleep(0.25)
             p.join()
             drain_progress_queue(progress_queue, progress_bar)
