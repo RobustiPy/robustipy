@@ -180,7 +180,7 @@ def _run_parallel_seed_batches(
             seeds[start:start + task_batch_size]
             for start in range(0, len(seeds), task_batch_size)
         ]
-        parallel_output = Parallel(**parallel_kwargs, return_as="generator")(
+        parallel_output = Parallel(**parallel_kwargs)(
             delayed(_run_seed_chunk)(seed_chunk)
             for seed_chunk in seed_chunks
         )
