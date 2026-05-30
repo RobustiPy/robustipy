@@ -1824,7 +1824,7 @@ class OLSRobust(BaseRobust):
         -----
         - At least one of draws or kfold must be set to perform model fitting.
         - z_specs_sample_size samples the covariate-subset space before fitting.
-        - composite_sample is currently reserved for future outcome-composite sampling.
+        - composite_sample samples the outcome-composite space before fitting when len(y) > 1.
         - This method may be computationally intensive; parallelisation is recommended via n_cpu.
         """
 
