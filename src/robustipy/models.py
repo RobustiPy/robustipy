@@ -1548,6 +1548,15 @@ class OLSResult(Protoresult):
             DataFrame containing BMA results with control variable inclusion
             probabilities and average coefficients.
         """
+    if isinstance(self.y_name, list) and len({str(y) for y in self.y_name}) > 1:
+        warnings.warn(
+            "BMA weights are being computed on a result object with multiple "
+            "outcome operationalisations. BIC weights are only likelihood-comparable "
+            "within a common outcome, likelihood family, and estimation sample. "
+            "Interpret these summaries descriptively or compute BMA separately "
+            "within comparable outcome sets.",
+            UserWarning,
+        )
         likelihood_per_var = []
         weighted_coefs = []
 
@@ -1781,8 +1790,8 @@ class OLSRobust(BaseRobust):
         seed : int, optional
             Random seed for reproducibility. Propagated to all random operations.
         composite_sample : int, optional
-            If set, draw this many bootstrap samples **before** applying specification variation;
-            used to reduce total computation while capturing uncertainty in the full composite model.
+            Reserved for future outcome-composite sub-sampling. This argument is currently
+            stored for compatibility but is not yet used by the main OLSRobust.fit workflow.
         z_specs_sample_size : int, optional
             Number of z specifications to randomly sample from the full set of possible combinations.
             If None, the full specification space is used.
@@ -1805,7 +1814,8 @@ class OLSRobust(BaseRobust):
         Notes
         -----
         - At least one of draws or kfold must be set to perform model fitting.
-        - If both composite_sample and z_specs_sample_size are set, the combination is applied in that order.
+        - z_specs_sample_size samples the covariate-subset space before fitting.
+        - composite_sample is currently reserved for future outcome-composite sampling.
         - This method may be computationally intensive; parallelisation is recommended via n_cpu.
         """
 
@@ -2775,7 +2785,11 @@ class LRobust(BaseRobust):
                     metric.append(k_cross_entropy)
 
                 elif oos_metric_name == 'imv':
-                    imv = calculate_imv_score(y_true, y_pred)
+                    imv = calculate_imv_score(
+                        y_true,
+                        y_pred,
+                        null_mean=float(np.mean(y.iloc[train])),
+                    )
                     metric.append(imv)
 
                 else:
