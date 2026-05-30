@@ -1548,15 +1548,12 @@ class OLSResult(Protoresult):
             DataFrame containing BMA results with control variable inclusion
             probabilities and average coefficients.
         """
-    if isinstance(self.y_name, list) and len({str(y) for y in self.y_name}) > 1:
-        warnings.warn(
-            "BMA weights are being computed on a result object with multiple "
-            "outcome operationalisations. BIC weights are only likelihood-comparable "
-            "within a common outcome, likelihood family, and estimation sample. "
-            "Interpret these summaries descriptively or compute BMA separately "
-            "within comparable outcome sets.",
-            UserWarning,
-        )
+        if isinstance(self.y_name, list) and len({str(y) for y in self.y_name}) > 1:
+            raise ValueError(
+                "BMA weights are only likelihood-comparable within a common outcome, "
+                "likelihood family, and estimation sample. Compute BMA separately "
+                "within comparable outcome sets."
+            )
         likelihood_per_var = []
         weighted_coefs = []
 
@@ -1583,14 +1580,25 @@ class OLSResult(Protoresult):
             weighted_coefs.append(np.nansum(weighted_coef))
 
         # Normalize to get posterior inclusion probabilities and BMA-weighted coefficients
+        likelihood_per_var = np.asarray(likelihood_per_var, dtype=float)
+        weighted_coefs = np.asarray(weighted_coefs, dtype=float)
+
         probs = likelihood_per_var / sum_likelihoods
         final_coefs = weighted_coefs / sum_likelihoods
 
+        conditional_coefs = np.divide(
+            weighted_coefs,
+            likelihood_per_var,
+            out=np.full_like(weighted_coefs, np.nan, dtype=float),
+            where=likelihood_per_var != 0,
+        )
+
         # Return summary DataFrame
         summary_bma = pd.DataFrame({
-            'control_var': self.controls,
-            'probs': probs,
-            'average_coefs': final_coefs
+            "control_var": self.controls,
+            "probs": probs,
+            "average_coefs": final_coefs,
+            "conditional_average_coefs": conditional_coefs,
         })
 
         return summary_bma
