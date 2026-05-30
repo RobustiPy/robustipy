@@ -30,13 +30,31 @@ X = \{x_{1}, x_{2}, \dots, x_{n}\}
 Z = \{z_{1}, z_{2}, \dots, z_{n}\}
 ```
 
-`RobustiPy` will then:
+`RobustiPy` then constructs an admissible specification space. In the unrestricted case, this space is the Cartesian product of the defensible outcome, functional-form, focal-predictor, and control spaces,
 
-```math
-\Pi = \left\{ \overline{S_i} \mid S_i \in \mathcal{P}(Y) \text{ and } S_i \neq \emptyset \right\} \times X \times \mathcal{P}(Z)
-```
+$$
+\Pi_{\mathrm{prod}}
+=
+\Pi_Y
+\times
+\Pi_F
+\times
+\Pi_X
+\times
+\Pi_Z .
+$$
 
-In words, it creates a set contaning the aritmentic mean of the elements of the powerset $\mathcal{P}$ (all possible combination of any length) of $Y$, the set $X$ and the powerset of $Z$ to then produce the Cartesian product of these sets, creating the full set of possible model specifications $\Pi$. `RobustiPy` then takes these specifications, fits them against observable (tabular) data, and produces coefficients and relevant metrics for each version of the predictor $x$ in the set $X$.
+In practice, not every tuple of choices is necessarily valid. For example, a binary-response estimator is only appropriate for binary outcomes. We therefore treat the analysed specification space as an admissible subset,
+
+$$
+\Pi
+=
+\{(y,f,x,z)\in \Pi_Y\times\Pi_F\times\Pi_X\times\Pi_Z:C(y,f,x,z)=1\}
+\subseteq
+\Pi_{\mathrm{prod}},
+$$
+
+where \(C(y,f,x,z)\) records whether a specification is admissible. `RobustiPy` takes these specifications, fits them to observable tabular data, and produces coefficients, uncertainty summaries, model-selection metrics, out-of-sample metrics, and visualisations for the focal predictor.
 
 A paper which more fully describes RobustiPy and all of its examples can be found [here](https://arxiv.org/abs/2506.19958).
 
