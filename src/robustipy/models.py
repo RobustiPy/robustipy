@@ -1677,11 +1677,14 @@ class OLSRobust(BaseRobust):
 
     Parameters
     ----------
-    y : str or list of str
-        Name(s) of the dependent variable(s). If multiple, runs separate analyses.
-    x : str or list of str
-        Name(s) of the primary predictor(s) of interest.
-    data : pandas.DataFrame
+    y : list[str]
+        Dependent variable column name(s). If multiple dependent variables are
+        supplied, OLSRobust constructs non-empty standardised outcome composites.
+    x : list[str]
+        Predictor column name(s) included in every specification. The first element
+        is treated as the reported focal estimand; any additional elements are fixed
+        predictors that do not vary across the control-subset space.
+        data : pandas.DataFrame
         The full dataset containing `y`, `x`, and any controls.
     model_name : str, default='OLS Robust'
         A custom label for this model run, used in outputs and plots
@@ -1695,8 +1698,8 @@ class OLSRobust(BaseRobust):
     def __init__(
         self,
         *,
-        y: Union[str, List[str]],
-        x: Union[str, List[str]],
+        y: List[str],
+        x: List[str],
         data: pd.DataFrame,
         model_name: str = 'OLS Robust'
     ) -> None:
@@ -2605,15 +2608,17 @@ class OLSRobust(BaseRobust):
 
 class LRobust(BaseRobust):
     """
-    A class to perform logistic regression analysis, underlying lr package = statsmodel
+    A class to perform logistic regression analysis using statsmodels.Logit.
 
     Parameters
     ----------
-    y : str or List[str]
-        Name(s) of the dependent binary variable(s). If multiple,
-        runs separate analyses for each.
-    x : str or List[str]
-        Name(s) of the primary predictor(s) of interest.
+    y : list[str]
+        Name of the dependent binary variable, supplied as a one-element list.
+        Multiple binary outcomes are not currently supported in a single LRobust fit.
+    x : list[str]
+        Predictor column name(s) included in every specification. The first element
+        is treated as the reported focal estimand; any additional elements are fixed
+        predictors that do not vary across the control-subset space.
     data : pandas.DataFrame
         The dataset containing `y`, `x`, and any optional controls.
     model_name : str, default='Logistic Regression Robust'
@@ -2629,8 +2634,8 @@ class LRobust(BaseRobust):
     def __init__(
         self,
         *,
-        y: Union[str, List[str]],
-        x: Union[str, List[str]],
+        y: List[str],
+        x: List[str],
         data: pd.DataFrame,
         model_name: str = 'Logistic Regression Robust'
     ) -> None:
@@ -2652,7 +2657,7 @@ class LRobust(BaseRobust):
 
     def get_results(self) -> Any:
         """
-        Get the results of the OLS regression.
+        Get the results of the logistic regression.
 
         Returns
         -------
