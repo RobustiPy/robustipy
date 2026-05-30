@@ -1535,50 +1535,66 @@ def mcfadden_r2(y_true, y_prob, insample_mean):
     return 1 - (log_l_model / log_l_null)
 
 
-def calculate_imv_score(y_true, y_enhanced):
+def calculate_imv_score(y_true, y_enhanced, null_mean=None):
+    """Calculate the InterModel Vigorish (IMV) score.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Binary validation labels.
+    y_enhanced : array-like
+        Predicted probabilities from the fitted/enhanced model on the validation fold.
+    null_mean : float, optional
+        Constant null-model probability. If provided, this should usually be the
+        training-fold prevalence. If omitted, the validation-fold prevalence is used
+        for backward compatibility.
+
+    Returns
+    -------
+    float
+        Relative improvement of the enhanced model over the null model in IMV space.
     """
-    Calculates the IMV (Information Metric Value) score.
+    y_true = np.asarray(y_true, dtype=float).reshape(-1)
+    y_enhanced = np.asarray(y_enhanced, dtype=float).reshape(-1)
 
-    Parameters:
-    - y_true: array-like of binary true labels (0 or 1)
-    - y_enhanced: array-like of predicted probabilities from an enhanced model
+    if y_true.shape[0] != y_enhanced.shape[0]:
+        raise ValueError("y_true and y_enhanced must have the same length.")
 
-    Returns:
-    - IMV score: relative improvement of enhanced model over the null model
-    """
-    y_true,y_enhanced = np.asarray(y_true),np.asarray(y_enhanced)
+    eps = 1e-15
+    y_enhanced = np.clip(y_enhanced, eps, 1.0 - eps)
 
-    def ll(x, p):
-        # Log-likelihood function for binary outcomes
-        epsilon = 1e-4  # avoid log(0)
-        z = (np.log(p + epsilon) * x) + (np.log(1 - p + epsilon) * (1 - x))
-        return np.exp(np.sum(z) / len(z))
+    if null_mean is None:
+        null_mean = float(np.mean(y_true))
+    null_mean = float(np.clip(null_mean, eps, 1.0 - eps))
+    y_null = np.full_like(y_true, fill_value=null_mean, dtype=float)
 
-    def minimize_me(p, a):
-        # Objective function to minimize
-        return abs((p * np.log(p)) + ((1 - p) * np.log(1 - p)) - np.log(a))
+    def mean_log_score(pred):
+        pred = np.clip(np.asarray(pred, dtype=float), eps, 1.0 - eps)
+        return float(
+            np.mean(
+                y_true * np.log(pred)
+                + (1.0 - y_true) * np.log(1.0 - pred)
+            )
+        )
 
-    def get_w(a, guess=0.5, bounds=[(0.5, 0.999)]):
-        # Find the value of p that minimizes the objective function
-        res = minimize(minimize_me, guess, args=(a,),
-                       options={'ftol': 0, 'gtol': 1e-9},
-                       method='L-BFGS-B', bounds=bounds)
-        return res.x[0]
+    def entropy_score(w):
+        w = np.clip(float(w), eps, 1.0 - eps)
+        return w * np.log(w) + (1.0 - w) * np.log(1.0 - w)
 
-    # Null model: always predict mean(y_true)
-    y_null = np.full_like(y_true, fill_value=np.mean(y_true), dtype=float)
+    def get_w(target_log_score):
+        res = minimize(
+            lambda arr: (entropy_score(arr[0]) - target_log_score) ** 2,
+            x0=np.array([0.5]),
+            method="L-BFGS-B",
+            bounds=[(0.5, 0.999)],
+            options={"ftol": 0, "gtol": 1e-9},
+        )
+        return float(res.x[0])
 
-    # Compute likelihoods
-    ll_null = ll(y_true, y_null)
-    ll_enhanced = ll(y_true, y_enhanced)
+    w_null = get_w(mean_log_score(y_null))
+    w_enhanced = get_w(mean_log_score(y_enhanced))
 
-    # Transform to entropy space via get_w
-    w_null = get_w(ll_null)
-    w_enhanced = get_w(ll_enhanced)
-
-    # Compute IMV
-    imv = (w_enhanced - w_null) / w_null
-    return imv
+    return (w_enhanced - w_null) / w_null
 
 
 def sample_y_masks(
