@@ -1798,8 +1798,9 @@ class OLSRobust(BaseRobust):
         seed : int, optional
             Random seed for reproducibility. Propagated to all random operations.
         composite_sample : int, optional
-            Reserved for future outcome-composite sub-sampling. This argument is currently
-            stored for compatibility but is not yet used by the main OLSRobust.fit workflow.
+            Number of non-empty outcome-composite subsets to sample when multiple dependent
+            variables are supplied. If None, all non-empty outcome subsets are enumerated.
+            Ignored for a single dependent variable.
         z_specs_sample_size : int, optional
             Number of z specifications to randomly sample from the full set of possible combinations.
             If None, the full specification space is used.
