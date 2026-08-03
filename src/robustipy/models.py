@@ -1077,7 +1077,10 @@ class OLSResult(Protoresult):
             if null_meds.size == 0:
                 self.inference['median_p'] = np.nan
             else:
-                self.inference['median_p'] = float(np.mean(np.abs(null_meds) >= abs(obs_med)))
+                self.inference["median_p"] = self._empirical_p_two_sided(
+                    null_meds,
+                    obs_med,
+                )
         else:
             self.inference['median_p'] = np.nan
         
