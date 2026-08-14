@@ -14,9 +14,9 @@ Full documentation is available on [Read the Docs](https://robustipy.readthedocs
 
 More formally, lets assume we have a general model of the form:
 
-$$
+```math
 \hat{y} = \hat{f}(x, \textbf{z}) + \epsilon .
-$$
+```
 
 We are essentially attempting to model (single or multiple) dependent variables ($y$) using some kind of function $f()$, some predictor(s) $x$, some covariates $z$, and random error $\epsilon$. For all of these elements, different estimates of the coefficient of interest are produced. Let's assume $y$, $x$ and $z$ are imperfect latent variables or a collection of latent variables. Researchers can come up with _reasonable_ operationalisations of $y$, $x$ and $z$, running the analysis most usually with one or a small number of combinations of them. Ideally -- in an age of vast computational resources -- we should take all such _reasonable_ operationalisations, and store them in sets:
 
@@ -32,7 +32,7 @@ Z = \{z_{1}, z_{2}, \dots, z_{n}\}
 
 `RobustiPy` then constructs an admissible specification space. In the unrestricted case, this space is the Cartesian product of the defensible outcome, functional-form, focal-predictor, and control spaces,
 
-$$
+```math
 \Pi_{\mathrm{prod}}
 =
 \Pi_Y
@@ -42,19 +42,19 @@ $$
 \Pi_X
 \times
 \Pi_Z .
-$$
+```
 
 In practice, not every tuple of choices is necessarily valid. For example, a binary-response estimator is only appropriate for binary outcomes. We therefore treat the analysed specification space as an admissible subset,
 
-$$
+```math
 \Pi
 =
 \{(y,f,x,z)\in \Pi_Y\times\Pi_F\times\Pi_X\times\Pi_Z:C(y,f,x,z)=1\}
 \subseteq
 \Pi_{\mathrm{prod}},
-$$
+```
 
-where \(C(y,f,x,z)\) records whether a specification is admissible. `RobustiPy` takes these specifications, fits them to observable tabular data, and produces coefficients, uncertainty summaries, model-selection metrics, out-of-sample metrics, and visualisations for the focal predictor.
+where $C(y,f,x,z)$ records whether a specification is admissible. `RobustiPy` takes these specifications, fits them to observable tabular data, and produces coefficients, uncertainty summaries, model-selection metrics, out-of-sample metrics, and visualisations for the focal predictor.
 
 A paper which more fully describes RobustiPy and all of its examples can be found [here](https://arxiv.org/abs/2506.19958).
 
